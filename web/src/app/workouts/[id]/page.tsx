@@ -95,6 +95,13 @@ function getRecordingGuide(slug: string): RecordingGuide {
 
 // ─── Other helpers ────────────────────────────────────────────────────────────
 
+// Left-border accent per protocol — colour-codes the card at a glance
+const PROTOCOL_ACCENTS: Record<string, string> = {
+  max_effort: "border-l-[3px] border-l-red-400",
+  timed_hold: "border-l-[3px] border-l-violet-400",
+  graded:     "border-l-[3px] border-l-amber-400",
+};
+
 const PROTOCOL_LABELS: Record<string, { label: string; cls: string; description: string }> = {
   max_effort: {
     label: "Max effort",
@@ -209,7 +216,7 @@ export default async function WorkoutPage({
             </div>
             <a
               href="/dashboard"
-              className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0 mt-1"
+              className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0 -mr-2 px-2 py-2"
             >
               ← dashboard
             </a>
@@ -257,15 +264,16 @@ export default async function WorkoutPage({
             };
 
             const protocol = ex.tempo ? PROTOCOL_LABELS[ex.tempo] : null;
+            const accent = isAssessment ? (PROTOCOL_ACCENTS[ex.tempo ?? ""] ?? "") : "";
             const guide = getRecordingGuide(ex.exercise_slug);
 
             return (
-              <div key={ex.id} className={`bg-card p-5 ${i !== 0 ? "border-t border-border" : ""}`}>
+              <div key={ex.id} className={`bg-card p-5 ${i !== 0 ? "border-t border-border" : ""} ${accent}`}>
 
                 {/* ── Header row ── */}
                 <div className="flex items-start justify-between gap-3 mb-4">
                   <div className="flex items-baseline gap-3">
-                    <span className="font-mono text-xs text-muted-foreground/40 tabular-nums shrink-0">
+                    <span className="font-mono text-xs text-muted-foreground/60 tabular-nums shrink-0">
                       {isAssessment ? `TEST ${formatIndex(ex.order_index)}` : formatIndex(ex.order_index)}
                     </span>
                     <h2 className="text-base font-semibold text-foreground leading-snug">
@@ -334,44 +342,40 @@ export default async function WorkoutPage({
                   </div>
                 )}
 
-                {/* ── Recording guide (assessment only) ── */}
+                {/* ── Recording setup (assessment only) ── */}
                 {isAssessment && (
                   <div className="border-t border-border pt-4 mt-1">
                     <p className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-2">
-                      Recording guide
+                      Recording setup
                     </p>
-                    <div className="rounded border border-border bg-background p-3">
-                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 text-xs">
-                        <div className="flex gap-2">
-                          <span className="font-mono text-[10px] text-muted-foreground shrink-0 w-20">Angle</span>
-                          <span className="text-foreground">{guide.angle}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className="font-mono text-[10px] text-muted-foreground shrink-0 w-20">Height</span>
-                          <span className="text-foreground">{guide.cameraHeight}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className="font-mono text-[10px] text-muted-foreground shrink-0 w-20">Distance</span>
-                          <span className="text-foreground">{guide.distance}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className="font-mono text-[10px] text-muted-foreground shrink-0 w-20">Takes</span>
-                          <span className="text-foreground">
-                            <span className="inline-flex items-center justify-center font-mono text-[10px] font-semibold w-5 h-5 rounded-full bg-foreground text-background mr-1">
-                              {guide.takes}
-                            </span>
-                            recommended
-                          </span>
+                    <div className="rounded border border-border bg-background overflow-hidden">
+
+                      {/* Takes + angle — primary info row */}
+                      <div className="flex items-center gap-3.5 px-4 py-3">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-foreground font-mono text-xs font-semibold text-background shrink-0">
+                          {guide.takes}×
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground leading-tight">{guide.angle}</p>
+                          <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                            {guide.cameraHeight} · {guide.distance}
+                          </p>
                         </div>
                       </div>
-                      <div className="mt-2 pt-2 border-t border-border">
-                        <span className="font-mono text-[10px] text-muted-foreground">Framing </span>
-                        <span className="text-xs text-foreground">{guide.framing}</span>
+
+                      {/* Framing */}
+                      <div className="border-t border-border px-4 py-3">
+                        <p className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground mb-1">
+                          Framing
+                        </p>
+                        <p className="text-xs text-foreground leading-relaxed">{guide.framing}</p>
                       </div>
-                      <div className="mt-1.5">
-                        <span className="font-mono text-[10px] text-muted-foreground">Tip </span>
-                        <span className="text-xs text-muted-foreground">{guide.tip}</span>
+
+                      {/* Tip — muted background to visually separate */}
+                      <div className="border-t border-border bg-muted/40 px-4 py-3">
+                        <p className="text-xs text-muted-foreground leading-relaxed">{guide.tip}</p>
                       </div>
+
                     </div>
                   </div>
                 )}
@@ -396,21 +400,19 @@ export default async function WorkoutPage({
           )}
         </div>
 
-        {/* ── Actions ────────────────────────────────────────────────────── */}
+        {/* ── Actions (desktop + non-assessment mobile) ───────────────── */}
         {!isCompleted && !isSkipped && (
-          <div className="mt-8 flex items-center justify-end gap-6">
-            {/* No skip for assessment — skip only for regular sessions */}
+          <div className={`mt-8 flex items-center justify-end gap-6 ${isAssessment ? "hidden sm:flex" : "flex"}`}>
             {!isAssessment && (
               <form action={skipAction}>
                 <button
                   type="submit"
-                  className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors py-2 px-1"
                 >
                   skip session
                 </button>
               </form>
             )}
-
             {isAssessment ? (
               <a
                 href={`/workouts/${workout.id}/record`}
@@ -431,6 +433,11 @@ export default async function WorkoutPage({
           </div>
         )}
 
+        {/* ── Spacer so sticky bar doesn't cover last card ─────────────── */}
+        {isAssessment && !isCompleted && !isSkipped && (
+          <div className="h-24 sm:hidden" aria-hidden />
+        )}
+
         {(isCompleted || isSkipped) && (
           <div className="mt-8 flex justify-center">
             <a
@@ -443,6 +450,19 @@ export default async function WorkoutPage({
         )}
 
       </div>
+
+      {/* ── Sticky mobile Record bar ──────────────────────────────────────── */}
+      {isAssessment && !isCompleted && !isSkipped && (
+        <div className="fixed bottom-0 inset-x-0 z-20 border-t border-border bg-background/95 backdrop-blur-sm px-6 py-4 sm:hidden">
+          <a
+            href={`/workouts/${workout.id}/record`}
+            className="flex w-full items-center justify-center gap-2 rounded bg-foreground py-3.5 font-mono text-sm text-background active:opacity-80 transition-opacity"
+          >
+            Record →
+          </a>
+        </div>
+      )}
+
     </main>
   );
 }

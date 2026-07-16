@@ -17,7 +17,7 @@ export default async function SignInPage({
         {/* wordmark */}
         <Link href="/">
           <span style={{ fontFamily: "var(--font-serif)" }} className="text-2xl italic">
-            Vector
+            rvector
           </span>
         </Link>
 
@@ -59,7 +59,7 @@ export default async function SignInPage({
 
         {/* version stamp */}
         <p className="font-mono text-[10px] text-muted-foreground/40 tracking-wider">
-          vector · build 0.1.0 · calisthenics
+          rvector · build 0.1.0 · calisthenics
         </p>
       </div>
 
@@ -77,7 +77,7 @@ export default async function SignInPage({
               href="/"
               className="font-mono text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors tracking-wider"
             >
-              ← vector
+              ← rvector
             </Link>
           </div>
         </div>

@@ -1,5 +1,5 @@
 /**
- * Vector Biomechanics Knowledge Base
+ * rvector Biomechanics Knowledge Base
  *
  * Compiled from:
  *   - NSCA Essentials of Strength Training and Conditioning (4th ed.)

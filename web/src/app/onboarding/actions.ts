@@ -27,6 +27,8 @@ export async function saveProfile(input: ProfileInput): Promise<SaveProfileResul
       display_name: parsed.data.display_name,
       days_per_week: parsed.data.days_per_week,
       session_minutes: parsed.data.session_minutes,
+      experience_level: parsed.data.experience_level,
+      training_style: parsed.data.training_style,
       equipment: parsed.data.equipment,
       current_skills: parsed.data.current_skills,
       goal_skills: parsed.data.goal_skills,

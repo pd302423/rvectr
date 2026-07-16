@@ -21,8 +21,8 @@ const BLOCK_LABELS: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  completed: "border-emerald-300 bg-emerald-50 text-emerald-700",
-  in_progress: "border-amber-200 bg-amber-50 text-amber-700",
+  completed: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  in_progress: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
   pending: "border-border text-muted-foreground",
   skipped: "border-border text-muted-foreground/50",
 };
@@ -95,11 +95,11 @@ export default async function DashboardPage({
                 {profile.days_per_week}d/wk · {profile.session_minutes}min
               </span>
               {hasAssessment ? (
-                <span className="text-xs border border-emerald-200 bg-emerald-50 text-emerald-700 rounded px-2 py-0.5">
+                <span className="text-xs border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded px-2 py-0.5">
                   ✓ assessment complete
                 </span>
               ) : (
-                <span className="text-xs border border-sky-200 bg-sky-50 text-sky-700 rounded px-2 py-0.5">
+                <span className="text-xs border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300 rounded px-2 py-0.5">
                   baseline · pending assessment
                 </span>
               )}
@@ -108,7 +108,7 @@ export default async function DashboardPage({
           <form action="/auth/signout" method="POST">
             <button
               type="submit"
-              className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+              className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors -mr-2 px-2 py-2"
             >
               sign out
             </button>
@@ -125,19 +125,19 @@ export default async function DashboardPage({
         )}
 
         {/* ── Assessment CTA ───────────────────────────────────────────────── */}
-        <div className={`mb-8 rounded border p-6 ${hasAssessment ? "border-border bg-card" : "border-sky-200 bg-sky-50"}`}>
+        <div className={`mb-8 rounded border p-6 ${hasAssessment ? "border-border bg-card" : "border-sky-500/30 bg-sky-500/10"}`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
                 {hasAssessment ? "Reassessment" : "Step 1 — baseline assessment"}
               </p>
-              <p className={`font-medium ${hasAssessment ? "text-foreground" : "text-sky-900"}`}>
+              <p className={`font-medium ${hasAssessment ? "text-foreground" : "text-sky-900 dark:text-sky-100"}`}>
                 {hasAssessment ? "Run another strength assessment" : "Begin your strength assessment"}
               </p>
-              <p className={`mt-1 text-xs ${hasAssessment ? "text-muted-foreground" : "text-sky-800"}`}>
+              <p className={`mt-1 text-xs ${hasAssessment ? "text-muted-foreground" : "text-sky-800 dark:text-sky-200/70"}`}>
                 {hasAssessment
-                  ? "Vector will generate a fresh diagnostic test based on your current profile."
-                  : "Vector will generate a personalised test battery to measure your actual baseline. Takes ~30 minutes with full rest between tests."}
+                  ? "rvector will generate a fresh diagnostic test based on your current profile."
+                  : "rvector will generate a personalised test battery to measure your actual baseline. Takes ~30 minutes with full rest between tests."}
               </p>
             </div>
             <form action={generateSession} className="shrink-0">
@@ -211,7 +211,7 @@ export default async function DashboardPage({
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                No baseline skills recorded. Vector will programme foundations.
+                No baseline skills recorded. rvector will programme foundations.
               </p>
             )}
           </div>

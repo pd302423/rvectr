@@ -64,7 +64,7 @@ export default async function RecordPage({
             </div>
             <a
               href={`/workouts/${id}`}
-              className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0 mt-1"
+              className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors shrink-0 -mr-2 px-2 py-2"
             >
               ← tests
             </a>

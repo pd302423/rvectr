@@ -43,6 +43,8 @@ export type AthleteProfile = {
   display_name: string;
   days_per_week: number;
   session_minutes: number;
+  experience_level?: string;
+  training_style?: string;
   equipment: string[];
   current_skills: string[];
   goal_skills: string[];
@@ -180,7 +182,7 @@ async function generateWithClaude(
 // ─── Assessment prompts ───────────────────────────────────────────────────────
 
 function buildAssessmentSystemPrompt(): string {
-  return `You are Vector's assessment engine — a biomechanical strength testing system grounded in Low (2016) "Overcoming Gravity" 2nd ed. and NSCA CSCS 4th ed. principles.
+  return `You are rvector's assessment engine — a biomechanical strength testing system grounded in Low (2016) "Overcoming Gravity" 2nd ed. and NSCA CSCS 4th ed. principles.
 
 Your role is to generate a comprehensive, personalised strength test battery (5–8 tests) that determines the athlete's ACTUAL capability independent of self-report. All tests will be recorded on video and graded by a computer vision classifier — your form criteria must be precise enough for a camera to evaluate.
 
@@ -217,14 +219,14 @@ Each progression_context must include ALL of:
    "X+ reps / Xs hold → [next skill] (OG Level Y)"
    "X–Y reps → maintain current level"
    "< X reps → regress to [easier variation]"
-2. What the score tells Vector about readiness for each of the athlete's specific goal skills
+2. What the score tells rvector about readiness for each of the athlete's specific goal skills
 3. Why this threshold matters physiologically (e.g., "tendon-to-muscle force ratio", "neuromuscular recruitment pattern")
 
 ═══ AI RATIONALE ═══
 Write 2–3 paragraphs covering:
   Paragraph 1: Which movement patterns are being tested and why they reveal the athlete's true capacity
   Paragraph 2: How each specific test maps to the athlete's named goal skills
-  Paragraph 3: What Vector will do with the results — how it drives programming
+  Paragraph 3: What rvector will do with the results — how it drives programming
 
 Return ONLY valid JSON — no prose outside the JSON block:
 \`\`\`json
@@ -263,9 +265,11 @@ function buildAssessmentUserPrompt(profile: AthleteProfile): string {
 ATHLETE PROFILE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Name: ${profile.display_name}
+Experience level: ${profile.experience_level ?? "Not sure"}
+Primary focus: ${profile.training_style ?? "Not sure"}
 Available equipment: ${profile.equipment.join(", ") || "bodyweight only — no bar"}
 Self-reported current skills: ${profile.current_skills.join(", ") || "none listed"}
-Goal skills: ${profile.goal_skills.join(", ")}
+Goal skills: ${profile.goal_skills.join(", ") || "none listed"}
 Injuries / contraindications: ${profile.injuries ?? "none reported"}
 Training frequency: ${profile.days_per_week} days/week
 Session duration: ${profile.session_minutes} minutes
@@ -288,7 +292,7 @@ IMPORTANT: Write biomechanical notes that a computer vision model can USE to gra
 // ─── Workout prompts (future use, post-CV) ────────────────────────────────────
 
 function buildWorkoutSystemPrompt(): string {
-  return `You are Vector's AI coach — a biomechanical precision coaching system for calisthenics athletes.
+  return `You are rvector's AI coach — a biomechanical precision coaching system for calisthenics athletes.
 
 Your programming is grounded in Steven Low's "Overcoming Gravity" (2nd ed., 2016) and NSCA CSCS principles.
 
@@ -330,17 +334,19 @@ Schema:
 
 function buildWorkoutUserPrompt(profile: AthleteProfile, focus: SessionFocus): string {
   const prerequisites = profile.goal_skills.flatMap((slug) =>
-    (HARD_PREREQUISITES[slug] ?? []).join(", ")
+    HARD_PREREQUISITES[slug] ?? []
   );
 
   return `Generate a ${focus} session for this athlete:
 
 Name: ${profile.display_name}
+Experience level: ${profile.experience_level ?? "Not sure"}
+Primary focus: ${profile.training_style ?? "Not sure"}
 Training days/week: ${profile.days_per_week}
 Session length: ${profile.session_minutes} minutes
 Equipment: ${profile.equipment.join(", ")}
 Current skills: ${profile.current_skills.join(", ")}
-Goal skills: ${profile.goal_skills.join(", ")}
+Goal skills: ${profile.goal_skills.join(", ") || "none listed"}
 Injuries/contraindications: ${profile.injuries ?? "none"}
 Total sessions completed: ${profile.total_workouts_completed ?? 0}
 
@@ -472,7 +478,7 @@ function generateMockAssessment(profile: AthleteProfile): GeneratedWorkout {
       `This assessment battery is designed to verify ${profile.display_name}'s self-reported baseline and identify the biomechanical gaps between current capability and ${goalLabel}. ` +
       `Each test will be graded by computer vision for strict form — only clean repetitions count. ` +
       `Rest fully (5 minutes minimum) between tests. Fatigue between tests invalidates results. ` +
-      `Results from this session will drive Vector's periodisation engine and determine your starting block.`,
+      `Results from this session will drive rvector's periodisation engine and determine your starting block.`,
     exercises,
   };
 }

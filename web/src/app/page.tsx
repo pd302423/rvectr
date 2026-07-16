@@ -24,7 +24,7 @@ export default async function Home() {
       <nav className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-4">
           <span style={{ fontFamily: "var(--font-serif)" }} className="text-lg italic tracking-tight">
-            Vector
+            rvector
           </span>
           <div className="flex items-center gap-8">
             <a href="#methodology" className="hidden sm:block text-xs text-muted-foreground hover:text-foreground transition-colors tracking-wide">
@@ -71,14 +71,14 @@ export default async function Home() {
             <div className="lg:col-span-4 lg:pt-32">
               <div className="space-y-8">
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Vector measures every joint angle of every rep. When it detects struggle,
+                  rvector measures every joint angle of every rep. When it detects struggle,
                   form degradation, or readiness for progression, it adapts your training
                   in real time.
                 </p>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   Programming follows <em className="italic">Overcoming Gravity</em> (Low, 2016),
                   NSCA periodisation standards, and peer-reviewed sports biomechanics literature.
-                  Vector cites its sources.
+                  rvector cites its sources.
                 </p>
                 <div className="pt-4">
                   <Link
@@ -109,7 +109,7 @@ export default async function Home() {
                 style={{ fontFamily: "var(--font-serif)" }}
                 className="text-4xl leading-tight tracking-tight"
               >
-                Anatomy of a Vector session.
+                Anatomy of a rvector session.
               </h2>
             </div>
             <p className="text-xs text-muted-foreground sm:text-right max-w-xs">
@@ -142,14 +142,14 @@ export default async function Home() {
 
           <div className="space-y-8 text-base leading-[1.75] text-foreground/85 max-w-prose">
             <p>
-              Most fitness applications produce scores. Vector produces diagnoses.
+              Most fitness applications produce scores. rvector produces diagnoses.
               The distinction is consequential. A score is an opinion compressed into a number;
               a diagnosis is a measurement paired with a clinical interpretation, citable
               to the literature it derives from.
             </p>
 
             <p>
-              When you perform a pull-up in front of your camera, Vector extracts
+              When you perform a pull-up in front of your camera, rvector extracts
               thirty-three skeletal landmarks at thirty frames per second using Google&apos;s
               MediaPipe pose estimation. From these, the system computes joint angles —
               elbow flexion, scapular position, glenohumeral elevation, lumbar curvature —
@@ -163,14 +163,14 @@ export default async function Home() {
               Rep counting is the trivial part. The substantive output is the{" "}
               <span className="text-foreground">struggle profile</span>:
               the velocity at which each rep was completed, the form deviation observed
-              across the set, the inter-rep rest pattern. From this profile Vector
+              across the set, the inter-rep rest pattern. From this profile rvector
               estimates the&nbsp;<em>effective</em> rep count, distinct from the counted
               rep count, and uses the difference to inform the next session.
             </p>
 
             <PullQuote
-              text="A movement performed at sixty percent of fresh velocity is not the same movement. Vector treats it as a different data point."
-              source="Vector technical documentation, § 4.2"
+              text="A movement performed at sixty percent of fresh velocity is not the same movement. rvector treats it as a different data point."
+              source="rvector technical documentation, § 4.2"
             />
 
             <p>
@@ -178,7 +178,7 @@ export default async function Home() {
               in Steven Low&apos;s <em>Overcoming Gravity</em> (2nd ed., 2016): block
               periodisation with intra-week intensity oscillation, push-pull-core volume
               balance, prerequisite gating between skill progressions, and explicit
-              connective-tissue adaptation windows. Vector will not advance an athlete
+              connective-tissue adaptation windows. rvector will not advance an athlete
               to the next progression purely on the basis of acute strength; tendon
               adaptation timelines (typically eight to twelve weeks per progression) are
               enforced.
@@ -221,7 +221,7 @@ export default async function Home() {
                 style={{ fontFamily: "var(--font-serif)" }}
                 className="text-4xl leading-tight tracking-tight"
               >
-                Every metric Vector observes.
+                Every metric rvector observes.
               </h2>
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-xs">
                 Continuous measurement across the kinematic, performance, and
@@ -247,7 +247,7 @@ export default async function Home() {
             Begin your initial assessment.
           </h2>
           <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-md mx-auto">
-            Vector requires a baseline athlete profile before it can generate programming.
+            rvector requires a baseline athlete profile before it can generate programming.
             Setup takes approximately two minutes.
           </p>
           <div className="mt-10">
@@ -268,7 +268,7 @@ export default async function Home() {
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
             <div>
               <p style={{ fontFamily: "var(--font-serif)" }} className="text-lg italic">
-                Vector
+                rvector
               </p>
               <p className="mt-2 font-mono text-[11px] text-muted-foreground">
                 v0.1.0 · calisthenics build

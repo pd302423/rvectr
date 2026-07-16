@@ -1,9 +1,9 @@
 /**
  * Overcoming Gravity 2nd Edition — Steven Low (2016)
- * Encoded programming framework used by Vector's AI coach.
+ * Encoded programming framework used by rvector's AI coach.
  *
  * Difficulty scale: 1–15 (Low's original)
- * Vector maps this to 5 display dots in onboarding (1–3→1, 4–6→2, 7–9→3, 10–12→4, 13–15→5)
+ * rvector maps this to 5 display dots in onboarding (1–3→1, 4–6→2, 7–9→3, 10–12→4, 13–15→5)
  */
 
 // ─── DIFFICULTY RATINGS (Low 1–15 scale) ──────────────────────────────────
@@ -265,7 +265,7 @@ export const TENDON_RISK_MOVEMENTS = [
 // ─── PREREQUISITE GATING ────────────────────────────────────────────────────
 
 /**
- * Hard prerequisites — Vector will NOT program a skill until prerequisites
+ * Hard prerequisites — rvector will NOT program a skill until prerequisites
  * are confirmed. Prevents common injury patterns described by Low.
  */
 export const HARD_PREREQUISITES: Record<string, string[]> = {
@@ -314,7 +314,7 @@ export const HARD_PREREQUISITES: Record<string, string[]> = {
 
 /**
  * Low uses a 4-phase block system within each 8–12 week mesocycle.
- * Vector adapts this for individual skill progression tracking.
+ * rvector adapts this for individual skill progression tracking.
  */
 export const PERIODISATION_BLOCKS = [
   {

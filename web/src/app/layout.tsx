@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -21,9 +23,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Vector — Biomechanical precision for calisthenics",
+  title: "rvector — Biomechanical precision for calisthenics",
   description:
-    "Vector analyses joint angles, force vectors, and movement patterns to generate precise, science-grounded calisthenics programming.",
+    "rvector analyses joint angles, force vectors, and movement patterns to generate precise, science-grounded calisthenics programming.",
 };
 
 export default function RootLayout({
@@ -37,9 +39,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        {children}
-        <Toaster position="top-right" theme="light" />
+      <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-300">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {children}
+          <div className="fixed bottom-6 right-6 z-50">
+            <ThemeToggle />
+          </div>
+          <Toaster position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

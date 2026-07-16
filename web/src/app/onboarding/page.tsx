@@ -31,7 +31,7 @@ export default async function OnboardingPage() {
             Athlete profile.
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground max-w-lg">
-            Vector requires this data to generate biomechanically accurate programming.
+            rvector requires this data to generate biomechanically accurate programming.
             All fields inform the periodisation model — be precise.
           </p>
         </header>

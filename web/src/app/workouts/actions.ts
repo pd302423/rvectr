@@ -39,6 +39,8 @@ export async function generateSession() {
     equipment: profile.equipment ?? [],
     current_skills: profile.current_skills ?? [],
     goal_skills: profile.goal_skills ?? [],
+    experience_level: profile.experience_level ?? "Not sure",
+    training_style: profile.training_style ?? "Not sure",
     injuries: profile.injuries ?? null,
     total_workouts_completed: totalWorkouts,
   };
@@ -89,12 +91,16 @@ export async function generateSession() {
 
 // ─── Mark a workout complete ─────────────────────────────────────────────────
 
-export async function completeWorkout(workoutId: string) {
+export async function completeWorkout(
+  workoutId: string,
+  videoPathsOrFormData: Record<string, string> | FormData = {},
+) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/signin");
 
-  await supabase
+  // Update workout status
+  const { error: wErr } = await supabase
     .from("workouts")
     .update({
       status: "completed",
@@ -102,6 +108,23 @@ export async function completeWorkout(workoutId: string) {
     })
     .eq("id", workoutId)
     .eq("user_id", user.id);
+
+  if (wErr) {
+    throw new Error(`Failed to complete workout: ${wErr.message}`);
+  }
+
+  // Update each exercise with its corresponding video_path (if not called from HTML form action)
+  if (!(videoPathsOrFormData instanceof FormData)) {
+    for (const [exerciseId, path] of Object.entries(videoPathsOrFormData)) {
+      if (path) {
+        await supabase
+          .from("workout_exercises")
+          .update({ video_path: path })
+          .eq("id", exerciseId)
+          .eq("workout_id", workoutId);
+      }
+    }
+  }
 
   redirect("/dashboard");
 }

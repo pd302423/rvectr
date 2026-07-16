@@ -74,7 +74,7 @@ export function AuthForm({
         style={{ fontFamily: "var(--font-serif)" }}
         className="text-4xl leading-tight tracking-tight"
       >
-        {mode === "signin" ? "Sign in to Vector." : "Create your account."}
+        {mode === "signin" ? "Sign in to rvector." : "Create your account."}
       </h1>
 
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -176,7 +176,7 @@ export function AuthForm({
 
           <p className="text-[11px] text-muted-foreground/50 leading-relaxed">
             Your data is private and used only to inform your biomechanical
-            coaching profile. Vector does not sell or share athlete data.
+            coaching profile. rvector does not sell or share athlete data.
           </p>
         </form>
       )}
