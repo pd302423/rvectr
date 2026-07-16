@@ -95,7 +95,7 @@ export default async function RecordPage({
         </div>
 
         {/* ── Per-exercise upload (client component) ─────────────────────── */}
-        <RecordSubmit exercises={rows} submitAction={submitAction} />
+        <RecordSubmit workoutId={id} exercises={rows} submitAction={submitAction} />
 
       </div>
     </main>

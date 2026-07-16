@@ -81,9 +81,11 @@ function uploadFileWithXhr(
 }
 
 export function RecordSubmit({
+  workoutId,
   exercises,
   submitAction,
 }: {
+  workoutId: string;
   exercises: { id: string; slug: string; name: string; order_index: number }[];
   submitAction: (formData: Record<string, number>) => Promise<void>;
 }) {
@@ -153,7 +155,7 @@ export function RecordSubmit({
                 )}
               </div>
 
-              <div className="w-full">
+              <div className="w-full flex gap-3">
                 <input
                   type="number"
                   min="0"
@@ -161,8 +163,18 @@ export function RecordSubmit({
                   value={val}
                   onChange={(e) => handleRepChange(ex.id, e.target.value)}
                   placeholder="e.g. 12"
-                  className="w-full bg-background border border-border rounded-lg px-4 py-3 font-mono text-lg focus:outline-none focus:ring-1 focus:ring-foreground transition-all disabled:opacity-50"
+                  className="flex-1 bg-background border border-border rounded-lg px-4 py-3 font-mono text-lg focus:outline-none focus:ring-1 focus:ring-foreground transition-all disabled:opacity-50"
                 />
+                <a
+                  href={`/workouts/${workoutId}/camera`}
+                  className="flex-shrink-0 flex items-center justify-center bg-foreground text-background rounded-lg px-4 hover:opacity-90 transition-opacity"
+                  title="Record via AI Camera (Optional)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-camera">
+                    <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
+                    <circle cx="12" cy="13" r="3"/>
+                  </svg>
+                </a>
               </div>
 
             </div>

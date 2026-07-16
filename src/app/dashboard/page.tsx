@@ -114,6 +114,29 @@ export default async function DashboardPage({
             </form>
           </div>
 
+          <div className="flex items-center justify-between bg-card border border-border rounded-2xl p-4 shadow-sm mb-2">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest">Current Streak</span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-2xl font-bold font-mono text-orange-500">🔥 3</span>
+                <span className="text-sm font-medium text-muted-foreground">Days</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, idx) => {
+                const isToday = idx === new Date().getDay() - 1 || (idx === 6 && new Date().getDay() === 0);
+                const isCompleted = idx < 3; // Mocking past days as completed
+                return (
+                  <div key={idx} className={`w-8 h-10 flex flex-col items-center justify-center rounded-lg border ${isToday ? 'bg-foreground text-background border-foreground' : isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600' : 'bg-background border-border text-muted-foreground'}`}>
+                    <span className="text-[10px] font-mono font-bold">{day}</span>
+                    {isCompleted && !isToday && <span className="text-[8px] mt-1">✓</span>}
+                    {isToday && <span className="w-1 h-1 bg-background rounded-full mt-1"></span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div className="flex flex-col items-center justify-center bg-card border border-border rounded-2xl p-4 shadow-sm">
               <Zap className="w-5 h-5 text-amber-500 mb-2" />
