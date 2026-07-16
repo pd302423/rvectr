@@ -130,15 +130,22 @@ export async function completeWorkout(
     throw new Error(`Failed to complete workout: ${wErr.message}`);
   }
 
-  // Update each exercise with its corresponding video_path (if not called from HTML form action)
+  // Update each exercise with its corresponding manual reps
   if (!(videoPathsOrFormData instanceof FormData)) {
-    for (const [exerciseId, path] of Object.entries(videoPathsOrFormData)) {
-      if (path) {
+    const manualReps = videoPathsOrFormData as Record<string, number>;
+    
+    // Insert into logged_sets
+    for (const [exerciseId, reps] of Object.entries(manualReps)) {
+      if (typeof reps === 'number') {
         await supabase
-          .from("workout_exercises")
-          .update({ video_path: path })
-          .eq("id", exerciseId)
-          .eq("workout_id", workoutId);
+          .from("logged_sets")
+          .insert({
+            workout_exercise_id: exerciseId,
+            user_id: user.id,
+            set_number: 1,
+            reps_completed: reps,
+            rpe_reported: 10, // Assuming max effort for assessment
+          });
       }
     }
   }

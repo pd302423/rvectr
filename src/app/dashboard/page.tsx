@@ -148,22 +148,69 @@ export default async function DashboardPage({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                {hasAssessment ? "Reassessment" : "Step 1 — baseline assessment"}
+                {hasAssessment ? "Next session ready" : "Step 1 — baseline assessment"}
               </p>
               <p className={`font-medium ${hasAssessment ? "text-foreground" : "text-sky-900 dark:text-sky-100"}`}>
-                {hasAssessment ? "Run another strength assessment" : "Begin your strength assessment"}
+                {hasAssessment ? "Generate tomorrow's workout" : "Begin your strength assessment"}
               </p>
               <p className={`mt-1 text-xs ${hasAssessment ? "text-muted-foreground" : "text-sky-800 dark:text-sky-200/70"}`}>
                 {hasAssessment
-                  ? "rvector will generate a fresh diagnostic test based on your current profile."
-                  : "rvector will generate a personalised test battery to measure your actual baseline. Takes ~30 minutes with full rest between tests."}
+                  ? "rvector AI will auto-regulate volume based on your recent performance."
+                  : "rvector will generate a personalised test battery to measure your actual baseline."}
               </p>
             </div>
             <form action={generateSession} className="shrink-0">
-              <GenerateButton focusLabel={hasAssessment ? "Reassessment" : "Assessment"} />
+              <GenerateButton focusLabel={hasAssessment ? "Generate Workout" : "Assessment"} />
             </form>
           </div>
         </div>
+
+        {/* ── Training Roadmap ─────────────────────────────────────────────── */}
+        {hasAssessment && (
+          <div className="mb-10 relative">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-4 px-1">
+              Training Block Roadmap
+            </p>
+            <div className="relative py-4 px-2">
+              <div className="absolute top-0 bottom-0 left-[27px] w-0.5 bg-border -z-10"></div>
+              
+              <div className="flex items-start gap-4 mb-8">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 text-background flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background shadow-sm">✓</div>
+                <div className="bg-card border border-border rounded-xl p-4 flex-1 shadow-sm opacity-60">
+                  <h3 className="font-semibold text-sm">Baseline Assessment</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Calibrated max capacities and kinematic profile.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 mb-8">
+                <div className="w-10 h-10 rounded-full bg-sky-500 text-background flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background shadow-md shadow-sky-500/20">W1</div>
+                <div className="bg-card border-2 border-sky-500/30 rounded-xl p-4 flex-1 shadow-md">
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-semibold text-sm">Accumulation Phase</h3>
+                    <span className="text-[10px] uppercase tracking-widest text-sky-500 font-bold font-mono">Current</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Building tissue tolerance and mastering movement patterns at sub-maximal loads.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 mb-8 opacity-50 grayscale">
+                <div className="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background">W2</div>
+                <div className="bg-card border border-border rounded-xl p-4 flex-1 shadow-sm">
+                  <h3 className="font-semibold text-sm">Intensification Phase</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Increasing load and approaching mechanical failure on key lifts.</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 opacity-50 grayscale">
+                <div className="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background">W3</div>
+                <div className="bg-card border border-border rounded-xl p-4 flex-1 shadow-sm">
+                  <h3 className="font-semibold text-sm">Realisation (Peak)</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Testing new maxes and demonstrating acquired strength.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Recent workouts ──────────────────────────────────────────────── */}
         {recentWorkouts.length > 0 && (
