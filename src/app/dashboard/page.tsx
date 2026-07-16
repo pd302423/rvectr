@@ -74,6 +74,43 @@ export default async function DashboardPage({
     .limit(5);
   const recentWorkouts = workoutsResult.data ?? [];
 
+  // Calculate streak from completed workouts
+  const completedWorkoutsResult = await supabase
+    .from("workouts")
+    .select("completed_at")
+    .eq("user_id", user.id)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false });
+    
+  const completedDates = (completedWorkoutsResult.data ?? [])
+    .map(w => w.completed_at ? new Date(w.completed_at).toDateString() : null)
+    .filter(Boolean) as string[];
+    
+  // Unique dates only
+  const uniqueDates = [...new Set(completedDates)];
+  
+  let currentStreak = 0;
+  const todayStr = new Date().toDateString();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toDateString();
+
+  if (uniqueDates.length > 0) {
+    if (uniqueDates[0] === todayStr || uniqueDates[0] === yesterdayStr) {
+      currentStreak = 1;
+      let checkDate = new Date(uniqueDates[0]);
+      
+      for (let i = 1; i < uniqueDates.length; i++) {
+        checkDate.setDate(checkDate.getDate() - 1);
+        if (uniqueDates[i] === checkDate.toDateString()) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
   const xp = profile.xp ?? 0;
   const credits = profile.credits ?? 100;
   const league = profile.league ?? 'Bronze';
@@ -118,18 +155,26 @@ export default async function DashboardPage({
             <div className="flex flex-col">
               <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest">Current Streak</span>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xl font-bold font-mono text-orange-500">🔥 3</span>
-                <span className="text-sm font-medium text-muted-foreground">Days</span>
+                <span className={`text-2xl font-bold font-mono ${currentStreak > 0 ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                  {currentStreak > 0 ? '🔥' : '❄️'} {currentStreak}
+                </span>
+                <span className="text-sm font-medium text-muted-foreground">Day{currentStreak !== 1 ? 's' : ''}</span>
               </div>
             </div>
             <div className="flex gap-2">
               {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, idx) => {
-                const isToday = idx === new Date().getDay() - 1 || (idx === 6 && new Date().getDay() === 0);
-                const isCompleted = idx < 3; // Mocking past days as completed
+                const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+                const isToday = idx === todayIdx;
+                
+                // For past days this week, check if we had a workout
+                const d = new Date();
+                d.setDate(d.getDate() - (todayIdx - idx));
+                const isCompleted = uniqueDates.includes(d.toDateString());
+                
                 return (
-                  <div key={idx} className={`w-8 h-10 flex flex-col items-center justify-center rounded-lg border ${isToday ? 'bg-foreground text-background border-foreground' : isCompleted ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600' : 'bg-background border-border text-muted-foreground'}`}>
+                  <div key={idx} className={`w-8 h-10 flex flex-col items-center justify-center rounded-lg border ${isToday ? 'bg-foreground text-background border-foreground' : isCompleted ? 'bg-orange-500/10 border-orange-500/30 text-orange-600' : 'bg-background border-border text-muted-foreground/30'}`}>
                     <span className="text-[10px] font-mono font-bold">{day}</span>
-                    {isCompleted && !isToday && <span className="text-[8px] mt-1">✓</span>}
+                    {isCompleted && !isToday && <span className="text-[8px] mt-1">🔥</span>}
                     {isToday && <span className="w-1 h-1 bg-background rounded-full mt-1"></span>}
                   </div>
                 );
