@@ -34,35 +34,66 @@ export default async function ProfilePage() {
 
         <section className="mb-10">
           <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-4">
-            Recent Muscular Fatigue
+            Muscular Fatigue Profile
           </h2>
-          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center">
-            {/* Minimalist SVG Muscle Map */}
-            <div className="relative w-48 h-64 border border-border/50 rounded-xl bg-muted/20 flex flex-col items-center justify-center overflow-hidden mb-6">
-              <span className="font-mono text-xs text-muted-foreground absolute top-4 left-4">ANTERIOR</span>
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+            <div className="space-y-5">
               
-              {/* Abstract Torso Map */}
-              <div className="w-16 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/50 mb-1 flex items-center justify-center">
-                <span className="text-[8px] font-mono font-bold text-emerald-700">CHEST (FRESH)</span>
-              </div>
-              <div className="flex gap-1 mb-1">
-                <div className="w-6 h-12 rounded-full bg-rose-500/20 border border-rose-500/50 flex items-center justify-center">
-                   <span className="text-[8px] font-mono font-bold text-rose-700 -rotate-90">BICEP</span>
+              {/* Muscle Group: Chest */}
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold tracking-tight">Pectoralis Major</span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-600">Fresh (0%)</span>
                 </div>
-                <div className="w-12 h-16 rounded-md bg-sky-500/20 border border-sky-500/50 flex items-center justify-center">
-                   <span className="text-[8px] font-mono font-bold text-sky-700">CORE (RECOVERING)</span>
-                </div>
-                <div className="w-6 h-12 rounded-full bg-rose-500/20 border border-rose-500/50 flex items-center justify-center">
-                   <span className="text-[8px] font-mono font-bold text-rose-700 -rotate-90">BICEP</span>
+                <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: "5%" }}></div>
                 </div>
               </div>
-              
-            </div>
-            
-            <div className="flex gap-4 text-xs font-mono w-full justify-center">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-500/50"></div>Fresh</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-sky-500/50"></div>Recovering</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-rose-500/50"></div>Fatigued</div>
+
+              {/* Muscle Group: Lats */}
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold tracking-tight">Latissimus Dorsi</span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-rose-600">Fatigued (85%)</span>
+                </div>
+                <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: "85%" }}></div>
+                </div>
+              </div>
+
+              {/* Muscle Group: Biceps */}
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold tracking-tight">Biceps Brachii</span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-sky-600">Recovering (40%)</span>
+                </div>
+                <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-sky-500 h-1.5 rounded-full" style={{ width: "40%" }}></div>
+                </div>
+              </div>
+
+              {/* Muscle Group: Triceps */}
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold tracking-tight">Triceps Brachii</span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-emerald-600">Fresh (10%)</span>
+                </div>
+                <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: "10%" }}></div>
+                </div>
+              </div>
+
+              {/* Muscle Group: Core */}
+              <div>
+                <div className="flex justify-between items-end mb-2">
+                  <span className="text-sm font-semibold tracking-tight">Abdominals</span>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-rose-600">Fatigued (95%)</span>
+                </div>
+                <div className="w-full bg-muted/30 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-rose-500 h-1.5 rounded-full" style={{ width: "95%" }}></div>
+                </div>
+              </div>
+
             </div>
           </div>
         </section>
