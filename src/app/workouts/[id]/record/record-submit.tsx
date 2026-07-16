@@ -76,9 +76,10 @@ function uploadFileWithXhr(
     xhr.onerror = () => {
       reject(new Error("Network connection error occurred during upload."));
     };
-    
     xhr.send(file);
   });
+}
+
 export function RecordSubmit({
   exercises,
   submitAction,
@@ -129,7 +130,7 @@ export function RecordSubmit({
       <div className="space-y-px border border-border rounded overflow-hidden mb-8">
         {exercises.map((ex, i) => {
           const val = reps[ex.id] ?? "";
-          const isDone = val !== "";
+          const isDone = reps[ex.id] !== undefined;
 
           return (
             <div key={ex.id} className={`bg-card p-5 ${i !== 0 ? "border-t border-border" : ""}`}>

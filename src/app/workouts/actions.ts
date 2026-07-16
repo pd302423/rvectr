@@ -110,7 +110,7 @@ export async function generateSession() {
 
 export async function completeWorkout(
   workoutId: string,
-  videoPathsOrFormData: Record<string, string> | FormData = {},
+  videoPathsOrFormData: Record<string, string | number> | FormData = {},
 ) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -130,22 +130,28 @@ export async function completeWorkout(
     throw new Error(`Failed to complete workout: ${wErr.message}`);
   }
 
-  // Update each exercise with its corresponding manual reps
+  // Update each exercise with its corresponding manual reps or video paths
   if (!(videoPathsOrFormData instanceof FormData)) {
-    const manualReps = videoPathsOrFormData as Record<string, number>;
+    const data = videoPathsOrFormData as Record<string, string | number>;
     
     // Insert into logged_sets
-    for (const [exerciseId, reps] of Object.entries(manualReps)) {
-      if (typeof reps === 'number') {
+    for (const [exerciseId, val] of Object.entries(data)) {
+      if (typeof val === 'number') {
         await supabase
           .from("logged_sets")
           .insert({
             workout_exercise_id: exerciseId,
             user_id: user.id,
             set_number: 1,
-            reps_completed: reps,
+            reps_completed: val,
             rpe_reported: 10, // Assuming max effort for assessment
           });
+      } else if (typeof val === 'string' && val.length > 0) {
+        await supabase
+          .from("workout_exercises")
+          .update({ video_path: val })
+          .eq("id", exerciseId)
+          .eq("workout_id", workoutId);
       }
     }
   }
