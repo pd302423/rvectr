@@ -45,8 +45,25 @@ export async function generateSession() {
     total_workouts_completed: totalWorkouts,
   };
 
+  // 1. Check generation limit to prevent abuse (Hard cap of 100 generations per user ~ $0.05 max spend on cheap models)
+  const { data: usageCheck } = await supabase
+    .from("profiles")
+    .select("generation_count")
+    .eq("id", user.id)
+    .single();
+
+  if (usageCheck && usageCheck.generation_count >= 100) {
+    throw new Error("You have reached the maximum AI generation limit for your account.");
+  }
+
   // Generate (uses Claude when ANTHROPIC_API_KEY is set; mock otherwise)
   const generated = await generateWorkout(athleteProfile, focus);
+
+  // Increment generation count
+  await supabase
+    .from("profiles")
+    .update({ generation_count: (usageCheck?.generation_count || 0) + 1 })
+    .eq("id", user.id);
 
   // Persist workout row
   const { data: workout, error: wErr } = await supabase

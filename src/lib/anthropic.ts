@@ -82,7 +82,7 @@ export async function generateWorkout(
  *   amazon.nova-pro-v1:0         — Amazon flagship, middle ground
  *   us.meta.llama3-1-70b-instruct-v1:0 — older Llama 3.1 if 3.3 unavailable
  */
-const DEFAULT_BEDROCK_MODEL = "us.meta.llama3-3-70b-instruct-v1:0";
+const DEFAULT_BEDROCK_MODEL = "amazon.nova-lite-v1:0";
 
 async function generateWithBedrock(
   profile: AthleteProfile,
