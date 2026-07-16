@@ -61,9 +61,12 @@ export function CameraFlow({
   const [isResting, setIsResting] = useState(false);
   const [restTimeLeft, setRestTimeLeft] = useState(0);
 
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentExercise = exercises[currentIndex];
   const isFinished = currentIndex >= exercises.length;
@@ -73,7 +76,7 @@ export function CameraFlow({
     async function setupCamera() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
+          video: { facingMode },
           audio: true,
         });
         if (videoRef.current) {
@@ -89,8 +92,15 @@ export function CameraFlow({
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
-  }, []);
+  }, [facingMode]);
+
+  function toggleCamera() {
+    setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
+  }
 
   // Timer
   useEffect(() => {
@@ -178,6 +188,23 @@ export function CameraFlow({
     }
   }
 
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setFiles((prev) => ({ ...prev, [currentExercise.id]: file }));
+    
+    if (currentIndex < exercises.length - 1) {
+      setIsResting(true);
+      setRestTimeLeft(currentExercise.rest_seconds_min || 300);
+      speak(`Test complete. Rest for ${Math.floor((currentExercise.rest_seconds_min || 300) / 60)} minutes.`);
+    } else {
+      speak("Assessment complete. Uploading videos.");
+      setCurrentIndex((i) => i + 1);
+      handleFinalUpload(file);
+    }
+  }
+
   async function handleFinalUpload(lastFile?: File) {
     setIsUploading(true);
     const supabase = createClient();
@@ -252,9 +279,17 @@ export function CameraFlow({
             {currentExercise?.name}
           </h1>
         </div>
-        <a href="." className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md">
-          Exit
-        </a>
+        <div className="flex gap-2">
+          <button
+            onClick={toggleCamera}
+            className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md active:scale-95 transition-transform"
+          >
+            Flip
+          </button>
+          <a href="." className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md">
+            Exit
+          </a>
+        </div>
       </div>
 
       {/* Spacer */}
@@ -299,7 +334,20 @@ export function CameraFlow({
             >
               <div className="w-20 h-20 bg-red-500 rounded-full" />
             </button>
-            <p className="text-sm text-gray-400 mt-2 font-mono uppercase tracking-wider">Tap to Start</p>
+            <div className="flex items-center gap-4 mt-2">
+              <p className="text-sm text-gray-400 font-mono uppercase tracking-wider">Tap to Start</p>
+              <span className="text-gray-600">|</span>
+              <label className="text-sm text-gray-400 font-mono uppercase tracking-wider cursor-pointer active:scale-95">
+                Upload
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                />
+              </label>
+            </div>
           </div>
         )}
       </div>
