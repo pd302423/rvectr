@@ -27,7 +27,7 @@ export default async function CameraPage({
 
   const { data: exercises } = await supabase
     .from("workout_exercises")
-    .select("id, exercise_slug, order_index")
+    .select("id, exercise_slug, order_index, rest_seconds_min")
     .eq("workout_id", id)
     .order("order_index", { ascending: true });
 
@@ -36,6 +36,7 @@ export default async function CameraPage({
     slug: ex.exercise_slug,
     name: getSkill(ex.exercise_slug)?.label ?? ex.exercise_slug.replace(/_/g, " "),
     order_index: ex.order_index,
+    rest_seconds_min: ex.rest_seconds_min,
   }));
 
   const submitAction = completeWorkout.bind(null, workout.id);

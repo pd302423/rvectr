@@ -9,6 +9,7 @@ export type ExerciseRow = {
   name: string;
   slug: string;
   order_index: number;
+  rest_seconds_min?: number;
 };
 
 // --- XHR Upload function from record-submit ---
@@ -56,6 +57,10 @@ export function CameraFlow({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Rest state
+  const [isResting, setIsResting] = useState(false);
+  const [restTimeLeft, setRestTimeLeft] = useState(0);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -100,10 +105,10 @@ export function CameraFlow({
 
   // Audio cues
   useEffect(() => {
-    if (!isFinished && currentExercise && !isRecording && !isUploading) {
+    if (!isFinished && currentExercise && !isRecording && !isUploading && !isResting) {
       speak(`Get ready for ${currentExercise.name}. Tap start when you are in position.`);
     }
-  }, [currentIndex, isFinished, isRecording, isUploading, currentExercise]);
+  }, [currentIndex, isFinished, isRecording, isUploading, isResting, currentExercise]);
 
   function speak(text: string) {
     if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -113,6 +118,22 @@ export function CameraFlow({
       utterance.pitch = 1.0;
       window.speechSynthesis.speak(utterance);
     }
+  }
+
+  // Timer for Rest
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isResting && restTimeLeft > 0) {
+      interval = setInterval(() => setRestTimeLeft((t) => t - 1), 1000);
+    } else if (isResting && restTimeLeft <= 0) {
+      finishRest();
+    }
+    return () => clearInterval(interval);
+  }, [isResting, restTimeLeft]);
+
+  function finishRest() {
+    setIsResting(false);
+    setCurrentIndex((i) => i + 1);
   }
 
   function startRecording() {
@@ -133,8 +154,16 @@ export function CameraFlow({
       const blob = new Blob(chunksRef.current, { type: mimeType });
       const file = new File([blob], `${currentExercise.slug}-${Date.now()}.webm`, { type: mimeType });
       setFiles((prev) => ({ ...prev, [currentExercise.id]: file }));
-      speak("Great job. Let's move to the next test.");
-      setCurrentIndex((i) => i + 1);
+      
+      if (currentIndex < exercises.length - 1) {
+        setIsResting(true);
+        setRestTimeLeft(currentExercise.rest_seconds_min || 300);
+        speak(`Test complete. Rest for ${Math.floor((currentExercise.rest_seconds_min || 300) / 60)} minutes.`);
+      } else {
+        speak("Assessment complete. Uploading videos.");
+        setCurrentIndex((i) => i + 1);
+        handleFinalUpload(file); // trigger upload automatically for the last one
+      }
     };
 
     mediaRecorder.start();
@@ -149,7 +178,7 @@ export function CameraFlow({
     }
   }
 
-  async function handleFinalUpload() {
+  async function handleFinalUpload(lastFile?: File) {
     setIsUploading(true);
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
@@ -165,7 +194,7 @@ export function CameraFlow({
     try {
       await Promise.all(
         exercises.map(async (ex) => {
-          const file = files[ex.id];
+          const file = files[ex.id] || (ex.id === currentExercise?.id ? lastFile : null);
           if (!file) return;
           const storagePath = `${userId}/${ex.id}.webm`;
           await uploadFileWithXhr(file, storagePath, token, () => {});
@@ -189,19 +218,14 @@ export function CameraFlow({
         <p className="text-muted-foreground mb-8">You've recorded all tests. Upload them to the AI for grading.</p>
         
         {isUploading ? (
-          <div className="w-full max-w-sm">
+          <div className="w-full max-w-sm mx-auto">
             <div className="mb-2 text-sm">Uploading videos... {uploadProgress}%</div>
             <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
               <div className="h-full bg-white transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
             </div>
           </div>
         ) : (
-          <button
-            onClick={handleFinalUpload}
-            className="w-full max-w-xs bg-white text-black py-4 rounded-full font-semibold text-lg active:scale-95 transition-transform"
-          >
-            Submit Videos
-          </button>
+          <p className="text-muted-foreground animate-pulse">Initializing upload...</p>
         )}
       </div>
     );
@@ -238,7 +262,20 @@ export function CameraFlow({
 
       {/* Bottom Controls */}
       <div className="relative z-10 p-8 pb-16 flex flex-col items-center bg-gradient-to-t from-black via-black/80 to-transparent">
-        {isRecording ? (
+        {isResting ? (
+          <div className="flex flex-col items-center gap-6 w-full max-w-xs mx-auto">
+            <p className="text-sm text-gray-300 font-mono uppercase tracking-wider text-center">Rest Period</p>
+            <div className="text-white font-mono text-5xl tabular-nums drop-shadow-md">
+              {Math.floor(restTimeLeft / 60)}:{(restTimeLeft % 60).toString().padStart(2, "0")}
+            </div>
+            <button
+              onClick={finishRest}
+              className="mt-4 w-full bg-white text-black py-4 rounded-full font-semibold text-lg active:scale-95 transition-transform"
+            >
+              Skip Rest
+            </button>
+          </div>
+        ) : isRecording ? (
           <div className="flex flex-col items-center gap-6">
             <div className="text-red-500 font-mono text-xl tabular-nums animate-pulse">
               {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, "0")}
