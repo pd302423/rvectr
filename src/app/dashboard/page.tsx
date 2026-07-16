@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getSkill } from "@/lib/calisthenics";
 import { generateSession } from "@/app/workouts/actions";
 import { GenerateButton } from "./generate-button";
-
+import { BottomNav } from "./bottom-nav";
+import { Trophy, Zap, Coins } from "lucide-react";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const FOCUS_LABELS: Record<string, string> = {
@@ -74,45 +75,63 @@ export default async function DashboardPage({
     .limit(5);
   const recentWorkouts = workoutsResult.data ?? [];
 
+  const xp = profile.xp ?? 0;
+  const credits = profile.credits ?? 100;
+  const league = profile.league ?? 'Bronze';
+
   return (
-    <main className="min-h-screen bg-background px-6 py-10">
+    <main className="min-h-screen bg-background px-4 py-8 pb-24">
       <div className="mx-auto max-w-4xl">
 
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <header className="mb-12 flex items-start justify-between border-b border-border pb-8">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-              § Athlete dashboard
-            </p>
-            <h1
-              style={{ fontFamily: "var(--font-serif)" }}
-              className="mt-3 text-4xl leading-tight tracking-tight"
-            >
-              {profile.display_name}
-            </h1>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs text-muted-foreground border border-border rounded px-2 py-0.5">
-                {profile.days_per_week}d/wk · {profile.session_minutes}min
-              </span>
-              {hasAssessment ? (
-                <span className="text-xs border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded px-2 py-0.5">
-                  ✓ assessment complete
+        {/* ── Gamification Header ────────────────────────────────────────── */}
+        <header className="mb-10 flex flex-col gap-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground mb-1">
+                § Athlete dashboard
+              </p>
+              <h1 style={{ fontFamily: "var(--font-serif)" }} className="text-4xl leading-tight tracking-tight">
+                {profile.display_name}
+              </h1>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="text-xs text-muted-foreground border border-border rounded-full px-3 py-0.5">
+                  {profile.days_per_week}d/wk · {profile.session_minutes}min
                 </span>
-              ) : (
-                <span className="text-xs border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300 rounded px-2 py-0.5">
-                  baseline · pending assessment
-                </span>
-              )}
+                {hasAssessment ? (
+                  <span className="text-xs border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-full px-3 py-0.5">
+                    ✓ Assessment Complete
+                  </span>
+                ) : (
+                  <span className="text-xs border border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300 rounded-full px-3 py-0.5">
+                    Baseline Pending
+                  </span>
+                )}
+              </div>
+            </div>
+            <form action="/auth/signout" method="POST">
+              <button type="submit" className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground/50 hover:text-muted-foreground transition-colors px-2 py-2">
+                Sign out
+              </button>
+            </form>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-2xl p-4 shadow-sm">
+              <Zap className="w-5 h-5 text-amber-500 mb-2" />
+              <span className="text-xl font-mono tracking-tight">{xp}</span>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">Total XP</span>
+            </div>
+            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-2xl p-4 shadow-sm">
+              <Coins className="w-5 h-5 text-sky-500 mb-2" />
+              <span className="text-xl font-mono tracking-tight">{credits}</span>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">Credits</span>
+            </div>
+            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-2xl p-4 shadow-sm">
+              <Trophy className="w-5 h-5 text-emerald-500 mb-2" />
+              <span className="text-lg font-mono tracking-tight">{league}</span>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">League</span>
             </div>
           </div>
-          <form action="/auth/signout" method="POST">
-            <button
-              type="submit"
-              className="font-mono text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors -mr-2 px-2 py-2"
-            >
-              sign out
-            </button>
-          </form>
         </header>
 
         {/* ── Error notice ────────────────────────────────────────────────── */}
@@ -125,7 +144,7 @@ export default async function DashboardPage({
         )}
 
         {/* ── Assessment CTA ───────────────────────────────────────────────── */}
-        <div className={`mb-8 rounded border p-6 ${hasAssessment ? "border-border bg-card" : "border-sky-500/30 bg-sky-500/10"}`}>
+        <div className={`mb-10 rounded-2xl border p-6 shadow-sm ${hasAssessment ? "border-border bg-card" : "border-sky-500/30 bg-sky-500/10"}`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
@@ -148,18 +167,16 @@ export default async function DashboardPage({
 
         {/* ── Recent workouts ──────────────────────────────────────────────── */}
         {recentWorkouts.length > 0 && (
-          <div className="mb-8">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3">
+          <div className="mb-10">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-3 px-1">
               Session history
             </p>
-            <div className="space-y-px rounded border border-border overflow-hidden">
+            <div className="space-y-2">
               {recentWorkouts.map((w, i) => (
                 <a
                   key={w.id}
                   href={`/workouts/${w.id}`}
-                  className={`flex items-center justify-between gap-4 bg-card px-4 py-3 hover:bg-muted/30 transition-colors ${
-                    i !== 0 ? "border-t border-border" : ""
-                  }`}
+                  className={`flex items-center justify-between gap-4 bg-card px-5 py-4 rounded-2xl border border-border shadow-sm hover:border-foreground/20 hover:shadow-md transition-all`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="font-mono text-xs text-muted-foreground/50 shrink-0">
@@ -191,10 +208,10 @@ export default async function DashboardPage({
         )}
 
         {/* ── Athlete data grid ────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-px border border-border sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mb-8">
 
           {/* Current skills */}
-          <div className="bg-card p-5">
+          <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
             <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
               Current skill inventory
             </p>
@@ -217,7 +234,7 @@ export default async function DashboardPage({
           </div>
 
           {/* Goal skills */}
-          <div className="bg-card p-5">
+          <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
             <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
               Target skill objectives
             </p>
@@ -239,7 +256,7 @@ export default async function DashboardPage({
 
           {/* Equipment */}
           {profile.equipment?.length > 0 && (
-            <div className="bg-card p-5">
+            <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
               <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
                 Available equipment
               </p>
@@ -258,7 +275,7 @@ export default async function DashboardPage({
 
           {/* Injuries */}
           {profile.injuries && (
-            <div className="bg-card p-5">
+            <div className="bg-card p-6 rounded-2xl border border-border shadow-sm">
               <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground mb-3">
                 Contraindications / notes
               </p>
@@ -271,6 +288,8 @@ export default async function DashboardPage({
         </div>
 
       </div>
+      
+      <BottomNav />
     </main>
   );
 }

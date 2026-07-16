@@ -50,7 +50,7 @@ function uploadFileWithXhr(
     xhr.open("POST", uploadUrl, true);
     xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
-    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
     xhr.setRequestHeader("x-upsert", "true"); // Allows overwriting existing test videos
     
     xhr.upload.onprogress = (event) => {
