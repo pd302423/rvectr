@@ -415,7 +415,7 @@ export default async function WorkoutPage({
             )}
             {isAssessment ? (
               <a
-                href={`/workouts/${workout.id}/record`}
+                href={`/workouts/${workout.id}/camera`}
                 className="inline-flex items-center gap-2 rounded bg-foreground px-6 py-2.5 font-mono text-sm text-background hover:opacity-90 transition-opacity"
               >
                 Record →
@@ -455,7 +455,7 @@ export default async function WorkoutPage({
       {isAssessment && !isCompleted && !isSkipped && (
         <div className="fixed bottom-0 inset-x-0 z-20 border-t border-border bg-background/95 backdrop-blur-sm px-6 py-4 sm:hidden">
           <a
-            href={`/workouts/${workout.id}/record`}
+            href={`/workouts/${workout.id}/camera`}
             className="flex w-full items-center justify-center gap-2 rounded bg-foreground py-3.5 font-mono text-sm text-background active:opacity-80 transition-opacity"
           >
             Record →
