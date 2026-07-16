@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSkill } from "@/lib/calisthenics";
 import { generateSession } from "@/app/workouts/actions";
 import { GenerateButton } from "./generate-button";
-import { Trophy, Zap, Coins } from "lucide-react";
+import { Trophy, Zap, Coins, Snowflake, Star, Check, Lock, Play } from "lucide-react";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const FOCUS_LABELS: Record<string, string> = {
@@ -182,21 +182,26 @@ export default async function DashboardPage({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-2xl p-4 shadow-sm">
-              <Zap className="w-5 h-5 text-amber-500 mb-2" />
-              <span className="text-xl font-mono tracking-tight">{xp}</span>
-              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">Total XP</span>
+          <div className="grid grid-cols-4 gap-2">
+            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-xl p-3 shadow-sm">
+              <Zap className="w-5 h-5 text-amber-500 mb-1" />
+              <span className="text-lg font-mono tracking-tight">{xp}</span>
+              <span className="text-[9px] font-mono uppercase text-muted-foreground tracking-widest mt-1">Total XP</span>
             </div>
-            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-2xl p-4 shadow-sm">
-              <Coins className="w-5 h-5 text-sky-500 mb-2" />
-              <span className="text-xl font-mono tracking-tight">{credits}</span>
-              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">Credits</span>
+            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-xl p-3 shadow-sm">
+              <Coins className="w-5 h-5 text-sky-500 mb-1" />
+              <span className="text-lg font-mono tracking-tight">{credits}</span>
+              <span className="text-[9px] font-mono uppercase text-muted-foreground tracking-widest mt-1">Credits</span>
             </div>
-            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-2xl p-4 shadow-sm">
-              <Trophy className="w-5 h-5 text-emerald-500 mb-2" />
-              <span className="text-lg font-mono tracking-tight">{league}</span>
-              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-widest mt-1">League</span>
+            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-xl p-3 shadow-sm">
+              <Snowflake className="w-5 h-5 text-blue-400 mb-1" />
+              <span className="text-lg font-mono tracking-tight">2</span>
+              <span className="text-[9px] font-mono uppercase text-muted-foreground tracking-widest mt-1">Freezes</span>
+            </div>
+            <div className="flex flex-col items-center justify-center bg-card border border-border rounded-xl p-3 shadow-sm">
+              <Trophy className="w-5 h-5 text-emerald-500 mb-1" />
+              <span className="text-md font-mono tracking-tight">{league}</span>
+              <span className="text-[9px] font-mono uppercase text-muted-foreground tracking-widest mt-1">League</span>
             </div>
           </div>
         </header>
@@ -210,70 +215,72 @@ export default async function DashboardPage({
           </div>
         )}
 
-        {/* ── Assessment CTA ───────────────────────────────────────────────── */}
-        <div className={`mb-10 rounded-2xl border p-6 shadow-sm ${hasAssessment ? "border-border bg-card" : "border-sky-500/30 bg-sky-500/10"}`}>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                {hasAssessment ? "Next session ready" : "Step 1 — baseline assessment"}
-              </p>
-              <p className={`font-medium ${hasAssessment ? "text-foreground" : "text-sky-900 dark:text-sky-100"}`}>
-                {hasAssessment ? "Generate tomorrow's workout" : "Begin your strength assessment"}
-              </p>
-              <p className={`mt-1 text-xs ${hasAssessment ? "text-muted-foreground" : "text-sky-800 dark:text-sky-200/70"}`}>
-                {hasAssessment
-                  ? "rvector AI will auto-regulate volume based on your recent performance."
-                  : "rvector will generate a personalised test battery to measure your actual baseline."}
-              </p>
-            </div>
-            <form action={generateSession} className="shrink-0">
-              <GenerateButton focusLabel={hasAssessment ? "Generate Workout" : "Assessment"} />
-            </form>
-          </div>
-        </div>
-
-        {/* ── Training Roadmap ─────────────────────────────────────────────── */}
-        {hasAssessment && (
-          <div className="mb-10 relative">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-4 px-1">
-              Training Block Roadmap
-            </p>
-            <div className="relative py-4 px-2">
-              <div className="absolute top-0 bottom-0 left-[27px] w-0.5 bg-border -z-10"></div>
+        {/* ── The Path (Duolingo Style) ─────────────────────────────────────────────── */}
+        {hasAssessment ? (
+          <div className="mb-24 flex flex-col items-center relative py-8 w-full max-w-sm mx-auto">
+            {[...Array(10)].map((_, i) => {
+              // Note: workoutCount includes the assessment. So day 1 is actually workout 2.
+              const nodeIndex = i;
+              const isCompleted = nodeIndex < workoutCount - 1;
+              const isCurrent = nodeIndex === workoutCount - 1;
+              const isLocked = nodeIndex > workoutCount - 1;
               
-              <div className="flex items-start gap-4 mb-8">
-                <div className="w-10 h-10 rounded-full bg-emerald-500 text-background flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background shadow-sm">✓</div>
-                <div className="bg-card border border-border rounded-xl p-4 flex-1 shadow-sm opacity-60">
-                  <h3 className="font-semibold text-sm">Baseline Assessment</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Calibrated max capacities and kinematic profile.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 mb-8">
-                <div className="w-10 h-10 rounded-full bg-sky-500 text-background flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background shadow-md shadow-sky-500/20">W1</div>
-                <div className="bg-card border-2 border-sky-500/30 rounded-xl p-4 flex-1 shadow-md">
-                  <div className="flex justify-between items-start mb-1">
-                    <h3 className="font-semibold text-sm">Accumulation Phase</h3>
-                    <span className="text-[10px] uppercase tracking-widest text-sky-500 font-bold font-mono">Current</span>
+              // Zig-zag offset pattern
+              const offsetPattern = [0, 40, 60, 40, 0, -40, -60, -40];
+              const offset = offsetPattern[i % offsetPattern.length];
+              const nextOffset = offsetPattern[(i + 1) % offsetPattern.length];
+              
+              return (
+                <div key={i} className="relative flex justify-center items-center h-28 w-full">
+                  {/* Connection Line */}
+                  {i < 9 && (
+                    <svg className="absolute top-1/2 left-0 w-full h-28 -z-10 overflow-visible pointer-events-none">
+                      <line 
+                        x1={`calc(50% + ${offset}px)`} 
+                        y1="24" 
+                        x2={`calc(50% + ${nextOffset}px)`} 
+                        y2="136" 
+                        stroke={isCompleted ? "#0ea5e9" : "#334155"} 
+                        strokeWidth="12" 
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                  
+                  <div 
+                    className={`relative w-20 h-20 rounded-full border-b-[6px] flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 ${
+                      isCompleted ? 'bg-sky-500 border-sky-700 text-white' : 
+                      isCurrent ? 'bg-emerald-500 border-emerald-700 text-white animate-bounce' : 
+                      'bg-card border-border text-muted-foreground grayscale'
+                    }`}
+                    style={{ transform: `translateX(${offset}px)` }}
+                  >
+                    {isCompleted ? <Check className="w-8 h-8" /> : isCurrent ? <Star className="w-8 h-8 fill-current" /> : <Lock className="w-6 h-6 opacity-50" />}
+                    
+                    {/* Floating label for current day */}
+                    {isCurrent && (
+                      <div className="absolute -top-10 bg-background border border-border px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-sm text-foreground animate-pulse">
+                        START TODAY
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Building tissue tolerance and mastering movement patterns at sub-maximal loads.</p>
                 </div>
-              </div>
-
-              <div className="flex items-start gap-4 mb-8 opacity-50 grayscale">
-                <div className="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background">W2</div>
-                <div className="bg-card border border-border rounded-xl p-4 flex-1 shadow-sm">
-                  <h3 className="font-semibold text-sm">Intensification Phase</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Increasing load and approaching mechanical failure on key lifts.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-4 opacity-50 grayscale">
-                <div className="w-10 h-10 rounded-full bg-muted text-muted-foreground flex items-center justify-center font-bold text-sm shrink-0 border-4 border-background">W3</div>
-                <div className="bg-card border border-border rounded-xl p-4 flex-1 shadow-sm">
-                  <h3 className="font-semibold text-sm">Realisation (Peak)</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Testing new maxes and demonstrating acquired strength.</p>
-                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mb-10 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
+                  Step 1 — baseline assessment
+                </p>
+                <p className="font-medium text-sky-900 dark:text-sky-100">
+                  Begin your strength assessment
+                </p>
+                <p className="mt-1 text-xs text-sky-800 dark:text-sky-200/70">
+                  rvector will generate a personalised test battery to measure your actual baseline.
+                </p>
               </div>
             </div>
           </div>
@@ -399,6 +406,19 @@ export default async function DashboardPage({
             </div>
           )}
 
+        </div>
+
+        {/* ── Fixed Bottom CTA ─────────────────────────────────────────────── */}
+        <div className="fixed bottom-[80px] left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent z-40 flex justify-center pb-6">
+          <form action={generateSession} className="w-full max-w-sm">
+            <button
+              type="submit"
+              className="w-full h-14 rounded-2xl bg-foreground text-background font-bold text-lg border-b-[6px] border-foreground/70 active:border-b-0 active:translate-y-[6px] transition-all flex items-center justify-center gap-3 shadow-xl"
+            >
+              <Play className="w-6 h-6 fill-current" />
+              {hasAssessment ? "Start Today's Session" : "Begin Assessment"}
+            </button>
+          </form>
         </div>
 
       </div>
