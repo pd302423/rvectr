@@ -259,86 +259,99 @@ export function CameraFlow({
   }
 
   return (
-    <div className="relative h-screen w-screen flex flex-col bg-black">
-      {/* Background Camera */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 w-full h-full object-cover opacity-80"
-      />
-      
+    <div className="min-h-screen w-full flex flex-col bg-[#0a0a0a] text-white">
       {/* Top HUD */}
-      <div className="relative z-10 p-6 pt-12 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-wider text-gray-400">
-            Test {currentIndex + 1} of {exercises.length}
+      <div className="p-6 pt-12 flex justify-between items-start">
+        <div className="space-y-1">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-500">
+            Assessment {currentIndex + 1} / {exercises.length}
           </p>
-          <h1 className="text-3xl font-serif text-white mt-1 shadow-black drop-shadow-md">
+          <h1 className="text-2xl font-serif text-white tracking-tight">
             {currentExercise?.name}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <button
             onClick={toggleCamera}
-            className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md active:scale-95 transition-transform"
+            className="flex items-center gap-2 text-xs font-medium text-gray-300 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-full transition-all"
           >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.29 7.04 12 12.01 20.71 7.04"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             Flip
           </button>
-          <a href="." className="text-sm font-mono text-gray-400 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md">
+          <a href="." className="flex items-center text-xs font-medium text-gray-300 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-full transition-all">
             Exit
           </a>
         </div>
       </div>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+      {/* Viewfinder Area */}
+      <div className="flex-1 w-full px-6 flex flex-col justify-center items-center">
+        <div className="relative w-full max-w-sm aspect-[3/4] sm:aspect-[9/16] rounded-[2rem] overflow-hidden bg-black border border-white/10 shadow-2xl ring-1 ring-white/5">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          
+          {/* Viewfinder Guidelines */}
+          <div className="absolute inset-6 border-2 border-dashed border-white/20 rounded-xl pointer-events-none mix-blend-overlay" />
+          
+          {/* Recording Indicator inside viewfinder */}
+          {isRecording && (
+            <div className="absolute top-4 right-4 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-red-500 font-mono text-xs tabular-nums font-semibold tracking-wider">
+                {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, "0")}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Bottom Controls */}
-      <div className="relative z-10 p-8 pb-16 flex flex-col items-center bg-gradient-to-t from-black via-black/80 to-transparent">
+      <div className="p-8 pb-12 flex flex-col items-center">
         {isResting ? (
           <div className="flex flex-col items-center gap-6 w-full max-w-xs mx-auto">
-            <p className="text-sm text-gray-300 font-mono uppercase tracking-wider text-center">Rest Period</p>
-            <div className="text-white font-mono text-5xl tabular-nums drop-shadow-md">
+            <p className="text-sm text-emerald-500 font-mono uppercase tracking-[0.15em] font-semibold text-center">Rest Period</p>
+            <div className="text-white font-mono text-6xl tabular-nums tracking-tighter">
               {Math.floor(restTimeLeft / 60)}:{(restTimeLeft % 60).toString().padStart(2, "0")}
             </div>
             <button
               onClick={finishRest}
-              className="mt-4 w-full bg-white text-black py-4 rounded-full font-semibold text-lg active:scale-95 transition-transform"
+              className="mt-2 w-full bg-white text-black py-4 rounded-xl font-semibold text-[15px] active:scale-95 transition-all shadow-lg hover:bg-gray-100"
             >
               Skip Rest
             </button>
           </div>
         ) : isRecording ? (
           <div className="flex flex-col items-center gap-6">
-            <div className="text-red-500 font-mono text-xl tabular-nums animate-pulse">
-              {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, "0")}
-            </div>
             <button
               onClick={stopRecording}
-              className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center border-4 border-white/20 active:scale-95 transition-all"
+              className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center ring-4 ring-red-500/20 active:scale-95 transition-all shadow-xl shadow-red-500/20"
             >
-              <div className="w-8 h-8 bg-white rounded-sm" />
+              <div className="w-8 h-8 bg-white rounded-md" />
             </button>
-            <p className="text-sm text-gray-400 mt-2 font-mono uppercase tracking-wider">Tap to Stop</p>
+            <p className="text-xs text-gray-400 font-mono uppercase tracking-[0.2em]">Tap to Stop</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-6">
-            <p className="text-center text-sm text-gray-300 max-w-[250px] mb-2 leading-relaxed">
-              Step back into frame. The AI will monitor your movement.
+          <div className="flex flex-col items-center gap-6 w-full">
+            <p className="text-center text-sm text-gray-400 max-w-[280px] leading-relaxed">
+              Ensure your full body is visible within the frame guidelines.
             </p>
             <button
               onClick={startRecording}
-              className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center border-4 border-white active:scale-95 transition-all"
+              className="w-20 h-20 bg-transparent rounded-full flex items-center justify-center border-[3px] border-white active:scale-95 transition-all shadow-xl shadow-white/10"
             >
-              <div className="w-20 h-20 bg-red-500 rounded-full" />
+              <div className="w-[68px] h-[68px] bg-red-500 rounded-full" />
             </button>
-            <div className="flex items-center gap-4 mt-2">
-              <p className="text-sm text-gray-400 font-mono uppercase tracking-wider">Tap to Start</p>
-              <span className="text-gray-600">|</span>
-              <label className="text-sm text-gray-400 font-mono uppercase tracking-wider cursor-pointer active:scale-95">
-                Upload
+            
+            <div className="flex items-center gap-6 mt-2">
+              <p className="text-xs text-gray-400 font-mono uppercase tracking-[0.2em]">Record</p>
+              <div className="w-1 h-1 rounded-full bg-gray-700" />
+              <label className="text-xs text-emerald-400 font-mono uppercase tracking-[0.2em] cursor-pointer hover:text-emerald-300 transition-colors">
+                Upload File
                 <input
                   type="file"
                   accept="video/*"
