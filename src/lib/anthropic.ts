@@ -456,6 +456,22 @@ function generateMockAssessment(profile: AthleteProfile): GeneratedWorkout {
     }
   }
 
+  // ── 4.5 Leg test ──────────────────────────────────────────────────────────
+  const isLegGoal = primaryGoal && ["parallel_squat", "full_squat", "pistol_squat", "split_squat", "beginner_shrimp_squat"].includes(primaryGoal);
+  if (isLegGoal || exercises.length < 4) {
+    const legSlug = pickByDifficulty(profile.current_skills, [
+      "pistol_squat", "intermediate_shrimp_squat", "split_squat", "full_squat",
+    ]);
+    addTest(
+      legSlug,
+      "strength",
+      "max_effort",
+      10, 30,
+      "Hip crease must drop below the top of the knee at the bottom of the squat. Keep heel of the working leg firmly on the floor. Maintain a neutral spine (avoid excessive butt wink).",
+      `${getSkill(legSlug)?.label ?? legSlug} assessment. 20+ reps -> advance to harder unilateral variations. <10 reps -> focus on volume and depth.`,
+    );
+  }
+
   // ── 5. Dead hang (structural integrity, bar only) ─────────────────────────
   if (hasBar && exercises.length < 6) {
     addTest(
