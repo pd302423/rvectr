@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getSkill } from "@/lib/calisthenics";
 import { generateSession } from "@/app/workouts/actions";
 import { GenerateButton } from "./generate-button";
-import { BottomNav } from "./bottom-nav";
 import { Trophy, Zap, Coins } from "lucide-react";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -335,8 +334,6 @@ export default async function DashboardPage({
         </div>
 
       </div>
-      
-      <BottomNav />
     </main>
   );
 }

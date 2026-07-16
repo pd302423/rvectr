@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { BottomNav } from "../bottom-nav";
-import { Settings, LogOut, Flame } from "lucide-react";
+import { Settings, LogOut } from "lucide-react";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -116,7 +115,6 @@ export default async function ProfilePage() {
           </div>
         </section>
       </div>
-      <BottomNav />
     </main>
   );
 }

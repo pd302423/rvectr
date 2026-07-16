@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { BottomNav } from "../bottom-nav";
 import { Heart, MessageCircle, MapPin, Share2 } from "lucide-react";
 
 export default async function SocialFeedPage() {
@@ -106,7 +105,6 @@ export default async function SocialFeedPage() {
           ))}
         </div>
       </div>
-      <BottomNav />
     </main>
   );
 }
