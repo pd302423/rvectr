@@ -66,13 +66,16 @@ export default async function DashboardPage({
   const hasAssessment = workoutCount > 0;
 
   // Recent workouts (last 5) — tables may not exist yet if migration pending
-  const workoutsResult = await supabase
+  const allWorkoutsResult = await supabase
     .from("workouts")
     .select("id, session_focus, block, week_number, status, generated_at, completed_at")
     .eq("user_id", user.id)
-    .order("generated_at", { ascending: false })
-    .limit(5);
-  const recentWorkouts = workoutsResult.data ?? [];
+    .order("generated_at", { ascending: true });
+  const allWorkouts = allWorkoutsResult.data ?? [];
+  const recentWorkouts = [...allWorkouts].reverse().slice(0, 5);
+
+  const pendingWorkout = allWorkouts.find(w => w.status === 'pending');
+  const totalNodes = Math.max((profile.days_per_week ?? 3) * 4, allWorkouts.length + 1);
 
   // Calculate streak from completed workouts
   const completedWorkoutsResult = await supabase
@@ -218,22 +221,44 @@ export default async function DashboardPage({
         {/* ── The Path (Duolingo Style) ─────────────────────────────────────────────── */}
         {hasAssessment ? (
           <div className="mb-24 flex flex-col items-center relative py-8 w-full max-w-sm mx-auto">
-            {[...Array(10)].map((_, i) => {
-              // Note: workoutCount includes the assessment. So day 1 is actually workout 2.
-              const nodeIndex = i;
-              const isCompleted = nodeIndex < workoutCount - 1;
-              const isCurrent = nodeIndex === workoutCount - 1;
-              const isLocked = nodeIndex > workoutCount - 1;
+            {[...Array(totalNodes)].map((_, i) => {
+              const workoutForNode = allWorkouts[i];
+              const isCompleted = workoutForNode?.status === 'completed';
+              const isPending = workoutForNode?.status === 'pending';
+              const isLocked = !workoutForNode;
+              
+              const isCurrent = isPending || (!pendingWorkout && i === allWorkouts.length);
               
               // Zig-zag offset pattern
               const offsetPattern = [0, 40, 60, 40, 0, -40, -60, -40];
               const offset = offsetPattern[i % offsetPattern.length];
               const nextOffset = offsetPattern[(i + 1) % offsetPattern.length];
               
+              // Define the inner UI of the node
+              const NodeUI = (
+                <div 
+                  className={`relative w-20 h-20 rounded-full border-b-[6px] flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 ${
+                    isCompleted ? 'bg-sky-500 border-sky-700 text-white' : 
+                    isCurrent ? 'bg-emerald-500 border-emerald-700 text-white animate-bounce' : 
+                    'bg-card border-border text-muted-foreground grayscale'
+                  }`}
+                  style={{ transform: `translateX(${offset}px)` }}
+                >
+                  {isCompleted ? <Check className="w-8 h-8" /> : isCurrent ? <Star className="w-8 h-8 fill-current" /> : <Lock className="w-6 h-6 opacity-50" />}
+                  
+                  {/* Floating label for current day */}
+                  {isCurrent && (
+                    <div className="absolute -top-10 bg-background border border-border px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-sm text-foreground animate-pulse">
+                      START TODAY
+                    </div>
+                  )}
+                </div>
+              );
+
               return (
                 <div key={i} className="relative flex justify-center items-center h-28 w-full">
                   {/* Connection Line */}
-                  {i < 9 && (
+                  {i < totalNodes - 1 && (
                     <svg className="absolute top-1/2 left-0 w-full h-28 -z-10 overflow-visible pointer-events-none">
                       <line 
                         x1={`calc(50% + ${offset}px)`} 
@@ -247,23 +272,14 @@ export default async function DashboardPage({
                     </svg>
                   )}
                   
-                  <div 
-                    className={`relative w-20 h-20 rounded-full border-b-[6px] flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 ${
-                      isCompleted ? 'bg-sky-500 border-sky-700 text-white' : 
-                      isCurrent ? 'bg-emerald-500 border-emerald-700 text-white animate-bounce' : 
-                      'bg-card border-border text-muted-foreground grayscale'
-                    }`}
-                    style={{ transform: `translateX(${offset}px)` }}
-                  >
-                    {isCompleted ? <Check className="w-8 h-8" /> : isCurrent ? <Star className="w-8 h-8 fill-current" /> : <Lock className="w-6 h-6 opacity-50" />}
-                    
-                    {/* Floating label for current day */}
-                    {isCurrent && (
-                      <div className="absolute -top-10 bg-background border border-border px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-sm text-foreground animate-pulse">
-                        START TODAY
-                      </div>
-                    )}
-                  </div>
+                  {/* Make node clickable if it has an actual workout */}
+                  {workoutForNode ? (
+                    <a href={`/workouts/${workoutForNode.id}`} className="outline-none">
+                      {NodeUI}
+                    </a>
+                  ) : (
+                    NodeUI
+                  )}
                 </div>
               );
             })}
@@ -410,15 +426,22 @@ export default async function DashboardPage({
 
         {/* ── Fixed Bottom CTA ─────────────────────────────────────────────── */}
         <div className="fixed bottom-[80px] left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent z-40 flex justify-center pb-6">
-          <form action={generateSession} className="w-full max-w-sm">
-            <button
-              type="submit"
-              className="w-full h-14 rounded-2xl bg-foreground text-background font-bold text-lg border-b-[6px] border-foreground/70 active:border-b-0 active:translate-y-[6px] transition-all flex items-center justify-center gap-3 shadow-xl"
-            >
+          {pendingWorkout ? (
+            <a href={`/workouts/${pendingWorkout.id}`} className="w-full max-w-sm h-14 rounded-2xl bg-foreground text-background font-bold text-lg border-b-[6px] border-foreground/70 active:border-b-0 active:translate-y-[6px] transition-all flex items-center justify-center gap-3 shadow-xl">
               <Play className="w-6 h-6 fill-current" />
-              {hasAssessment ? "Start Today's Session" : "Begin Assessment"}
-            </button>
-          </form>
+              Resume Today's Session
+            </a>
+          ) : (
+            <form action={generateSession} className="w-full max-w-sm">
+              <button
+                type="submit"
+                className="w-full h-14 rounded-2xl bg-foreground text-background font-bold text-lg border-b-[6px] border-foreground/70 active:border-b-0 active:translate-y-[6px] transition-all flex items-center justify-center gap-3 shadow-xl"
+              >
+                <Play className="w-6 h-6 fill-current" />
+                {hasAssessment ? "Generate Today's Session" : "Begin Assessment"}
+              </button>
+            </form>
+          )}
         </div>
 
       </div>
