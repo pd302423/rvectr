@@ -4,7 +4,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts';
 import { Camera, Activity, Ruler, Target, Database, AlertCircle, Box, Play, Pause, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Environment, Center } from '@react-three/drei';
+import { OrbitControls, useGLTF, Environment, Center, Html } from '@react-three/drei';
 import kinematicsData from './data.json';
 import './index.css';
 
@@ -14,7 +14,7 @@ const Num = ({ children, className = "" }) => (
 
 const meshCache = {};
 
-function AnimatedModel({ frame }) {
+function AnimatedModel({ frame, currentData }) {
   const [currentMesh, setCurrentMesh] = useState(null);
 
   useEffect(() => {
@@ -45,7 +45,25 @@ function AnimatedModel({ frame }) {
   }, [frame]);
 
   if (!currentMesh) return null;
-  return <primitive object={currentMesh} />;
+  return (
+    <group>
+      <primitive object={currentMesh} />
+      {currentData?.torso_lean > 45 && (
+        <Html position={[0, 0.4, 0.2]} center className="pointer-events-none">
+          <div className="bg-[#000000]/90 border border-[#ff0000] text-[#ff0000] text-[8px] uppercase tracking-widest font-mono px-2 py-1 whitespace-nowrap animate-pulse flex items-center gap-1">
+            <AlertCircle size={8} /> Excessive Shear Force
+          </div>
+        </Html>
+      )}
+      {currentData?.knee_distance < 0.2 && (
+        <Html position={[0, -0.4, 0.1]} center className="pointer-events-none">
+          <div className="bg-[#000000]/90 border border-[#ff0000] text-[#ff0000] text-[8px] uppercase tracking-widest font-mono px-2 py-1 whitespace-nowrap flex items-center gap-1">
+            <AlertCircle size={8} /> Valgus Detected
+          </div>
+        </Html>
+      )}
+    </group>
+  );
 }
 
 export default function App() {
@@ -56,6 +74,7 @@ export default function App() {
   const [fps, setFps] = useState(30);
   const [maximizedGraph, setMaximizedGraph] = useState(null); // 'knee' or 'spine'
   const [activePipelineStep, setActivePipelineStep] = useState('Telemetry');
+  const [showArchitecture, setShowArchitecture] = useState(false);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -113,9 +132,17 @@ export default function App() {
             <input type="file" accept="video/mp4,video/mov,video/*" className="hidden" onChange={handleFileUpload} />
             Mount Feed
           </label>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#ffffff] animate-pulse" />
-            <span className="text-[#ffffff] text-[10px] uppercase tracking-widest font-mono">Live</span>
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setShowArchitecture(true)}
+              className="text-[#a3a3a3] hover:text-[#ffffff] text-[9px] uppercase tracking-widest transition-colors font-bold border border-[#333333] hover:border-[#ffffff] px-3 py-1"
+            >
+              How it Works
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#ffffff] animate-pulse" />
+              <span className="text-[#ffffff] text-[10px] uppercase tracking-widest font-mono">Live</span>
+            </div>
           </div>
         </div>
       </header>
@@ -130,33 +157,46 @@ export default function App() {
             <div className="border-b border-[#333333] p-2 bg-[#111111]">
               <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Spatial Map</span>
             </div>
-            <div className="flex-1 relative bg-[linear-gradient(#111111_1px,transparent_1px),linear-gradient(90deg,#111111_1px,transparent_1px)] bg-[size:20px_20px]">
+            <div className="flex-1 relative bg-[#0a0a0a] overflow-hidden flex items-center justify-center border-t border-[#333333]">
               
-              <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2">
-                <div className="w-8 h-8 rounded-full border border-[#ffffff] flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#ffffff] animate-pulse" />
-                </div>
+              {/* Radar Sweep Animation */}
+              <div 
+                className="w-[300px] h-[300px] absolute rounded-full animate-[spin_4s_linear_infinite]" 
+                style={{ background: 'conic-gradient(from 0deg, transparent 70%, rgba(255,255,255,0.15) 100%)' }} 
+              />
+              
+              {/* Concentric Rings */}
+              <div className="w-16 h-16 rounded-full border border-[#333333] absolute" />
+              <div className="w-32 h-32 rounded-full border border-[#333333] absolute" />
+              <div className="w-48 h-48 rounded-full border border-[#333333] absolute" />
+              <div className="w-[100%] h-[1px] bg-[#333333] absolute" />
+              <div className="w-[1px] h-[100%] bg-[#333333] absolute" />
+
+              {/* Subject Dot */}
+              <div className="absolute w-2 h-2 rounded-full bg-[#ffffff] animate-pulse shadow-[0_0_10px_#ffffff]" />
+              <span className="absolute mt-6 text-[8px] font-bold text-[#ffffff] tracking-widest bg-[#000000] px-1">SUBJ_01</span>
+
+              {/* Cameras positioned on the rings */}
+              <div className="absolute top-[20%] left-[20%] flex flex-col items-center">
+                <Camera size={10} className="text-[#ffffff]" />
+                <span className="text-[7px] uppercase tracking-widest mt-1 text-[#ffffff] bg-[#000000] px-1">CAM_L</span>
               </div>
 
-              <div className="absolute top-[calc(40%+24px)] left-1/2 -translate-x-1/2 flex flex-col items-center">
-                <span className="text-[9px] uppercase tracking-widest font-bold bg-[#000000] px-1">Subj</span>
-                <div className="mt-4 flex flex-col items-center bg-[#000000] p-1">
-                  <Camera size={12} />
-                  <span className="text-[8px] uppercase tracking-widest mt-1">01_F</span>
-                </div>
-                <div className="w-[1px] h-8 bg-[#ffffff]/30 mt-1" />
+              <div className="absolute top-[20%] right-[20%] flex flex-col items-center">
+                <Camera size={10} className="text-[#a3a3a3]" />
+                <span className="text-[7px] uppercase tracking-widest mt-1 text-[#a3a3a3] bg-[#000000] px-1">CAM_R</span>
               </div>
 
-              <div className="absolute top-[10%] left-[10%] flex flex-col items-center text-[#a3a3a3]">
-                <Camera size={12} />
-                <span className="text-[8px] uppercase tracking-widest mt-1">02_L</span>
-                <div className="w-[1px] h-12 border-l border-dashed border-[#a3a3a3]/30 mt-1" />
+              <div className="absolute bottom-[15%] flex flex-col items-center">
+                <Camera size={10} className="text-[#ffffff]" />
+                <span className="text-[7px] uppercase tracking-widest mt-1 text-[#ffffff] bg-[#000000] px-1">CAM_F</span>
               </div>
 
-              <div className="absolute top-[10%] right-[10%] flex flex-col items-center text-[#a3a3a3]">
-                <Camera size={12} />
-                <span className="text-[8px] uppercase tracking-widest mt-1">03_R</span>
-                <div className="w-[1px] h-12 border-l border-dashed border-[#a3a3a3]/30 mt-1" />
+              {/* Live Coordinate Overlay */}
+              <div className="absolute top-2 right-2 flex flex-col items-end text-[7px] font-mono text-[#a3a3a3]">
+                <span>LAT: {(currentData?.torso_lean || 0).toFixed(4)}</span>
+                <span>LNG: {(currentData?.left_knee_angle || 0).toFixed(4)}</span>
+                <span className="text-[#ffffff] animate-pulse mt-1">TRACKING</span>
               </div>
             </div>
           </div>
@@ -260,7 +300,7 @@ export default function App() {
                   <pointLight position={[-10, -10, -10]} intensity={1} />
                   <Suspense fallback={null}>
                     <Center scale={2.5}>
-                      <AnimatedModel frame={currentFrame} />
+                      <AnimatedModel frame={currentFrame} currentData={currentData} />
                     </Center>
                     <Environment preset="city" />
                   </Suspense>
@@ -432,6 +472,43 @@ export default function App() {
                   )}
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ──────── ARCHITECTURE MODAL ──────── */}
+      {showArchitecture && (
+        <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-sm flex items-center justify-center p-12">
+          <div className="w-full max-w-4xl bg-[#000000] border border-[#ffffff] flex flex-col shadow-2xl">
+            <div className="flex justify-between items-center p-4 border-b border-[#333333]">
+              <span className="text-sm font-bold uppercase tracking-widest text-[#ffffff] flex items-center gap-2">
+                <Database size={16} /> System Architecture
+              </span>
+              <button onClick={() => setShowArchitecture(false)} className="text-[#a3a3a3] hover:text-[#ffffff] transition-colors p-2">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-8 font-mono text-sm text-[#a3a3a3] leading-relaxed overflow-y-auto max-h-[70vh]">
+              <p className="text-[#ffffff] font-bold mb-4 uppercase tracking-widest">Pipeline Overview</p>
+              <p>This system uses state-of-the-art computer vision to extract 3D kinematic data directly from a raw 2D video feed.</p>
+              
+              <div className="my-8 border-l-2 border-[#333333] pl-6 flex flex-col gap-8">
+                <div>
+                  <p className="text-[#ffffff] font-bold mb-2 uppercase tracking-widest flex items-center gap-2"><Target size={14} /> 1. Optical Processing</p>
+                  <p>Raw video is fed into <span className="text-[#ffffff] font-bold">4D-Humans</span> to reconstruct SMPL 3D human meshes for every single frame.</p>
+                </div>
+                
+                <div>
+                  <p className="text-[#ffffff] font-bold mb-2 uppercase tracking-widest flex items-center gap-2"><Box size={14} /> 2. Mesh Extraction</p>
+                  <p>We execute a custom Blender python script in headless mode to bake the mathematical SMPL parameters into 161 individual `.obj` files, one for each frame.</p>
+                </div>
+                
+                <div>
+                  <p className="text-[#ffffff] font-bold mb-2 uppercase tracking-widest flex items-center gap-2"><Activity size={14} /> 3. Real-time Streaming</p>
+                  <p>The frontend React application loads these `.obj` files directly into the browser's GPU using WebGL via <span className="text-[#ffffff] font-bold">@react-three/fiber</span>, mapping the physical 3D mesh strictly to the calculated telemetry in real-time.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
