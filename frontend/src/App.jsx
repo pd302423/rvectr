@@ -55,6 +55,7 @@ export default function App() {
   const [isPlaying3D, setIsPlaying3D] = useState(false);
   const [fps, setFps] = useState(30);
   const [maximizedGraph, setMaximizedGraph] = useState(null); // 'knee' or 'spine'
+  const [activePipelineStep, setActivePipelineStep] = useState('Telemetry');
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -167,18 +168,25 @@ export default function App() {
             <div className="flex-1 flex flex-col justify-center px-6 gap-6 relative">
               <div className="absolute left-9 top-8 bottom-8 w-[1px] bg-[#333333]" />
               {[
-                { icon: Camera, title: 'Capture Sync', active: false },
-                { icon: Target, title: 'Spatial Keypoints', active: false },
-                { icon: Database, title: 'Mesh Regression', active: false },
-                { icon: Activity, title: 'Telemetry', active: true }
-              ].map((step, idx) => (
-                <div key={idx} className="flex items-center gap-4 relative z-10">
-                  <div className={`w-6 h-6 rounded border flex items-center justify-center bg-[#000000] ${step.active ? 'border-[#ffffff] text-[#ffffff]' : 'border-[#333333] text-[#a3a3a3]'}`}>
-                    <step.icon size={10} />
-                  </div>
-                  <span className={`text-[10px] uppercase tracking-widest ${step.active ? 'text-[#ffffff] font-bold' : 'text-[#a3a3a3]'}`}>{step.title}</span>
-                </div>
-              ))}
+                { icon: Camera, title: 'Capture Sync' },
+                { icon: Target, title: 'Spatial Keypoints' },
+                { icon: Database, title: 'Mesh Regression' },
+                { icon: Activity, title: 'Telemetry' }
+              ].map((step, idx) => {
+                const isActive = activePipelineStep === step.title;
+                return (
+                  <button 
+                    key={idx} 
+                    onClick={() => setActivePipelineStep(step.title)}
+                    className="flex items-center gap-4 relative z-10 w-full text-left group"
+                  >
+                    <div className={`w-6 h-6 rounded border flex items-center justify-center bg-[#000000] transition-colors ${isActive ? 'border-[#ffffff] text-[#ffffff]' : 'border-[#333333] text-[#a3a3a3] group-hover:border-[#ffffff] group-hover:text-[#ffffff]'}`}>
+                      <step.icon size={10} />
+                    </div>
+                    <span className={`text-[10px] uppercase tracking-widest transition-colors ${isActive ? 'text-[#ffffff] font-bold' : 'text-[#a3a3a3] group-hover:text-[#ffffff]'}`}>{step.title}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
