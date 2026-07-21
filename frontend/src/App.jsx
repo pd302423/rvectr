@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, Suspense, useMemo } from 'react';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts';
-import { Camera, Activity, Ruler, Target, Database, AlertCircle, Box, Play, Pause, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react';
+import { Camera, Activity, Ruler, Target, Database, AlertCircle, Box, Play, Pause, ChevronLeft, ChevronRight, Maximize2, X, MessageSquare } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF, Environment, Center, Html } from '@react-three/drei';
 import kinematicsData from './data.json';
@@ -150,83 +150,70 @@ export default function App() {
       {/* ──────── MAIN WORKSPACE ──────── */}
       <div className="flex-1 flex gap-4 overflow-hidden">
         
-        {/* LEFT PANEL: Architecture & Maps */}
-        <aside className="w-[300px] flex flex-col gap-4 shrink-0">
+        {/* LEFT PANEL: Streaming Data & Mini Graphs */}
+        <aside className="w-[350px] flex flex-col gap-4 shrink-0">
           
-          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000]">
-            <div className="border-b border-[#333333] p-2 bg-[#111111]">
-              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Spatial Map</span>
+          <div className="h-[250px] border border-[#333333] flex flex-col bg-[#000000]">
+            <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
+              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Kinematic Readout</span>
+              <Activity size={12} className="text-[#ffffff]" />
             </div>
-            <div className="flex-1 relative bg-[#0a0a0a] overflow-hidden flex items-center justify-center border-t border-[#333333]">
-              
-              {/* Radar Sweep Animation */}
-              <div 
-                className="w-[300px] h-[300px] absolute rounded-full animate-[spin_4s_linear_infinite]" 
-                style={{ background: 'conic-gradient(from 0deg, transparent 70%, rgba(255,255,255,0.15) 100%)' }} 
-              />
-              
-              {/* Concentric Rings */}
-              <div className="w-16 h-16 rounded-full border border-[#333333] absolute" />
-              <div className="w-32 h-32 rounded-full border border-[#333333] absolute" />
-              <div className="w-48 h-48 rounded-full border border-[#333333] absolute" />
-              <div className="w-[100%] h-[1px] bg-[#333333] absolute" />
-              <div className="w-[1px] h-[100%] bg-[#333333] absolute" />
-
-              {/* Subject Dot */}
-              <div className="absolute w-2 h-2 rounded-full bg-[#ffffff] animate-pulse shadow-[0_0_10px_#ffffff]" />
-              <span className="absolute mt-6 text-[8px] font-bold text-[#ffffff] tracking-widest bg-[#000000] px-1">SUBJ_01</span>
-
-              {/* Cameras positioned on the rings */}
-              <div className="absolute top-[20%] left-[20%] flex flex-col items-center">
-                <Camera size={10} className="text-[#ffffff]" />
-                <span className="text-[7px] uppercase tracking-widest mt-1 text-[#ffffff] bg-[#000000] px-1">CAM_L</span>
-              </div>
-
-              <div className="absolute top-[20%] right-[20%] flex flex-col items-center">
-                <Camera size={10} className="text-[#a3a3a3]" />
-                <span className="text-[7px] uppercase tracking-widest mt-1 text-[#a3a3a3] bg-[#000000] px-1">CAM_R</span>
-              </div>
-
-              <div className="absolute bottom-[15%] flex flex-col items-center">
-                <Camera size={10} className="text-[#ffffff]" />
-                <span className="text-[7px] uppercase tracking-widest mt-1 text-[#ffffff] bg-[#000000] px-1">CAM_F</span>
-              </div>
-
-              {/* Live Coordinate Overlay */}
-              <div className="absolute top-2 right-2 flex flex-col items-end text-[7px] font-mono text-[#a3a3a3]">
-                <span>LAT: {(currentData?.torso_lean || 0).toFixed(4)}</span>
-                <span>LNG: {(currentData?.left_knee_angle || 0).toFixed(4)}</span>
-                <span className="text-[#ffffff] animate-pulse mt-1">TRACKING</span>
-              </div>
+            <div className="flex-1 overflow-y-auto p-3 text-[10px] flex flex-col gap-1 font-mono">
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_KNEE</span><span>{currentData.left_knee_angle.toFixed(2)}</span></div>
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_KNEE</span><span>{currentData.right_knee_angle.toFixed(2)}</span></div>
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_HIP</span><span>{currentData.left_hip_angle.toFixed(2)}</span></div>
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_HIP</span><span>{currentData.right_hip_angle.toFixed(2)}</span></div>
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_ANKLE</span><span>{currentData.left_ankle_angle.toFixed(2)}</span></div>
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_ANKLE</span><span>{currentData.right_ankle_angle.toFixed(2)}</span></div>
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">TORSO</span><span className={isFormDegraded ? 'bg-[#ffffff] text-[#000000] px-1' : ''}>{currentData.torso_lean.toFixed(2)}</span></div>
+              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">VELOCITY</span><span>{currentData.velocity.toFixed(3)}</span></div>
             </div>
           </div>
 
-          <div className="h-[250px] border border-[#333333] flex flex-col bg-[#000000]">
-            <div className="border-b border-[#333333] p-2 bg-[#111111]">
-              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Pipeline Status</span>
+          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] relative">
+            <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
+              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Knee Trajectory</span>
+              <button onClick={() => setMaximizedGraph('knee')} className="text-[#a3a3a3] hover:text-[#ffffff] flex items-center gap-1 transition-colors">
+                <span className="text-[8px] uppercase font-bold tracking-widest">Expand</span>
+                <Maximize2 size={10} />
+              </button>
             </div>
-            <div className="flex-1 flex flex-col justify-center px-6 gap-6 relative">
-              <div className="absolute left-9 top-8 bottom-8 w-[1px] bg-[#333333]" />
-              {[
-                { icon: Camera, title: 'Capture Sync' },
-                { icon: Target, title: 'Spatial Keypoints' },
-                { icon: Database, title: 'Mesh Regression' },
-                { icon: Activity, title: 'Telemetry' }
-              ].map((step, idx) => {
-                const isActive = activePipelineStep === step.title;
-                return (
-                  <button 
-                    key={idx} 
-                    onClick={() => setActivePipelineStep(step.title)}
-                    className="flex items-center gap-4 relative z-10 w-full text-left group"
-                  >
-                    <div className={`w-6 h-6 rounded border flex items-center justify-center bg-[#000000] transition-colors ${isActive ? 'border-[#ffffff] text-[#ffffff]' : 'border-[#333333] text-[#a3a3a3] group-hover:border-[#ffffff] group-hover:text-[#ffffff]'}`}>
-                      <step.icon size={10} />
-                    </div>
-                    <span className={`text-[10px] uppercase tracking-widest transition-colors ${isActive ? 'text-[#ffffff] font-bold' : 'text-[#a3a3a3] group-hover:text-[#ffffff]'}`}>{step.title}</span>
-                  </button>
-                );
-              })}
+            
+            <div className="absolute top-10 right-4 text-[8px] uppercase font-mono text-right pointer-events-none z-10">
+              <div className="text-[#ffffff] flex items-center justify-end gap-1"><div className="w-2 h-0.5 bg-[#ffffff]" /> Left Knee</div>
+              <div className="text-[#a3a3a3] flex items-center justify-end gap-1 mt-0.5"><div className="w-2 h-0.5 border-t border-dashed border-[#a3a3a3]" /> Right Knee</div>
+            </div>
+
+            <div className="flex-1 p-2 pt-4 cursor-crosshair relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={kinematicsData} margin={{ top: 0, right: 5, bottom: 0, left: -25 }} onMouseMove={handleGraphHover}>
+                  <XAxis dataKey="frame" hide />
+                  <YAxis domain={[40, 180]} stroke="#333333" tick={{fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#a3a3a3'}} tickLine={false} axisLine={false} />
+                  <ReferenceLine x={currentFrame + 1} stroke="#ffffff" strokeWidth={1} />
+                  <Line type="step" dataKey="left_knee_angle" stroke="#ffffff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                  <Line type="step" dataKey="right_knee_angle" stroke="#a3a3a3" strokeWidth={1} strokeDasharray="3 3" dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] relative">
+            <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
+              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Spinal Trajectory</span>
+              <button onClick={() => setMaximizedGraph('spine')} className="text-[#a3a3a3] hover:text-[#ffffff] flex items-center gap-1 transition-colors">
+                <span className="text-[8px] uppercase font-bold tracking-widest">Expand</span>
+                <Maximize2 size={10} />
+              </button>
+            </div>
+            <div className="flex-1 p-2 pt-4 cursor-crosshair relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={kinematicsData} margin={{ top: 0, right: 5, bottom: 0, left: -25 }} onMouseMove={handleGraphHover}>
+                  <XAxis dataKey="frame" hide />
+                  <YAxis domain={[0, 90]} stroke="#333333" tick={{fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#a3a3a3'}} tickLine={false} axisLine={false} />
+                  <ReferenceLine x={currentFrame + 1} stroke="#ffffff" strokeWidth={1} />
+                  <Line type="step" dataKey="torso_lean" stroke="#ffffff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
@@ -359,73 +346,51 @@ export default function App() {
           </div>
         </main>
 
-        {/* RIGHT PANEL: Streaming Data & Mini Graphs */}
+        {/* RIGHT PANEL: AI Chatbot Window */}
         <aside className="w-[350px] flex flex-col gap-4 shrink-0">
-          
-          <div className="h-[250px] border border-[#333333] flex flex-col bg-[#000000]">
+          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000]">
             <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
-              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Kinematic Readout</span>
-              <Activity size={12} className="text-[#ffffff]" />
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 text-[10px] flex flex-col gap-1 font-mono">
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_KNEE</span><span>{currentData.left_knee_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_KNEE</span><span>{currentData.right_knee_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_HIP</span><span>{currentData.left_hip_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_HIP</span><span>{currentData.right_hip_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_ANKLE</span><span>{currentData.left_ankle_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_ANKLE</span><span>{currentData.right_ankle_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">TORSO</span><span className={isFormDegraded ? 'bg-[#ffffff] text-[#000000] px-1' : ''}>{currentData.torso_lean.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">VELOCITY</span><span>{currentData.velocity.toFixed(3)}</span></div>
-            </div>
-          </div>
-
-          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] relative">
-            <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
-              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Knee Trajectory</span>
-              <button onClick={() => setMaximizedGraph('knee')} className="text-[#a3a3a3] hover:text-[#ffffff] flex items-center gap-1 transition-colors">
-                <span className="text-[8px] uppercase font-bold tracking-widest">Expand</span>
-                <Maximize2 size={10} />
-              </button>
+              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3] flex items-center gap-2">
+                <MessageSquare size={12} /> AI COACH
+              </span>
+              <div className="w-1.5 h-1.5 rounded-full bg-[#ffffff] animate-pulse" />
             </div>
             
-            <div className="absolute top-10 right-4 text-[8px] uppercase font-mono text-right pointer-events-none z-10">
-              <div className="text-[#ffffff] flex items-center justify-end gap-1"><div className="w-2 h-0.5 bg-[#ffffff]" /> Left Knee</div>
-              <div className="text-[#a3a3a3] flex items-center justify-end gap-1 mt-0.5"><div className="w-2 h-0.5 border-t border-dashed border-[#a3a3a3]" /> Right Knee</div>
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+              <div className="bg-[#111111] border border-[#333333] p-3 text-[10px] font-mono text-[#a3a3a3]">
+                <span className="text-[#ffffff] font-bold">SYSTEM:</span> Frame {currentFrame + 1} analysis complete.
+              </div>
+              
+              {isFormDegraded ? (
+                <div className="bg-[#ffffff] border border-[#ffffff] p-3 text-[10px] font-mono text-[#000000] shadow-[0_0_15px_rgba(255,255,255,0.2)] animate-pulse">
+                  <span className="font-bold">AI COACH:</span> Critical Warning! Your torso lean has exceeded the safe threshold ({currentData.torso_lean.toFixed(1)}°). This puts dangerous shear force on your lower back. Keep your chest up!
+                </div>
+              ) : (
+                <div className="bg-[#111111] border border-[#333333] p-3 text-[10px] font-mono text-[#a3a3a3]">
+                  <span className="text-[#ffffff] font-bold">AI COACH:</span> Form looks solid. Spine and knee valgus are within safe physiological limits.
+                </div>
+              )}
+              
+              {currentData.knee_distance < 0.2 && (
+                <div className="bg-[#ffffff] border border-[#ffffff] p-3 text-[10px] font-mono text-[#000000] shadow-[0_0_15px_rgba(255,255,255,0.2)] animate-pulse">
+                  <span className="font-bold">AI COACH:</span> Knee Valgus detected! Push your knees outward. Valgus collapse greatly increases ACL injury risk.
+                </div>
+              )}
             </div>
-
-            <div className="flex-1 p-2 pt-4 cursor-crosshair relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={kinematicsData} margin={{ top: 0, right: 5, bottom: 0, left: -25 }} onMouseMove={handleGraphHover}>
-                  <XAxis dataKey="frame" hide />
-                  <YAxis domain={[40, 180]} stroke="#333333" tick={{fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#a3a3a3'}} tickLine={false} axisLine={false} />
-                  <ReferenceLine x={currentFrame + 1} stroke="#ffffff" strokeWidth={1} />
-                  <Line type="step" dataKey="left_knee_angle" stroke="#ffffff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                  <Line type="step" dataKey="right_knee_angle" stroke="#a3a3a3" strokeWidth={1} strokeDasharray="3 3" dot={false} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] relative">
-            <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
-              <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Spinal Trajectory</span>
-              <button onClick={() => setMaximizedGraph('spine')} className="text-[#a3a3a3] hover:text-[#ffffff] flex items-center gap-1 transition-colors">
-                <span className="text-[8px] uppercase font-bold tracking-widest">Expand</span>
-                <Maximize2 size={10} />
-              </button>
-            </div>
-            <div className="flex-1 p-2 pt-4 cursor-crosshair relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={kinematicsData} margin={{ top: 0, right: 5, bottom: 0, left: -25 }} onMouseMove={handleGraphHover}>
-                  <XAxis dataKey="frame" hide />
-                  <YAxis domain={[0, 90]} stroke="#333333" tick={{fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#a3a3a3'}} tickLine={false} axisLine={false} />
-                  <ReferenceLine x={currentFrame + 1} stroke="#ffffff" strokeWidth={1} />
-                  <Line type="step" dataKey="torso_lean" stroke="#ffffff" strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                </LineChart>
-              </ResponsiveContainer>
+            
+            <div className="border-t border-[#333333] p-2 bg-[#111111]">
+              <div className="flex items-center gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Ask AI Coach about this frame..." 
+                  className="flex-1 bg-[#000000] border border-[#333333] text-[#ffffff] text-[10px] font-mono p-2 focus:outline-none focus:border-[#ffffff] placeholder:text-[#333333]"
+                />
+                <button className="bg-[#ffffff] text-[#000000] p-2 px-4 text-[10px] font-bold uppercase tracking-widest hover:bg-[#a3a3a3] transition-colors">
+                  SEND
+                </button>
+              </div>
             </div>
           </div>
-
         </aside>
       </div>
 
