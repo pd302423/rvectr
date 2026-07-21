@@ -339,14 +339,21 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] group relative">
+          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] relative">
             <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
               <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Knee Trajectory</span>
-              <button onClick={() => setMaximizedGraph('knee')} className="opacity-0 group-hover:opacity-100 transition-opacity text-[#ffffff]">
-                <Maximize2 size={12} />
+              <button onClick={() => setMaximizedGraph('knee')} className="text-[#a3a3a3] hover:text-[#ffffff] flex items-center gap-1 transition-colors">
+                <span className="text-[8px] uppercase font-bold tracking-widest">Expand</span>
+                <Maximize2 size={10} />
               </button>
             </div>
-            <div className="flex-1 p-2 pt-4 cursor-crosshair">
+            
+            <div className="absolute top-10 right-4 text-[8px] uppercase font-mono text-right pointer-events-none z-10">
+              <div className="text-[#ffffff] flex items-center justify-end gap-1"><div className="w-2 h-0.5 bg-[#ffffff]" /> Left Knee</div>
+              <div className="text-[#a3a3a3] flex items-center justify-end gap-1 mt-0.5"><div className="w-2 h-0.5 border-t border-dashed border-[#a3a3a3]" /> Right Knee</div>
+            </div>
+
+            <div className="flex-1 p-2 pt-4 cursor-crosshair relative">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={kinematicsData} margin={{ top: 0, right: 5, bottom: 0, left: -25 }} onMouseMove={handleGraphHover}>
                   <XAxis dataKey="frame" hide />
@@ -359,14 +366,15 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] group relative">
+          <div className="flex-1 border border-[#333333] flex flex-col bg-[#000000] relative">
             <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
               <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Spinal Trajectory</span>
-              <button onClick={() => setMaximizedGraph('spine')} className="opacity-0 group-hover:opacity-100 transition-opacity text-[#ffffff]">
-                <Maximize2 size={12} />
+              <button onClick={() => setMaximizedGraph('spine')} className="text-[#a3a3a3] hover:text-[#ffffff] flex items-center gap-1 transition-colors">
+                <span className="text-[8px] uppercase font-bold tracking-widest">Expand</span>
+                <Maximize2 size={10} />
               </button>
             </div>
-            <div className="flex-1 p-2 pt-4 cursor-crosshair">
+            <div className="flex-1 p-2 pt-4 cursor-crosshair relative">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={kinematicsData} margin={{ top: 0, right: 5, bottom: 0, left: -25 }} onMouseMove={handleGraphHover}>
                   <XAxis dataKey="frame" hide />
