@@ -1,28 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
-
 export default async function Home() {
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarded")
-        .eq("id", user.id)
-        .single();
-      redirect(profile?.onboarded ? "/dashboard" : "/onboarding");
-    }
-  }
-
   return (
-    <main className="bg-background text-foreground">
+    <main className="bg-background text-foreground relative overflow-hidden min-h-screen">
+      
+      {/* Ambient Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-primary/20 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-accent/20 blur-[150px] pointer-events-none" />
 
       {/* ──────── NAV ──────── */}
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-4">
+      <nav className="fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-background/50 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
           <span style={{ fontFamily: "var(--font-serif)" }} className="text-lg italic tracking-tight">
             rvector
           </span>
@@ -43,8 +31,8 @@ export default async function Home() {
         </div>
       </nav>
 
-      {/* ──────── HERO — asymmetric 8/4 ──────── */}
-      <section className="border-b border-border pt-32 pb-24">
+      {/* ──────── HERO — Apple Fitness Style ──────── */}
+      <section className="relative pt-40 pb-32">
         <div className="mx-auto max-w-7xl px-8">
           <div className="grid grid-cols-1 gap-16 lg:grid-cols-12 lg:gap-12">
 
@@ -54,16 +42,13 @@ export default async function Home() {
                 Calisthenics · Coaching system · v0.1
               </p>
               <h1
-                style={{ fontFamily: "var(--font-serif)" }}
-                className="text-[clamp(3rem,8vw,7.5rem)] leading-[0.95] tracking-tight font-normal"
+                className="text-[clamp(3.5rem,10vw,8rem)] leading-[0.9] tracking-tight font-bold bg-clip-text text-transparent bg-gradient-to-br from-foreground via-foreground to-foreground/50"
               >
-                A coaching
+                Intelligent
                 <br />
-                system that
+                tracking for
                 <br />
-                <span className="italic text-muted-foreground">watches you</span>
-                <br />
-                train.
+                <span className="text-primary italic">calisthenics.</span>
               </h1>
             </div>
 
@@ -83,9 +68,9 @@ export default async function Home() {
                 <div className="pt-4">
                   <Link
                     href="/signin"
-                    className="inline-flex items-center gap-3 text-sm border-b border-foreground pb-1.5 hover:gap-4 transition-all"
+                    className="inline-flex items-center gap-3 text-sm font-medium bg-primary text-primary-foreground px-6 py-3 rounded-full hover:scale-105 transition-transform shadow-[0_0_20px_rgba(var(--primary),0.3)]"
                   >
-                    Begin initial assessment
+                    Start your assessment
                     <span>→</span>
                   </Link>
                 </div>
@@ -95,8 +80,8 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ──────── SAMPLE SESSION REPORT — single large diagnostic ──────── */}
-      <section className="border-b border-border py-24">
+      {/* ──────── SAMPLE SESSION REPORT — glass card ──────── */}
+      <section className="relative py-24">
         <div className="mx-auto max-w-7xl px-8">
 
           {/* Meta header */}
@@ -125,19 +110,14 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ──────── METHODOLOGY — long-form editorial ──────── */}
-      <section id="methodology" className="border-b border-border py-32">
+      {/* ──────── METHODOLOGY — premium format ──────── */}
+      <section id="methodology" className="relative py-32 bg-secondary/30">
         <div className="mx-auto max-w-3xl px-8">
 
-          <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-6">
-            § 01 — Methodology
-          </p>
-
           <h2
-            style={{ fontFamily: "var(--font-serif)" }}
-            className="text-5xl leading-tight tracking-tight mb-12"
+            className="text-5xl font-bold leading-tight tracking-tight mb-12"
           >
-            Coaching, but as <span className="italic">measurement</span>.
+            Not just tracking. <span className="text-accent italic">Coaching.</span>
           </h2>
 
           <div className="space-y-8 text-base leading-[1.75] text-foreground/85 max-w-prose">
@@ -209,19 +189,15 @@ export default async function Home() {
       </section>
 
       {/* ──────── WHAT IS MEASURED — spec table ──────── */}
-      <section id="measurements" className="border-b border-border py-32">
+      <section id="measurements" className="relative py-32">
         <div className="mx-auto max-w-7xl px-8">
 
           <div className="grid grid-cols-1 gap-16 lg:grid-cols-12">
             <div className="lg:col-span-4">
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-6">
-                § 02 — Measurements
-              </p>
               <h2
-                style={{ fontFamily: "var(--font-serif)" }}
-                className="text-4xl leading-tight tracking-tight"
+                className="text-4xl font-bold leading-tight tracking-tight"
               >
-                Every metric rvector observes.
+                Measured with precision.
               </h2>
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-xs">
                 Continuous measurement across the kinematic, performance, and
@@ -237,25 +213,24 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ──────── CTA — minimal ──────── */}
-      <section className="py-32">
-        <div className="mx-auto max-w-3xl px-8 text-center">
+      {/* ──────── CTA ──────── */}
+      <section className="relative py-32 overflow-hidden">
+        <div className="absolute inset-0 bg-primary/10 blur-[100px] pointer-events-none" />
+        <div className="relative mx-auto max-w-3xl px-8 text-center glass p-16 rounded-3xl">
           <h2
-            style={{ fontFamily: "var(--font-serif)" }}
-            className="text-5xl leading-tight tracking-tight"
+            className="text-5xl font-bold leading-tight tracking-tight"
           >
-            Begin your initial assessment.
+            Ready to begin?
           </h2>
-          <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-md mx-auto">
-            rvector requires a baseline athlete profile before it can generate programming.
-            Setup takes approximately two minutes.
+          <p className="mt-6 text-base leading-relaxed text-muted-foreground max-w-md mx-auto">
+            Take the baseline assessment and let our AI engine generate your personalized progression path.
           </p>
           <div className="mt-10">
             <Link
               href="/signin"
-              className="inline-flex items-center gap-3 text-sm border-b border-foreground pb-1.5 hover:gap-4 transition-all"
+              className="inline-flex items-center gap-3 text-sm font-medium bg-foreground text-background px-8 py-4 rounded-full hover:scale-105 transition-transform"
             >
-              Continue to authentication
+              Start tracking
               <span>→</span>
             </Link>
           </div>
@@ -327,7 +302,7 @@ function PullQuote({ text, source }: { text: string; source: string }) {
 
 function SessionReport() {
   return (
-    <div className="border border-border bg-card font-mono text-xs">
+    <div className="glass rounded-2xl font-mono text-xs overflow-hidden">
 
       {/* ── Document header ── */}
       <header className="grid grid-cols-2 gap-x-8 gap-y-4 border-b border-border px-6 py-5 sm:grid-cols-4">
@@ -521,8 +496,8 @@ function SpecTable() {
 
   let lastDomain = "";
   return (
-    <div className="border border-border">
-      <div className="border-b border-border bg-secondary/30 grid grid-cols-12 px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+    <div className="glass rounded-2xl overflow-hidden">
+      <div className="border-b border-white/5 bg-white/5 grid grid-cols-12 px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         <div className="col-span-3">Domain</div>
         <div className="col-span-5">Metric</div>
         <div className="col-span-2">Unit</div>

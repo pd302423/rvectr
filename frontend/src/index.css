@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+@theme inline {
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+  --color-primary: #ffffff;
+  --color-accent: #ffffff;
+  --color-border: #333333;
+  --color-muted: #111111; 
+  --color-muted-foreground: #a3a3a3;
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333333; border-radius: 0px; }
+::-webkit-scrollbar-thumb:hover { background: #ffffff; }
+
+/* Structural Panels */
+.instrument-panel {
+  border: 1px solid var(--color-border);
+  background-color: transparent;
+}
+
+.instrument-header {
+  border-bottom: 1px solid var(--color-border);
+  padding: 8px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted-foreground);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}

@@ -1,0 +1,194 @@
+[
+  {
+    "verdict": "knee_valgus_moderate, depth_insufficient",
+    "coaching_text": "Your knees are caving inward (valgus) as you stand up, and you are stopping a few inches above parallel. Focus on actively pushing your knees outward and lowering your hips until your crease is below your knee."
+  },
+  {
+    "verdict": "spine_flexion_excessive, hip_hinge_late",
+    "coaching_text": "You are rounding your lower back ('butt wink') at the bottom of the squat, and you are starting the descent by just bending your knees. Brace your core and break at the hips and knees simultaneously to keep your spine neutral."
+  },
+  {
+    "verdict": "heel_lift_severe, ankle_dorsiflexion_poor",
+    "coaching_text": "Your heels are coming completely off the floor at the bottom, indicating limited ankle mobility. Try reaching your arms further forward for counterbalance, and incorporate calf stretches into your daily routine."
+  },
+  {
+    "verdict": "torso_lean_excessive, center_of_mass_forward",
+    "coaching_text": "Your chest is collapsing forward, shifting your center of mass over your toes. Keep your chest proud, raise your arms higher in front of you for balance, and look straight ahead rather than down at the floor."
+  },
+  {
+    "verdict": "form_perfect, velocity_steady",
+    "coaching_text": "Excellent rep! Your balance is perfectly centered over your mid-foot, depth is well below parallel, and you maintained strong core tension without any spinal flexion. Beautiful bodyweight mechanics."
+  },
+  {
+    "verdict": "asymmetric_weight_shift_right, hip_shift",
+    "coaching_text": "During the ascent, your hips shift noticeably to the right, pushing harder off your right leg. This could indicate a strength imbalance. Incorporate unilateral work like pistol squat progressions to balance this out."
+  },
+  {
+    "verdict": "knee_varus_slight, stance_too_wide",
+    "coaching_text": "Your knees are bowing too far outward beyond your feet. Your stance might be slightly too wide for your hip anatomy. Bring your feet in about an inch on each side to find a smoother groove."
+  },
+  {
+    "verdict": "cervical_hyperextension, gaze_too_high",
+    "coaching_text": "You are cranking your neck backward and looking at the ceiling. Keep your neck neutral by tucking your chin slightly and staring at a spot on the wall directly in front of you."
+  },
+  {
+    "verdict": "descent_velocity_excessive, loss_of_tension",
+    "coaching_text": "You are dive-bombing the descent and bouncing out of the bottom rather than controlling it. Take 2-3 seconds to go down to build muscle control and protect your joints."
+  },
+  {
+    "verdict": "inadequate_hip_extension_top, soft_knees_lockout",
+    "coaching_text": "You aren't fully finishing the rep at the top. Your hips remain slightly hinged. Make sure to squeeze your glutes and stand completely tall before starting the next repetition."
+  },
+  {
+    "verdict": "good_morning_squat, hips_shoot_up",
+    "coaching_text": "Out of the hole, your hips shoot up faster than your chest, pitching your torso forward. Keep your chest up and ensure your shoulders and hips rise at the exact same speed."
+  },
+  {
+    "verdict": "toe_lift_slight, weight_on_heels",
+    "coaching_text": "Your toes are lifting off the ground, meaning your weight is shifted too far back. Focus on maintaining 'tripod foot' pressure—equal weight on the heel, base of the big toe, and base of the little toe."
+  },
+  {
+    "verdict": "depth_excessive, loss_of_lumbar_extension",
+    "coaching_text": "You are squatting so deep that your lower back is rounding aggressively. For your current mobility, stop your descent just an inch higher to maintain a flat, neutral spine."
+  },
+  {
+    "verdict": "knee_slide_forward, late_knee_travel",
+    "coaching_text": "Your knees continue to slide forward at the very bottom of the squat, which stresses the patellar tendon. Try to set your knee position in the first half of the descent and drop straight down from there."
+  },
+  {
+    "verdict": "stance_too_narrow, hip_impingement_early",
+    "coaching_text": "Your stance is too narrow, causing your thighs to block your torso and limit your depth. Widen your stance by an inch or two and point your toes out slightly more to open up your hips."
+  },
+  {
+    "verdict": "breathing_incorrect, loss_of_bracing",
+    "coaching_text": "You appear to be exhaling on the way down, which deflates your core. Even for bodyweight squats, take a breath at the top, brace your abs, and exhale as you push back up."
+  },
+  {
+    "verdict": "arms_dropping_ascent, loss_of_balance",
+    "coaching_text": "You are dropping your arms to your sides as you stand up, which is causing you to lose your forward balance. Keep your arms extended parallel to the floor throughout the entire movement."
+  },
+  {
+    "verdict": "asymmetric_arm_swing, torso_twist",
+    "coaching_text": "You are swinging your right arm higher than your left, causing your torso to twist. Keep your hands clasped together in front of your chest to ensure your shoulders stay square."
+  },
+  {
+    "verdict": "pause_squat_unintentional, sticking_point_failure",
+    "coaching_text": "You are pausing halfway up the ascent. Instead of slowing down, focus on pushing the floor away aggressively as soon as you reach the bottom of the squat."
+  },
+  {
+    "verdict": "pronation_foot, arch_collapse",
+    "coaching_text": "The arches of your feet are collapsing inward (pronating), which drags your knees with them. Actively 'screw' your bare feet into the floor to create torque and raise your arches."
+  },
+  {
+    "verdict": "form_perfect, depth_excellent, bracing_strong",
+    "coaching_text": "Textbook execution. Your core remained tight, your knees tracked perfectly over your toes, and you hit convincing depth without any pelvic tilt. Phenomenal work."
+  },
+  {
+    "verdict": "hip_hinge_excessive, minimal_knee_bend",
+    "coaching_text": "You are pushing your hips back dramatically but barely bending your knees, throwing your torso completely horizontal. Let your knees travel forward naturally to keep your torso more upright."
+  },
+  {
+    "verdict": "valgus_twitch, concentric_weakness",
+    "coaching_text": "You exhibit a small 'valgus twitch' (knees dart in and out) right as you start to stand up. This indicates your glute medius isn't firing correctly. Focus hard on pushing the knees wide out of the hole."
+  },
+  {
+    "verdict": "hands_on_knees, self_assistance",
+    "coaching_text": "You are putting your hands on your thighs and pushing to help yourself stand up. To build true leg strength, keep your arms off your legs—cross them over your chest or hold them out in front."
+  },
+  {
+    "verdict": "stutter_step_setup, lack_of_focus",
+    "coaching_text": "You are shuffling your feet constantly before starting the rep. Plant your feet firmly just outside shoulder width, grip the floor with your toes, and don't move them until the set is over."
+  },
+  {
+    "verdict": "cervical_flexion, chin_tucked_excessive",
+    "coaching_text": "You are staring straight down at your feet, which encourages your upper back to round. Lift your gaze to look straight ahead to keep your spine extended."
+  },
+  {
+    "verdict": "descent_too_slow, concentric_slow",
+    "coaching_text": "You are moving in slow motion for the entire rep. While control is good, creeping down wastes energy. Drop with purpose and stand up with explosive speed."
+  },
+  {
+    "verdict": "stance_staggered, left_foot_forward",
+    "coaching_text": "Your left foot is placed ahead of your right foot. This staggered stance causes your pelvis to twist. Check your feet before every set to ensure your toes are on an even line."
+  },
+  {
+    "verdict": "knee_valgus_severe, lack_of_control",
+    "coaching_text": "Your knees are crashing together violently on the way up. You need to prioritize knee tracking immediately. Think about spreading the floor apart with your feet."
+  },
+  {
+    "verdict": "heel_lift_moderate, center_of_mass_forward",
+    "coaching_text": "Your center of mass is drifting over your toes, lifting your heels. Focus on keeping your weight distributed evenly across the middle of your foot for the entire rep."
+  },
+  {
+    "verdict": "form_adequate, depth_borderline",
+    "coaching_text": "Solid overall mechanics, but your depth is right on the border. Try to sink just one inch lower to leave no doubt that you broke parallel. Your back and knees look great."
+  },
+  {
+    "verdict": "butt_wink_early, core_unbraced",
+    "coaching_text": "Your pelvis is tucking under very early in the descent. You aren't bracing your core properly. Flex your abs as if expecting a punch before you start dropping."
+  },
+  {
+    "verdict": "asymmetric_depth, right_hip_high",
+    "coaching_text": "At the bottom of the squat, your right hip is visibly higher than your left. This uneven depth usually stems from uneven ankle mobility. Check if your right ankle feels tighter than the left."
+  },
+  {
+    "verdict": "torso_upright_excessive, lack_of_hip_hinge",
+    "coaching_text": "You are trying to keep your torso perfectly vertical, which forces your knees too far forward. It is completely okay to lean your torso forward slightly to allow your hips to push back."
+  },
+  {
+    "verdict": "bouncing_out_of_hole, joint_stress",
+    "coaching_text": "You are crash-landing into the bottom of the squat and bouncing off your calves. This uncontrolled bounce places immense stress on your knee joints. Control the last inch of the descent."
+  },
+  {
+    "verdict": "head_whip_ascent, cervical_stress",
+    "coaching_text": "As you stand up, you violently whip your head backward. This does not generate force and can easily strain a neck muscle. Keep your neck stiff and packed."
+  },
+  {
+    "verdict": "feet_too_straight, poor_tracking",
+    "coaching_text": "Your feet are pointed perfectly straight forward, which prevents your hips from opening up. Turn your toes out slightly (about 15-30 degrees) to give your hips room to operate."
+  },
+  {
+    "verdict": "hyper_extension_top, lower_back_stress",
+    "coaching_text": "At the top of the rep, instead of just standing tall, you are leaning back and hyper-extending your spine. To finish the rep safely, just squeeze your glutes without leaning your shoulders backward."
+  },
+  {
+    "verdict": "shoulder_tension, trap_shrug",
+    "coaching_text": "You are shrugging your shoulders tightly up toward your ears. Relax your upper body. Drop your shoulders away from your ears to keep the movement fluid."
+  },
+  {
+    "verdict": "form_perfect, explosive_concentric",
+    "coaching_text": "Incredible squat. You controlled the eccentric beautifully and exploded upward with maximum velocity while maintaining a flawless torso angle. Excellent calisthenics baseline."
+  },
+  {
+    "verdict": "squat_morning_severe, weak_quads",
+    "coaching_text": "You are shooting your hips back and folding over on the way up. Your quads aren't doing the work. Try practicing wall sits to build foundational quad strength and endurance."
+  },
+  {
+    "verdict": "toe_angle_asymmetric, right_foot_flared",
+    "coaching_text": "Your left foot is angled slightly, but your right foot is flared out aggressively. This asymmetry will cause your hips to twist. Ensure both feet are mirroring each other."
+  },
+  {
+    "verdict": "knee_cave_initiation, hip_internal_rotation",
+    "coaching_text": "Your knees cave inward the moment you begin the descent. You need to actively 'root' your feet and push your knees out from the very first inch of the movement."
+  },
+  {
+    "verdict": "loss_of_balance_backward, toes_floating",
+    "coaching_text": "You almost lost your balance falling backward. Your weight is shifting entirely to your heels. Think about gripping the floor with your big toes to keep yourself anchored."
+  },
+  {
+    "verdict": "hips_descend_first, delayed_knee_bend",
+    "coaching_text": "You are pushing your hips back for a full second before your knees start to bend. This disconnect makes the movement clunky. The hips and knees must unlock at the exact same time."
+  },
+  {
+    "verdict": "good_morning_squat_mild, glute_dominance",
+    "coaching_text": "Your chest is dropping slightly faster than your hips are descending. Think 'chest up' as you come out of the hole to keep your torso angle consistent."
+  },
+  {
+    "verdict": "over_pronation_ascent, medial_knee_stress",
+    "coaching_text": "As you push out of the bottom, the inside of your foot collapses into the floor. Since you are doing this barefoot, really focus on gripping the ground to build up those arch muscles."
+  },
+  {
+    "verdict": "form_excellent, mobility_great",
+    "coaching_text": "Fantastic lift. Your ankle and hip mobility allow you to achieve a very deep, upright bodyweight squat without any lower back rounding. Mechanics are dialed in. Great work."
+  }
+]
