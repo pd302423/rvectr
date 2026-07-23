@@ -26,11 +26,17 @@ const JOINTS = [
 ];
 
 const meshCache = {};
+const materialCache = {};
 
 function getMeshMaterial(style) {
+  if (materialCache[style]) {
+    return materialCache[style];
+  }
+
+  let mat;
   switch (style) {
     case 'smooth_metal':
-      return new THREE.MeshStandardMaterial({
+      mat = new THREE.MeshStandardMaterial({
         color: '#cbd5e1',
         wireframe: false,
         flatShading: false,
@@ -38,24 +44,27 @@ function getMeshMaterial(style) {
         metalness: 0.95,
         envMapIntensity: 2.0
       });
+      break;
     case 'solid':
-      return new THREE.MeshStandardMaterial({
+      mat = new THREE.MeshStandardMaterial({
         color: '#e2e8f0',
         wireframe: false,
         flatShading: false,
         roughness: 0.35,
         metalness: 0.1
       });
+      break;
     case 'metallic':
-      return new THREE.MeshStandardMaterial({
+      mat = new THREE.MeshStandardMaterial({
         color: '#94a3b8',
         wireframe: false,
         flatShading: false,
         roughness: 0.25,
         metalness: 0.75
       });
+      break;
     case 'neon':
-      return new THREE.MeshStandardMaterial({
+      mat = new THREE.MeshStandardMaterial({
         color: '#38bdf8',
         wireframe: true,
         transparent: true,
@@ -63,16 +72,21 @@ function getMeshMaterial(style) {
         emissive: '#0284c7',
         emissiveIntensity: 0.5
       });
+      break;
     case 'translucent':
     default:
-      return new THREE.MeshStandardMaterial({
+      mat = new THREE.MeshStandardMaterial({
         color: '#ffffff',
         wireframe: true,
         transparent: true,
         opacity: 0.25,
         roughness: 0.5
       });
+      break;
   }
+
+  materialCache[style] = mat;
+  return mat;
 }
 
 function AnimatedModel({ frame, currentData, selectedJoint, setSelectedJoint, hoveredJoint, setHoveredJoint, meshStyle = 'translucent', exerciseMode = 'running' }) {
@@ -82,14 +96,26 @@ function AnimatedModel({ frame, currentData, selectedJoint, setSelectedJoint, ho
     const loader = new OBJLoader();
     const folder = exerciseMode === 'running' ? '/running_meshes' : '/meshes';
     const totalFrames = exerciseMode === 'running' ? 90 : 161;
+    const initialMat = getMeshMaterial(meshStyle);
 
-    for(let i=1; i<=totalFrames; i++) {
+    for (let i = 1; i <= totalFrames; i++) {
       const frameStr = String(i).padStart(4, '0');
       const cacheKey = `${exerciseMode}_${i}`;
-      loader.load(`${folder}/frame_${frameStr}_0.obj`, (obj) => {
-        meshCache[cacheKey] = obj;
-        if (i === frame + 1) setCurrentMesh(obj);
-      });
+
+      if (!meshCache[cacheKey]) {
+        loader.load(`${folder}/frame_${frameStr}_0.obj`, (obj) => {
+          obj.traverse((child) => {
+            if (child.isMesh) {
+              child.geometry.computeVertexNormals(); // Compute smooth vertex normals ONCE upon load
+              child.material = initialMat;
+            }
+          });
+          meshCache[cacheKey] = obj;
+          if (i === frame + 1) setCurrentMesh(obj);
+        });
+      } else if (i === frame + 1) {
+        setCurrentMesh(meshCache[cacheKey]);
+      }
     }
   }, [exerciseMode]);
 
@@ -102,19 +128,15 @@ function AnimatedModel({ frame, currentData, selectedJoint, setSelectedJoint, ho
 
   useEffect(() => {
     const mat = getMeshMaterial(meshStyle);
-    const applySmoothMat = (obj) => {
+    Object.values(meshCache).forEach((obj) => {
       if (!obj) return;
       obj.traverse((child) => {
         if (child.isMesh) {
-          child.geometry.computeVertexNormals(); // Compute smooth vertex normals
           child.material = mat;
         }
       });
-    };
-
-    Object.values(meshCache).forEach(applySmoothMat);
-    if (currentMesh) applySmoothMat(currentMesh);
-  }, [meshStyle, currentMesh]);
+    });
+  }, [meshStyle]);
 
   if (!currentMesh) return null;
   return (
@@ -153,16 +175,35 @@ export default function App() {
     }
   }, [currentFrame, viewMode]);
 
+  // VSync-synchronized requestAnimationFrame loop for silky smooth 3D playback
   useEffect(() => {
-    let interval;
+    let animId;
+    let lastTime = performance.now();
+    let accumulator = 0;
+
     if (isPlaying3D && viewMode === '3d') {
-      const delay = Math.floor(1000 / fps);
-      interval = setInterval(() => {
-        setCurrentFrame(prev => (prev >= kinematicsData.length - 1 ? 0 : prev + 1));
-      }, delay);
+      const frameDuration = 1000 / fps;
+      const tick = (now) => {
+        const delta = now - lastTime;
+        lastTime = now;
+        accumulator += delta;
+
+        if (accumulator >= frameDuration) {
+          const stepCount = Math.floor(accumulator / frameDuration);
+          accumulator %= frameDuration;
+          setCurrentFrame(prev => {
+            const nextFrame = prev + stepCount;
+            return nextFrame >= kinematicsData.length ? 0 : nextFrame;
+          });
+        }
+        animId = requestAnimationFrame(tick);
+      };
+      animId = requestAnimationFrame(tick);
     }
-    return () => clearInterval(interval);
-  }, [isPlaying3D, viewMode, fps]);
+    return () => {
+      if (animId) cancelAnimationFrame(animId);
+    };
+  }, [isPlaying3D, viewMode, fps, kinematicsData.length]);
 
   const handleGraphHover = (state) => {
     if (state && state.activeTooltipIndex !== undefined) {

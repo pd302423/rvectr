@@ -388,8 +388,8 @@ export default function SquatTestPage() {
       }
     }
 
-    // 2. Draw joint points — highlight squat-critical joints (hips, knees, ankles)
-    const squatKeyJoints = [23, 24, 25, 26, 27, 28]; // hips, knees, ankles
+    // 2. Draw joint points — highlight squat-critical joints (hips, knees, ankles, heels, toes)
+    const squatKeyJoints = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32]; // hips, knees, ankles, heels, toes
     const secondaryJoints = [11, 12]; // shoulders (for torso lean reference)
     
     for (const [idx, lm] of landmarks.entries()) {

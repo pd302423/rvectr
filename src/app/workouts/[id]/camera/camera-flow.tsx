@@ -104,12 +104,9 @@ export function CameraFlow({
 
   // Timer
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isRecording) {
-      interval = setInterval(() => setRecordingTime((t) => t + 1), 1000);
-    } else {
-      setRecordingTime(0);
-    }
+    if (!isRecording) return;
+    setRecordingTime(0);
+    const interval = setInterval(() => setRecordingTime((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, [isRecording]);
 
@@ -242,7 +239,7 @@ export function CameraFlow({
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center">
         <h2 className="text-3xl font-serif mb-4">Assessment Complete</h2>
-        <p className="text-muted-foreground mb-8">You've recorded all tests. Upload them to the AI for grading.</p>
+        <p className="text-muted-foreground mb-8">You&apos;ve recorded all tests. Upload them to the AI for grading.</p>
         
         {isUploading ? (
           <div className="w-full max-w-sm mx-auto">

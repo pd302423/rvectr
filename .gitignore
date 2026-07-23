@@ -58,6 +58,34 @@ backend/**/*.pt.part*
 backend/**/*.tar.gz
 backend/**/*.npy
 backend/**/*.npz
+*.pkl
+*.npz
+*.pth
+*.pt
+*.ckpt
+*.task
+*.onnx
+**/data/smpl*
+**/data/models/
+backend/4D-Humans/data/
+backend/EasyMocap/data/
+
+# Video Recordings & Media Files
+*.mp4
+*.MOV
+*.mov
+*.avi
+*.webm
+*.m4v
+videos/
+videos2/
+
+# 3D Mesh Output & Large Binary Files
+*.blend
+*.blend1
+*.glb
+*.obj
+*.npy
 
 # Backend — Mesh outputs and video frames (generated, not source)
 backend/squat_demo_out/
@@ -74,4 +102,5 @@ backend/**/__pycache__/
 
 # Backend — Haar cascade (930KB, downloadable from OpenCV)
 backend/haarcascade_frontalface_default.xml
+
 

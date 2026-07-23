@@ -3,6 +3,7 @@ import {
   angleBetweenPoints,
   getHipAngle,
   getKneeAngle,
+  getHeelLiftRatio,
   LANDMARKS,
 } from "@/lib/cv/angles";
 
@@ -52,6 +53,10 @@ export interface SquatFrameData {
   rightHip: number;
   /** Torso lean from vertical (degrees). 0° = perfectly upright. */
   torsoLean: number;
+  /** Left heel lift ratio (normalized, >0.35 indicates lifted heel). */
+  leftHeelLift?: number;
+  /** Right heel lift ratio (normalized, >0.35 indicates lifted heel). */
+  rightHeelLift?: number;
   /** Frame capture timestamp (ms, monotonic). */
   timestamp: number;
 }
@@ -116,6 +121,8 @@ export function extractSquatFrame(landmarks: Landmark[]): SquatFrameData {
     leftHip: getHipAngle(landmarks, "left"),
     rightHip: getHipAngle(landmarks, "right"),
     torsoLean: calculateTorsoLean(landmarks),
+    leftHeelLift: getHeelLiftRatio(landmarks, "left"),
+    rightHeelLift: getHeelLiftRatio(landmarks, "right"),
     timestamp: 0,
   };
 }
@@ -256,17 +263,16 @@ export function gradeSquatRep(frames: SquatFrameData[]): SquatRepScore {
   // Bottom-phase accumulators (knee < 110°)
   let bottomLeanSum = 0;
   let bottomFrameCount = 0;
-
-  // Heel-rise detection: rapid torso lean change in bottom phase
-  let heelRiseDetected = false;
+  let heelLiftFramesCount = 0;
 
   for (let i = 0; i < frames.length; i++) {
     const f = frames[i];
     const avgKnee = (f.leftKnee + f.rightKnee) / 2;
     const avgHip = (f.leftHip + f.rightHip) / 2;
 
-    if (avgKnee < minKneeAngle) minKneeAngle = avgKnee;
-    if (avgHip < minHipAngle) minHipAngle = avgHip;
+    // Ignore invalid/occluded landmark readings (angles <= 10°)
+    if (avgKnee > 10 && avgKnee < minKneeAngle) minKneeAngle = avgKnee;
+    if (avgHip > 10 && avgHip < minHipAngle) minHipAngle = avgHip;
 
     totalKneeDiff += Math.abs(f.leftKnee - f.rightKnee);
 
@@ -275,16 +281,18 @@ export function gradeSquatRep(frames: SquatFrameData[]): SquatRepScore {
       bottomLeanSum += f.torsoLean;
       bottomFrameCount++;
 
-      // Check for rapid torso lean change (heel rise proxy)
-      if (i > 0) {
-        const prev = frames[i - 1];
-        const leanDelta = Math.abs(f.torsoLean - prev.torsoLean);
-        if (leanDelta > 15) {
-          heelRiseDetected = true;
-        }
+      // Check direct heel elevation relative to toe (lift ratio > 0.35)
+      const maxLift = Math.max(f.leftHeelLift ?? 0, f.rightHeelLift ?? 0);
+      if (maxLift > 0.35) {
+        heelLiftFramesCount++;
       }
     }
   }
+
+  // Flag heel rise only if significant heel lift is sustained during bottom phase
+  const heelRiseDetected =
+    bottomFrameCount >= 2 &&
+    (heelLiftFramesCount >= 2 || (bottomFrameCount > 0 && heelLiftFramesCount / bottomFrameCount > 0.2));
 
   const avgKneeDiff = totalKneeDiff / frames.length;
   const avgLeanBottom =

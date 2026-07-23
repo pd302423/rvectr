@@ -133,20 +133,30 @@ export async function completeWorkout(
   // Update each exercise with its corresponding manual reps or video paths
   if (!(videoPathsOrFormData instanceof FormData)) {
     const data = videoPathsOrFormData as Record<string, string | number>;
-    
-    // Insert into logged_sets
+
+    // Verify exercise ownership to prevent unauthorized cross-tenant modifications
+    const { data: validExercises } = await supabase
+      .from("workout_exercises")
+      .select("id")
+      .eq("workout_id", workoutId);
+
+    const validExerciseIds = new Set(validExercises?.map((e) => e.id) ?? []);
+
+    // Insert into logged_sets or update video_path
     for (const [exerciseId, val] of Object.entries(data)) {
-      if (typeof val === 'number') {
-        await supabase
-          .from("logged_sets")
-          .insert({
-            workout_exercise_id: exerciseId,
-            user_id: user.id,
-            set_number: 1,
-            reps_completed: val,
-            rpe_reported: 10, // Assuming max effort for assessment
-          });
-      } else if (typeof val === 'string' && val.length > 0) {
+      if (!validExerciseIds.has(exerciseId)) {
+        continue; // Skip any unauthorized or invalid exercise IDs
+      }
+
+      if (typeof val === "number" && val >= 0) {
+        await supabase.from("logged_sets").insert({
+          workout_exercise_id: exerciseId,
+          user_id: user.id,
+          set_number: 1,
+          reps_completed: Math.floor(val),
+          rpe_reported: 10,
+        });
+      } else if (typeof val === "string" && val.length > 0) {
         await supabase
           .from("workout_exercises")
           .update({ video_path: val })
