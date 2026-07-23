@@ -48,3 +48,30 @@ coverage/
 # Claude Code local settings (machine-specific permissions cache)
 .claude/settings.local.json
 .env*
+
+# Backend — Model weights (large binary files, download separately)
+backend/**/*.pkl
+backend/**/*.pth
+backend/**/*.ckpt
+backend/**/*.pt
+backend/**/*.pt.part*
+backend/**/*.tar.gz
+backend/**/*.npy
+backend/**/*.npz
+
+# Backend — Mesh outputs and video frames (generated, not source)
+backend/squat_demo_out/
+backend/squat_demo_out_smoothed/
+backend/running_demo_out/
+backend/squat_frames/
+backend/single_image_out/
+backend/single_image_test/
+backend/glb_output/
+
+# Backend — Python virtual environments
+backend/**/venv/
+backend/**/__pycache__/
+
+# Backend — Haar cascade (930KB, downloadable from OpenCV)
+backend/haarcascade_frontalface_default.xml
+

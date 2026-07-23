@@ -1,0 +1,21 @@
+=== Joint Angles Summary ===
+left_knee_angle: Min=42.87, Max=141.97, Mean=103.56, Std=34.48
+right_knee_angle: Min=41.36, Max=140.28, Mean=100.60, Std=33.66
+left_hip_angle: Min=41.01, Max=148.51, Mean=108.53, Std=37.08
+right_hip_angle: Min=43.58, Max=148.87, Mean=108.92, Std=36.54
+
+Deepest squat frame: 149 (Depth: -0.09)
+
+Frames with potential knee valgus: []
+
+=== Angular Velocity Summary ===
+left_knee_angular_vel: Min=-387.60, Max=382.80, Mean=-1.19, Std=217.07
+right_knee_angular_vel: Min=-378.90, Max=368.25, Mean=-0.84, Std=212.68
+left_hip_angular_vel: Min=-415.95, Max=396.75, Mean=-1.16, Std=231.63
+right_hip_angular_vel: Min=-406.50, Max=388.65, Mean=0.43, Std=229.05
+
+=== Left-Right Symmetry (Absolute Differences) ===
+Knee Mean Diff: 2.96 (Std: 1.45)
+Hip Mean Diff: 1.25 (Std: 0.95)
+
+Phases Example (first 10): ['STANDING', 'STANDING', 'STANDING', 'STANDING', 'STANDING', 'STANDING', 'STANDING', 'STANDING', 'STANDING', 'STANDING']

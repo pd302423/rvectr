@@ -2,80 +2,156 @@ import React, { useState, useRef, useEffect, Suspense, useMemo } from 'react';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts';
-import { Camera, Activity, Ruler, Target, Database, AlertCircle, Box, Play, Pause, ChevronLeft, ChevronRight, Maximize2, X, MessageSquare } from 'lucide-react';
+import { Camera, Activity, Ruler, Target, Database, AlertCircle, Box, Play, Pause, ChevronLeft, ChevronRight, Maximize2, X, MessageSquare, Layers, Eye, Settings } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useGLTF, Environment, Center, Html } from '@react-three/drei';
-import kinematicsData from './data.json';
+import squatKinematicsData from './data.json';
+import runningKinematicsData from './running_data.json';
 import './index.css';
 
 const Num = ({ children, className = "" }) => (
   <span className={`font-mono ${className}`}>{children}</span>
 );
 
+const JOINTS = [
+  { id: 'left_knee', label: 'L_KNEE', name: 'Left Knee', angleKey: 'left_knee_angle', velKey: 'left_knee_angular_vel', pos: [-0.08, -0.22, 0.05] },
+  { id: 'right_knee', label: 'R_KNEE', name: 'Right Knee', angleKey: 'right_knee_angle', velKey: 'right_knee_angular_vel', pos: [0.08, -0.22, 0.05] },
+  { id: 'left_hip', label: 'L_HIP', name: 'Left Hip', angleKey: 'left_hip_angle', velKey: 'left_hip_angular_vel', pos: [-0.06, 0.02, 0.0] },
+  { id: 'right_hip', label: 'R_HIP', name: 'Right Hip', angleKey: 'right_hip_angle', velKey: 'right_hip_angular_vel', pos: [0.06, 0.02, 0.0] },
+  { id: 'left_ankle', label: 'L_ANKLE', name: 'Left Ankle', angleKey: 'left_ankle_angle', velKey: 'left_ankle_angular_vel', pos: [-0.09, -0.48, 0.05] },
+  { id: 'right_ankle', label: 'R_ANKLE', name: 'Right Ankle', angleKey: 'right_ankle_angle', velKey: 'right_ankle_angular_vel', pos: [0.09, -0.48, 0.05] },
+  { id: 'left_elbow', label: 'L_ELBOW', name: 'Left Elbow', angleKey: 'left_elbow_angle', velKey: 'left_elbow_angular_vel', pos: [-0.20, 0.18, 0.05] },
+  { id: 'right_elbow', label: 'R_ELBOW', name: 'Right Elbow', angleKey: 'right_elbow_angle', velKey: 'right_elbow_angular_vel', pos: [0.20, 0.18, 0.05] },
+  { id: 'torso', label: 'TORSO', name: 'Spine / Torso', angleKey: 'torso_lean', velKey: 'velocity', pos: [0.0, 0.28, 0.0] },
+];
+
 const meshCache = {};
 
-function AnimatedModel({ frame, currentData }) {
+function getMeshMaterial(style) {
+  switch (style) {
+    case 'smooth_metal':
+      return new THREE.MeshStandardMaterial({
+        color: '#cbd5e1',
+        wireframe: false,
+        flatShading: false,
+        roughness: 0.08,
+        metalness: 0.95,
+        envMapIntensity: 2.0
+      });
+    case 'solid':
+      return new THREE.MeshStandardMaterial({
+        color: '#e2e8f0',
+        wireframe: false,
+        flatShading: false,
+        roughness: 0.35,
+        metalness: 0.1
+      });
+    case 'metallic':
+      return new THREE.MeshStandardMaterial({
+        color: '#94a3b8',
+        wireframe: false,
+        flatShading: false,
+        roughness: 0.25,
+        metalness: 0.75
+      });
+    case 'neon':
+      return new THREE.MeshStandardMaterial({
+        color: '#38bdf8',
+        wireframe: true,
+        transparent: true,
+        opacity: 0.65,
+        emissive: '#0284c7',
+        emissiveIntensity: 0.5
+      });
+    case 'translucent':
+    default:
+      return new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        wireframe: true,
+        transparent: true,
+        opacity: 0.25,
+        roughness: 0.5
+      });
+  }
+}
+
+function AnimatedModel({ frame, currentData, selectedJoint, setSelectedJoint, hoveredJoint, setHoveredJoint, meshStyle = 'translucent', exerciseMode = 'running' }) {
   const [currentMesh, setCurrentMesh] = useState(null);
 
   useEffect(() => {
     const loader = new OBJLoader();
-    const material = new THREE.MeshBasicMaterial({ 
-      color: '#ffffff', 
-      wireframe: true,
-      transparent: true,
-      opacity: 0.2
-    });
+    const folder = exerciseMode === 'running' ? '/running_meshes' : '/meshes';
+    const totalFrames = exerciseMode === 'running' ? 90 : 161;
 
-    for(let i=1; i<=161; i++) {
+    for(let i=1; i<=totalFrames; i++) {
       const frameStr = String(i).padStart(4, '0');
-      loader.load(`/meshes/frame_${frameStr}_0.obj`, (obj) => {
-        obj.traverse((child) => {
-          if (child.isMesh) child.material = material;
-        });
-        meshCache[i] = obj;
+      const cacheKey = `${exerciseMode}_${i}`;
+      loader.load(`${folder}/frame_${frameStr}_0.obj`, (obj) => {
+        meshCache[cacheKey] = obj;
         if (i === frame + 1) setCurrentMesh(obj);
       });
     }
-  }, []);
+  }, [exerciseMode]);
 
   useEffect(() => {
-    if (meshCache[frame + 1]) {
-      setCurrentMesh(meshCache[frame + 1]);
+    const cacheKey = `${exerciseMode}_${frame + 1}`;
+    if (meshCache[cacheKey]) {
+      setCurrentMesh(meshCache[cacheKey]);
     }
-  }, [frame]);
+  }, [frame, exerciseMode]);
+
+  useEffect(() => {
+    const mat = getMeshMaterial(meshStyle);
+    const applySmoothMat = (obj) => {
+      if (!obj) return;
+      obj.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry.computeVertexNormals(); // Compute smooth vertex normals
+          child.material = mat;
+        }
+      });
+    };
+
+    Object.values(meshCache).forEach(applySmoothMat);
+    if (currentMesh) applySmoothMat(currentMesh);
+  }, [meshStyle, currentMesh]);
 
   if (!currentMesh) return null;
   return (
     <group>
       <primitive object={currentMesh} />
-      {currentData?.torso_lean > 45 && (
-        <Html position={[0, 0.4, 0.2]} center className="pointer-events-none">
-          <div className="bg-[#000000]/90 border border-[#ff0000] text-[#ff0000] text-[8px] uppercase tracking-widest font-mono px-2 py-1 whitespace-nowrap animate-pulse flex items-center gap-1">
-            <AlertCircle size={8} /> Excessive Shear Force
-          </div>
-        </Html>
-      )}
-      {currentData?.knee_distance < 0.2 && (
-        <Html position={[0, -0.4, 0.1]} center className="pointer-events-none">
-          <div className="bg-[#000000]/90 border border-[#ff0000] text-[#ff0000] text-[8px] uppercase tracking-widest font-mono px-2 py-1 whitespace-nowrap flex items-center gap-1">
-            <AlertCircle size={8} /> Valgus Detected
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
 
 export default function App() {
+  const [exerciseMode, setExerciseMode] = useState('squat'); // 'running' | 'squat'
+  const kinematicsData = exerciseMode === 'running' ? runningKinematicsData : squatKinematicsData;
+
   const [currentFrame, setCurrentFrame] = useState(0);
   const [videoSrc, setVideoSrc] = useState("/video.mp4");
-  const [viewMode, setViewMode] = useState("video"); 
+  const [viewMode, setViewMode] = useState("3d"); 
   const [isPlaying3D, setIsPlaying3D] = useState(false);
   const [fps, setFps] = useState(30);
   const [maximizedGraph, setMaximizedGraph] = useState(null); // 'knee' or 'spine'
   const [activePipelineStep, setActivePipelineStep] = useState('Telemetry');
   const [showArchitecture, setShowArchitecture] = useState(false);
+  const [selectedJoint, setSelectedJoint] = useState(null);
+  const [hoveredJoint, setHoveredJoint] = useState(null);
+  const [meshStyle, setMeshStyle] = useState('smooth_metal'); // 'translucent' | 'solid' | 'smooth_metal' | 'metallic' | 'neon'
+  const [floorStyle, setFloorStyle] = useState('reflective'); // 'reflective' | 'solid' | 'grid_only' | 'neon'
+  const [showGrid, setShowGrid] = useState(true);
+  const [showMaterialMenu, setShowMaterialMenu] = useState(false);
   const videoRef = useRef(null);
+
+  useEffect(() => {
+    if (videoRef.current && viewMode === 'video') {
+      const targetTime = currentFrame / 30.0;
+      if (Math.abs(videoRef.current.currentTime - targetTime) > 0.04) {
+        videoRef.current.currentTime = targetTime;
+      }
+    }
+  }, [currentFrame, viewMode]);
 
   useEffect(() => {
     let interval;
@@ -115,6 +191,7 @@ export default function App() {
 
   const currentData = kinematicsData[currentFrame] || kinematicsData[0];
   const isFormDegraded = currentData.torso_lean > 45;
+  const activeJointObj = JOINTS.find(j => j.id === (selectedJoint || hoveredJoint));
 
   return (
     <div className="h-screen w-screen bg-[#000000] text-[#ffffff] font-sans overflow-hidden flex flex-col p-4 gap-4 selection:bg-[#ffffff] selection:text-[#000000]">
@@ -153,20 +230,39 @@ export default function App() {
         {/* LEFT PANEL: Streaming Data & Mini Graphs */}
         <aside className="w-[350px] flex flex-col gap-4 shrink-0">
           
-          <div className="h-[250px] border border-[#333333] flex flex-col bg-[#000000]">
+          <div className="h-[260px] border border-[#333333] flex flex-col bg-[#000000]">
             <div className="border-b border-[#333333] p-2 bg-[#111111] flex justify-between items-center">
               <span className="text-[9px] uppercase tracking-widest text-[#a3a3a3]">Kinematic Readout</span>
               <Activity size={12} className="text-[#ffffff]" />
             </div>
             <div className="flex-1 overflow-y-auto p-3 text-[10px] flex flex-col gap-1 font-mono">
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_KNEE</span><span>{currentData.left_knee_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_KNEE</span><span>{currentData.right_knee_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_HIP</span><span>{currentData.left_hip_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_HIP</span><span>{currentData.right_hip_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">L_ANKLE</span><span>{currentData.left_ankle_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">R_ANKLE</span><span>{currentData.right_ankle_angle.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">TORSO</span><span className={isFormDegraded ? 'bg-[#ffffff] text-[#000000] px-1' : ''}>{currentData.torso_lean.toFixed(2)}</span></div>
-              <div className="flex justify-between border-b border-[#333333] py-1"><span className="text-[#a3a3a3]">VELOCITY</span><span>{currentData.velocity.toFixed(3)}</span></div>
+              {JOINTS.map((joint) => {
+                const isSel = selectedJoint === joint.id;
+                const isHov = hoveredJoint === joint.id;
+                const angleVal = currentData[joint.angleKey];
+                const velVal = currentData[joint.velKey];
+
+                return (
+                  <div
+                    key={joint.id}
+                    onClick={() => setSelectedJoint(isSel ? null : joint.id)}
+                    onMouseEnter={() => setHoveredJoint(joint.id)}
+                    onMouseLeave={() => setHoveredJoint(null)}
+                    className={`flex justify-between items-center border-b border-[#333333] py-1 px-1 cursor-pointer transition-colors ${
+                      isSel ? 'bg-[#38bdf8]/20 border-[#38bdf8] text-[#38bdf8] font-bold' : isHov ? 'bg-[#111111] text-[#ffffff]' : ''
+                    }`}
+                  >
+                    <span className={isSel ? 'text-[#38bdf8]' : 'text-[#a3a3a3]'}>{joint.label}</span>
+                    <div className="flex items-center gap-3">
+                      <span>{angleVal !== undefined ? angleVal.toFixed(1) : 'N/A'}°</span>
+                      <span className={`text-[8px] ${velVal > 0 ? 'text-[#4ade80]' : velVal < 0 ? 'text-[#f87171]' : 'text-[#a3a3a3]'}`}>
+                        {velVal !== undefined ? (velVal > 0 ? `+${velVal.toFixed(1)}` : velVal.toFixed(1)) : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="flex justify-between border-b border-[#333333] py-1 px-1"><span className="text-[#a3a3a3]">VELOCITY</span><span>{currentData.velocity.toFixed(3)} m/s</span></div>
             </div>
           </div>
 
@@ -236,6 +332,110 @@ export default function App() {
                 <Box size={10} /> Spatial Mesh
               </button>
             </div>
+
+            {/* Quick 3D Joint Selection Node Toolbar & View Menu */}
+            {viewMode === "3d" && (
+              <div className="flex items-center gap-3 font-mono text-[8px]">
+                <div className="flex items-center gap-1">
+                  <span className="text-[#a3a3a3] uppercase mr-1">3D Node:</span>
+                  {JOINTS.map(j => (
+                    <button
+                      key={j.id}
+                      onClick={() => setSelectedJoint(selectedJoint === j.id ? null : j.id)}
+                      className={`px-1.5 py-0.5 border uppercase transition-colors ${
+                        selectedJoint === j.id 
+                          ? 'border-[#38bdf8] bg-[#38bdf8] text-[#000000] font-bold' 
+                          : 'border-[#333333] text-[#a3a3a3] hover:border-[#ffffff] hover:text-[#ffffff]'
+                      }`}
+                    >
+                      {j.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Viewport Material Config Menu Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowMaterialMenu(!showMaterialMenu)}
+                    className="text-[9px] uppercase tracking-widest flex items-center gap-1 font-mono border border-[#333333] hover:border-[#ffffff] px-2 py-0.5 bg-[#000000] text-[#ffffff] transition-colors"
+                  >
+                    <Layers size={10} /> View Menu
+                  </button>
+
+                  {showMaterialMenu && (
+                    <div className="absolute right-0 top-7 z-40 bg-[#0a0a0a]/95 border border-[#262626] p-3 rounded-md font-mono text-[9px] w-60 flex flex-col gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+                      <div className="flex justify-between items-center border-b border-[#262626] pb-1 text-[#ffffff] font-bold uppercase tracking-widest">
+                        <span>Viewport Settings</span>
+                        <button onClick={() => setShowMaterialMenu(false)} className="text-[#a3a3a3] hover:text-[#ffffff]">
+                          <X size={12} />
+                        </button>
+                      </div>
+
+                      {/* Mesh Material Selector */}
+                      <div>
+                        <span className="text-[#a3a3a3] uppercase block mb-1 text-[8px]">Avatar Mesh Material:</span>
+                        <div className="grid grid-cols-2 gap-1">
+                          {[
+                            { id: 'translucent', label: 'Translucent' },
+                            { id: 'solid', label: 'Solid Matte' },
+                            { id: 'smooth_metal', label: 'Smooth Metal' },
+                            { id: 'metallic', label: 'Metallic' },
+                            { id: 'neon', label: 'Cyber Neon' }
+                          ].map(m => (
+                            <button
+                              key={m.id}
+                              onClick={() => setMeshStyle(m.id)}
+                              className={`p-1 border text-[8px] uppercase transition-colors text-center rounded-sm ${
+                                meshStyle === m.id ? 'border-[#38bdf8] bg-[#38bdf8]/20 text-[#38bdf8] font-bold' : 'border-[#262626] text-[#a3a3a3] hover:border-[#ffffff] hover:text-[#ffffff]'
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Floor Material Selector */}
+                      <div>
+                        <span className="text-[#a3a3a3] uppercase block mb-1 text-[8px]">Floor Ground Style:</span>
+                        <div className="grid grid-cols-2 gap-1">
+                          {[
+                            { id: 'reflective', label: 'Reflective' },
+                            { id: 'solid', label: 'Solid Floor' },
+                            { id: 'grid_only', label: 'Grid Only' },
+                            { id: 'neon', label: 'Cyber Grid' }
+                          ].map(f => (
+                            <button
+                              key={f.id}
+                              onClick={() => setFloorStyle(f.id)}
+                              className={`p-1 border text-[8px] uppercase transition-colors text-center rounded-sm ${
+                                floorStyle === f.id ? 'border-[#38bdf8] bg-[#38bdf8]/20 text-[#38bdf8] font-bold' : 'border-[#262626] text-[#a3a3a3] hover:border-[#ffffff] hover:text-[#ffffff]'
+                              }`}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Grid Lines Toggle */}
+                      <div className="flex justify-between items-center border-t border-[#262626] pt-2">
+                        <span className="text-[#a3a3a3] uppercase text-[8px]">Show Floor Grid:</span>
+                        <button
+                          onClick={() => setShowGrid(!showGrid)}
+                          className={`px-2 py-0.5 border text-[8px] uppercase font-bold transition-colors rounded-sm ${
+                            showGrid ? 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]' : 'border-[#262626] text-[#a3a3a3]'
+                          }`}
+                        >
+                          {showGrid ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {viewMode === "video" && (
               <span className="text-[10px] uppercase font-mono text-[#ffffff]">FR_<Num>{String(currentFrame + 1).padStart(3, '0')}</Num></span>
             )}
@@ -281,14 +481,51 @@ export default function App() {
               </>
             ) : (
               <div className="w-full h-full cursor-grab active:cursor-grabbing relative">
-                <Canvas camera={{ position: [0, 1, 5], fov: 45 }}>
+
+                <Canvas camera={{ position: [0, 0, 3.8], fov: 50 }}>
                   <ambientLight intensity={1.5} />
                   <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={2} />
                   <pointLight position={[-10, -10, -10]} intensity={1} />
                   <Suspense fallback={null}>
-                    <Center scale={2.5}>
-                      <AnimatedModel frame={currentFrame} currentData={currentData} />
+                    <Center position={[0, 0, 0]}>
+                      <group scale={1.8}>
+                        <AnimatedModel 
+                          frame={currentFrame} 
+                          currentData={currentData} 
+                          selectedJoint={selectedJoint}
+                          setSelectedJoint={setSelectedJoint}
+                          hoveredJoint={hoveredJoint}
+                          setHoveredJoint={setHoveredJoint}
+                          meshStyle={meshStyle}
+                          exerciseMode={exerciseMode}
+                        />
+                      </group>
                     </Center>
+
+                    {/* Dynamic 3D Ground Plane & Grid Helper */}
+                    {showGrid && (
+                      <gridHelper 
+                        args={[
+                          20, 
+                          20, 
+                          floorStyle === 'neon' ? '#38bdf8' : floorStyle === 'grid_only' ? '#38bdf8' : '#ffffff', 
+                          floorStyle === 'neon' ? '#0284c7' : floorStyle === 'grid_only' ? '#1e293b' : '#333333'
+                        ]} 
+                        position={[0, -1.02, 0]} 
+                      />
+                    )}
+
+                    {floorStyle !== 'grid_only' && (
+                      <mesh position={[0, -1.025, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                        <planeGeometry args={[20, 20]} />
+                        <meshStandardMaterial 
+                          color={floorStyle === 'solid' ? '#1e293b' : floorStyle === 'neon' ? '#030712' : '#050505'} 
+                          roughness={floorStyle === 'solid' ? 0.9 : floorStyle === 'neon' ? 0.4 : 0.8} 
+                          metalness={floorStyle === 'solid' ? 0.0 : floorStyle === 'neon' ? 0.6 : 0.2} 
+                        />
+                      </mesh>
+                    )}
+
                     <Environment preset="city" />
                   </Suspense>
                   <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
@@ -342,7 +579,7 @@ export default function App() {
             )}
             
             {/* Grid overlay over the container */}
-            <div className="absolute inset-0 pointer-events-none border border-[#333333] m-8 mt-12 bg-[linear-gradient(#333333_1px,transparent_1px),linear-gradient(90deg,#333333_1px,transparent_1px)] bg-[size:50px_50px] opacity-10" />
+            <div className="absolute inset-0 pointer-events-none border border-[#333333] m-8 mt-12 bg-[linear-gradient(#333333_1px,transparent_1px),gradient(90deg,#333333_1px,transparent_1px)] bg-[size:50px_50px] opacity-10" />
           </div>
         </main>
 
