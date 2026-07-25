@@ -18,46 +18,63 @@ export default async function Home() {
   }
 
   return (
-    <main className="bg-background text-foreground">
+    <main className="bg-background text-foreground min-h-screen">
 
       {/* ──────── NAV ──────── */}
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-4">
-          <span style={{ fontFamily: "var(--font-serif)" }} className="text-lg italic tracking-tight">
-            rvector
-          </span>
-          <div className="flex items-center gap-8">
-            <a href="#methodology" className="hidden sm:block text-xs text-muted-foreground hover:text-foreground transition-colors tracking-wide">
-              Methodology
-            </a>
-            <a href="#measurements" className="hidden sm:block text-xs text-muted-foreground hover:text-foreground transition-colors tracking-wide">
-              Measurements
-            </a>
-            <Link
-              href="/signin"
-              className="text-xs text-foreground tracking-wide border-b border-foreground/30 pb-0.5 hover:border-foreground transition-colors"
-            >
-              Sign in
+      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span style={{ fontFamily: "var(--font-serif)" }} className="text-xl font-bold italic tracking-tight">
+              rvectr
+            </span>
+            <span className="font-mono text-[10px] uppercase border border-border px-2 py-0.5 text-muted-foreground">
+              v1.0-OSS
+            </span>
+          </div>
+
+          <div className="flex items-center gap-6 font-mono text-xs">
+            <Link href="/demo" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
+              3D Workspace
             </Link>
+            <Link href="/analysis" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
+              Kinematics Lab
+            </Link>
+            <Link href="/test/squat" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
+              Live CV
+            </Link>
+            <a href="#documentation" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
+              Documentation
+            </a>
+            <a
+              href="https://github.com/pd302423/rvectr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 border border-foreground/30 px-3 py-1 text-foreground hover:bg-foreground hover:text-background transition-colors"
+            >
+              <span>GitHub</span>
+              <span className="text-[10px]">↗</span>
+            </a>
           </div>
         </div>
       </nav>
 
-      {/* ──────── HERO — asymmetric 8/4 ──────── */}
-      <section className="border-b border-border pt-32 pb-24">
+      {/* ──────── HERO — Asymmetric 8/4 ──────── */}
+      <section className="border-b border-border pt-36 pb-24">
         <div className="mx-auto max-w-7xl px-8">
-          <div className="grid grid-cols-1 gap-16 lg:grid-cols-12 lg:gap-12">
+          <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
 
             {/* Left: Editorial display */}
             <div className="lg:col-span-8">
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-12">
-                Calisthenics · Coaching system · v0.1
-              </p>
+              <div className="flex items-center gap-3 mb-8">
+                <span className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
+                  Clinical Biomechanics · 3D Mesh Telemetry · Calisthenics
+                </span>
+              </div>
               <h1
                 style={{ fontFamily: "var(--font-serif)" }}
-                className="text-[clamp(3rem,8vw,7.5rem)] leading-[0.95] tracking-tight font-normal"
+                className="text-[clamp(3rem,7.5vw,7rem)] leading-[0.95] tracking-tight font-normal"
               >
-                A coaching
+                A clinical
                 <br />
                 system that
                 <br />
@@ -65,29 +82,54 @@ export default async function Home() {
                 <br />
                 train.
               </h1>
+
+              <div className="mt-12 flex flex-wrap items-center gap-4">
+                <Link
+                  href="/demo"
+                  className="px-6 py-3 bg-foreground text-background font-mono text-xs font-bold uppercase tracking-wider hover:bg-foreground/90 transition-colors"
+                >
+                  Launch 3D Motion Command Workspace →
+                </Link>
+                <Link
+                  href="/test/squat"
+                  className="px-6 py-3 border border-border bg-card font-mono text-xs font-bold uppercase tracking-wider hover:bg-secondary transition-colors"
+                >
+                  Test Optical CV Telemetry
+                </Link>
+                <a
+                  href="https://github.com/pd302423/rvectr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-3 border border-border text-muted-foreground font-mono text-xs font-bold uppercase tracking-wider hover:text-foreground transition-colors flex items-center gap-2"
+                >
+                  <span>pd302423/rvectr</span>
+                  <span>↗</span>
+                </a>
+              </div>
             </div>
 
-            {/* Right: dense info column */}
-            <div className="lg:col-span-4 lg:pt-32">
-              <div className="space-y-8">
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  rvector measures every joint angle of every rep. When it detects struggle,
-                  form degradation, or readiness for progression, it adapts your training
-                  in real time.
-                </p>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Programming follows <em className="italic">Overcoming Gravity</em> (Low, 2016),
-                  NSCA periodisation standards, and peer-reviewed sports biomechanics literature.
-                  rvector cites its sources.
-                </p>
-                <div className="pt-4">
-                  <Link
-                    href="/signin"
-                    className="inline-flex items-center gap-3 text-sm border-b border-foreground pb-1.5 hover:gap-4 transition-all"
-                  >
-                    Begin initial assessment
-                    <span>→</span>
-                  </Link>
+            {/* Right: Dense info column */}
+            <div className="lg:col-span-4 lg:pt-20">
+              <div className="space-y-8 border-l border-border pl-8">
+                <div className="space-y-2">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Primary Moat</p>
+                  <p className="text-sm leading-relaxed text-foreground/90 font-mono">
+                    Monocular (4D-Humans / HMR2) & Multi-view (EasyMocap) 3D Body Surface Mesh Recovery (SMPL 6,890-vertex parameters).
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Telemetry Engine</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    rvectr measures every joint angle of every rep. When it detects struggle, joint angular velocity collapse, or form degradation, it diagnoses biomechanical failure in real time.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Sports Science Standards</p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Programming follows <em className="italic">Overcoming Gravity</em> (Low, 2016), NSCA periodisation standards, and peer-reviewed sports science literature.
+                  </p>
                 </div>
               </div>
             </div>
@@ -95,7 +137,78 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ──────── SAMPLE SESSION REPORT — single large diagnostic ──────── */}
+      {/* ──────── DOCUMENTATION & ARCHITECTURE SECTION ──────── */}
+      <section id="documentation" className="border-b border-border py-24 bg-card/30">
+        <div className="mx-auto max-w-7xl px-8">
+          <div className="mb-12">
+            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
+              § 01 — Architectural Specs
+            </p>
+            <h2 style={{ fontFamily: "var(--font-serif)" }} className="text-4xl leading-tight tracking-tight">
+              System Architecture & Open-Source Engine
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground font-mono">
+              Complete technical specification for the rvectr motion capture & telemetry stack.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="border border-border p-6 bg-card space-y-4">
+              <div className="font-mono text-xs text-muted-foreground uppercase tracking-wider">01 / Monocular HMR2</div>
+              <h3 className="font-mono font-bold text-lg">4D-Humans SMPL Recovery</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Fits a 6,890-vertex SMPL body surface mesh directly from single-view consumer camera recordings using local PyTorch ViTDet models.
+              </p>
+              <div className="pt-2">
+                <a
+                  href="https://github.com/pd302423/rvectr/tree/main/backend/4D-Humans"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[11px] underline text-muted-foreground hover:text-foreground"
+                >
+                  View 4D-Humans Submodule ↗
+                </a>
+              </div>
+            </div>
+
+            <div className="border border-border p-6 bg-card space-y-4">
+              <div className="font-mono text-xs text-muted-foreground uppercase tracking-wider">02 / Multi-View Triangulation</div>
+              <h3 className="font-mono font-bold text-lg">EasyMocap Triangulation</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Processes multi-camera synchronized recordings to perform 3D spatial keypoint triangulation, solving single-camera self-occlusion.
+              </p>
+              <div className="pt-2">
+                <a
+                  href="https://github.com/pd302423/rvectr/tree/main/backend/EasyMocap"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[11px] underline text-muted-foreground hover:text-foreground"
+                >
+                  View EasyMocap Submodule ↗
+                </a>
+              </div>
+            </div>
+
+            <div className="border border-border p-6 bg-card space-y-4">
+              <div className="font-mono text-xs text-muted-foreground uppercase tracking-wider">03 / WebGL Telemetry Canvas</div>
+              <h3 className="font-mono font-bold text-lg">In-Browser Three.js Viewport</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Renders interactive 360° 3D mesh model sequences, real-time MediaPipe joint angle waveforms, and bilateral asymmetry matrices.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/demo"
+                  className="font-mono text-[11px] underline text-muted-foreground hover:text-foreground"
+                >
+                  Launch Interactive Demo →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ──────── SAMPLE SESSION REPORT — Single large diagnostic ──────── */}
       <section className="border-b border-border py-24">
         <div className="mx-auto max-w-7xl px-8">
 
@@ -103,113 +216,27 @@ export default async function Home() {
           <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
-                Sample session report
+                Sample Diagnostic Output
               </p>
               <h2
                 style={{ fontFamily: "var(--font-serif)" }}
                 className="text-4xl leading-tight tracking-tight"
               >
-                Anatomy of a rvector session.
+                Anatomy of a rvectr session.
               </h2>
             </div>
-            <p className="text-xs text-muted-foreground sm:text-right max-w-xs">
-              Each session produces a structured report.
-              <br />
-              Below is the actual output format.
+            <p className="text-xs font-mono text-muted-foreground sm:text-right max-w-xs">
+              Continuous 30Hz joint telemetry stream & clinical diagnostic evaluation.
             </p>
           </div>
 
-          {/* The full report — a single dense lab-style document */}
           <SessionReport />
 
         </div>
       </section>
 
-      {/* ──────── METHODOLOGY — long-form editorial ──────── */}
-      <section id="methodology" className="border-b border-border py-32">
-        <div className="mx-auto max-w-3xl px-8">
-
-          <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-6">
-            § 01 — Methodology
-          </p>
-
-          <h2
-            style={{ fontFamily: "var(--font-serif)" }}
-            className="text-5xl leading-tight tracking-tight mb-12"
-          >
-            Coaching, but as <span className="italic">measurement</span>.
-          </h2>
-
-          <div className="space-y-8 text-base leading-[1.75] text-foreground/85 max-w-prose">
-            <p>
-              Most fitness applications produce scores. rvector produces diagnoses.
-              The distinction is consequential. A score is an opinion compressed into a number;
-              a diagnosis is a measurement paired with a clinical interpretation, citable
-              to the literature it derives from.
-            </p>
-
-            <p>
-              When you perform a pull-up in front of your camera, rvector extracts
-              thirty-three skeletal landmarks at thirty frames per second using Google&apos;s
-              MediaPipe pose estimation. From these, the system computes joint angles —
-              elbow flexion, scapular position, glenohumeral elevation, lumbar curvature —
-              and compares each against population-validated standards drawn from the{" "}
-              <em>Journal of Strength and Conditioning Research</em>, the NSCA{" "}
-              <em>Essentials of Strength Training and Conditioning</em>, and the FIG Code
-              of Points for gymnastic movements.
-            </p>
-
-            <p>
-              Rep counting is the trivial part. The substantive output is the{" "}
-              <span className="text-foreground">struggle profile</span>:
-              the velocity at which each rep was completed, the form deviation observed
-              across the set, the inter-rep rest pattern. From this profile rvector
-              estimates the&nbsp;<em>effective</em> rep count, distinct from the counted
-              rep count, and uses the difference to inform the next session.
-            </p>
-
-            <PullQuote
-              text="A movement performed at sixty percent of fresh velocity is not the same movement. rvector treats it as a different data point."
-              source="rvector technical documentation, § 4.2"
-            />
-
-            <p>
-              Programming is structured around the periodisation principles articulated
-              in Steven Low&apos;s <em>Overcoming Gravity</em> (2nd ed., 2016): block
-              periodisation with intra-week intensity oscillation, push-pull-core volume
-              balance, prerequisite gating between skill progressions, and explicit
-              connective-tissue adaptation windows. rvector will not advance an athlete
-              to the next progression purely on the basis of acute strength; tendon
-              adaptation timelines (typically eight to twelve weeks per progression) are
-              enforced.
-            </p>
-
-            <p>
-              The result is a coaching system that behaves less like a fitness app and
-              more like a laboratory instrument. It does not motivate. It does not gamify.
-              It measures.
-            </p>
-          </div>
-
-          {/* citations */}
-          <div className="mt-16 border-t border-border pt-8">
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-4">
-              References
-            </p>
-            <ol className="space-y-2 text-xs text-muted-foreground font-mono leading-relaxed">
-              <li>[1] Low, S. (2016). <em className="italic font-sans">Overcoming Gravity</em>, 2nd ed. Battle Ground Creative.</li>
-              <li>[2] Haff, G.G. & Triplett, N.T. (2016). <em className="italic font-sans">NSCA&apos;s Essentials of Strength Training and Conditioning</em>, 4th ed.</li>
-              <li>[3] Hewett, T.E. et al. (2005). <em className="italic font-sans">Am J Sports Med</em>, 33(4):492-501. Biomechanical measures of neuromuscular control.</li>
-              <li>[4] Ludewig, P.M. & Cook, T.M. (2000). <em className="italic font-sans">JOSPT</em>, 30(1):24-37. Alterations in shoulder kinematics.</li>
-              <li>[5] FIG Code of Points (2022). Men&apos;s Artistic Gymnastics. Fédération Internationale de Gymnastique.</li>
-            </ol>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ──────── WHAT IS MEASURED — spec table ──────── */}
-      <section id="measurements" className="border-b border-border py-32">
+      {/* ──────── WHAT IS MEASURED — Spec table ──────── */}
+      <section id="measurements" className="border-b border-border py-24">
         <div className="mx-auto max-w-7xl px-8">
 
           <div className="grid grid-cols-1 gap-16 lg:grid-cols-12">
@@ -221,11 +248,10 @@ export default async function Home() {
                 style={{ fontFamily: "var(--font-serif)" }}
                 className="text-4xl leading-tight tracking-tight"
               >
-                Every metric rvector observes.
+                Every metric rvectr observes.
               </h2>
               <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-xs">
-                Continuous measurement across the kinematic, performance, and
-                physiological domains. All values are real-time.
+                Continuous measurement across kinematic, performance, and periodisation domains.
               </p>
             </div>
 
@@ -237,61 +263,48 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ──────── CTA — minimal ──────── */}
-      <section className="py-32">
-        <div className="mx-auto max-w-3xl px-8 text-center">
-          <h2
-            style={{ fontFamily: "var(--font-serif)" }}
-            className="text-5xl leading-tight tracking-tight"
-          >
-            Begin your initial assessment.
-          </h2>
-          <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-md mx-auto">
-            rvector requires a baseline athlete profile before it can generate programming.
-            Setup takes approximately two minutes.
-          </p>
-          <div className="mt-10">
-            <Link
-              href="/signin"
-              className="inline-flex items-center gap-3 text-sm border-b border-foreground pb-1.5 hover:gap-4 transition-all"
-            >
-              Continue to authentication
-              <span>→</span>
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* ──────── FOOTER ──────── */}
-      <footer className="border-t border-border">
+      <footer className="border-t border-border bg-card/20">
         <div className="mx-auto max-w-7xl px-8 py-12">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
             <div>
-              <p style={{ fontFamily: "var(--font-serif)" }} className="text-lg italic">
-                rvector
+              <p style={{ fontFamily: "var(--font-serif)" }} className="text-xl italic font-bold">
+                rvectr
               </p>
               <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                v0.1.0 · calisthenics build
+                v1.0.0 · Open Source Biomechanics Engine
               </p>
             </div>
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
-                System
+                Open Source
               </p>
-              <ul className="space-y-1.5 text-xs text-muted-foreground">
-                <li>Methodology</li>
-                <li>Citations</li>
-                <li>Changelog</li>
+              <ul className="space-y-1.5 text-xs font-mono text-muted-foreground">
+                <li>
+                  <a href="https://github.com/pd302423/rvectr" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+                    GitHub Repository (pd302423/rvectr) ↗
+                  </a>
+                </li>
+                <li>
+                  <a href="https://github.com/pd302423/rvectr/blob/main/README.md" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+                    Documentation & Quickstart ↗
+                  </a>
+                </li>
+                <li>
+                  <a href="https://github.com/pd302423/rvectr/blob/main/WORKSPACE_SUMMARY.md" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
+                    Architecture Specs ↗
+                  </a>
+                </li>
               </ul>
             </div>
             <div>
               <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
-                Legal
+                Live Workspaces
               </p>
-              <ul className="space-y-1.5 text-xs text-muted-foreground">
-                <li>Privacy</li>
-                <li>Terms</li>
-                <li>Not medical advice</li>
+              <ul className="space-y-1.5 text-xs font-mono text-muted-foreground">
+                <li><Link href="/demo" className="hover:text-foreground">3D Motion Workspace</Link></li>
+                <li><Link href="/analysis" className="hover:text-foreground">Kinematics Diagnostic Lab</Link></li>
+                <li><Link href="/test/squat" className="hover:text-foreground">Live Optical CV Telemetry</Link></li>
               </ul>
             </div>
           </div>
@@ -302,42 +315,22 @@ export default async function Home() {
 }
 
 /* ─────────────────────────────────────────────
-   Pull quote — editorial component
-   ───────────────────────────────────────────── */
-
-function PullQuote({ text, source }: { text: string; source: string }) {
-  return (
-    <blockquote className="my-12 border-l-2 border-foreground pl-6 py-2">
-      <p
-        style={{ fontFamily: "var(--font-serif)" }}
-        className="text-2xl leading-snug italic"
-      >
-        &ldquo;{text}&rdquo;
-      </p>
-      <cite className="mt-3 block font-mono text-[11px] not-italic uppercase tracking-[0.2em] text-muted-foreground">
-        — {source}
-      </cite>
-    </blockquote>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Session report — the big diagnostic mockup
+   Session report — diagnostic mockup component
    ───────────────────────────────────────────── */
 
 function SessionReport() {
   return (
     <div className="border border-border bg-card font-mono text-xs">
 
-      {/* ── Document header ── */}
+      {/* Document header */}
       <header className="grid grid-cols-2 gap-x-8 gap-y-4 border-b border-border px-6 py-5 sm:grid-cols-4">
         <Field label="athlete_id" value="ATH-0042" />
-        <Field label="session_id" value="SES-2026-05-23-T1845" />
+        <Field label="session_id" value="SES-2026-07-25-T1845" />
         <Field label="duration" value="00:42:17" />
         <Field label="status" value="completed" tone="emerald" />
       </header>
 
-      {/* ── Movement: Pull-up ── */}
+      {/* Movement: Pull-up */}
       <div className="border-b border-border">
         <div className="flex items-baseline justify-between border-b border-border bg-secondary/30 px-6 py-3">
           <p className="text-foreground"><span className="text-muted-foreground">movement_01</span> &nbsp; pull_up</p>
@@ -369,9 +362,9 @@ function SessionReport() {
                   ["2·7", "159°", "0.38", "0.46", "red"],
                 ] as const).map(([id, angle, vel, qual, tone]) => {
                   const toneClass =
-                    tone === "emerald" ? "text-emerald-700"
-                    : tone === "amber" ? "text-amber-700"
-                    : "text-red-700";
+                    tone === "emerald" ? "text-emerald-500"
+                    : tone === "amber" ? "text-amber-500"
+                    : "text-red-500";
                   return (
                     <tr key={id}>
                       <td className="px-6 py-1.5 text-muted-foreground">{id}</td>
@@ -392,25 +385,20 @@ function SessionReport() {
               viewBox="0 0 280 110"
               className="w-full"
               preserveAspectRatio="none"
-              data-darkreader-ignore
             >
-              {/* baseline + gridlines */}
-              <line x1="0" y1="80" x2="280" y2="80" stroke="oklch(0 0 0 / 12%)" strokeWidth="1" />
-              <line x1="0" y1="50" x2="280" y2="50" stroke="oklch(0 0 0 / 6%)" strokeWidth="1" strokeDasharray="2 4" />
-              <line x1="0" y1="20" x2="280" y2="20" stroke="oklch(0 0 0 / 6%)" strokeWidth="1" strokeDasharray="2 4" />
-              {/* velocity drop curve */}
+              <line x1="0" y1="80" x2="280" y2="80" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+              <line x1="0" y1="50" x2="280" y2="50" stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="2 4" />
               <polyline
                 points="0,20 35,22 70,28 105,40 140,55 175,68 210,82 245,92"
                 fill="none"
-                stroke="oklch(0.50 0.16 162)"
+                stroke="#38bdf8"
                 strokeWidth="1.5"
               />
-              {/* fail threshold */}
-              <line x1="0" y1="70" x2="280" y2="70" stroke="oklch(0 0 0 / 22%)" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1="0" y1="70" x2="280" y2="70" stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeDasharray="3 3" />
               <text
                 x="276"
                 y="68"
-                fill="oklch(0.50 0 0)"
+                fill="#a3a3a3"
                 textAnchor="end"
                 fontSize="9"
                 fontFamily="var(--font-geist-mono), monospace"
@@ -436,41 +424,16 @@ function SessionReport() {
 
         </div>
 
-        {/* Movement diagnosis */}
         <div className="border-t border-border bg-secondary/20 px-6 py-4">
-          <p className="text-muted-foreground uppercase tracking-wider text-[10px] mb-2">diagnosis</p>
-          <p className="text-foreground leading-relaxed font-sans">
+          <p className="text-muted-foreground uppercase tracking-wider text-[10px] mb-2">rvectr diagnosis</p>
+          <p className="text-foreground leading-relaxed font-sans text-xs">
             Scapular depression strength is the limiting factor — not pulling strength.
-            Velocity collapse precedes form failure by ~1 rep, indicating central rather
-            than peripheral fatigue. Confirmed 3 sessions running. Prescribed corrective:
-            band pull-aparts 2×20 + scapular pull-ups 3×8 prior to next pulling session.
+            Velocity collapse precedes form failure by ~1 rep, indicating central fatigue. Prescribed corrective: scapular pull-ups 3×8 prior to next pulling session.
           </p>
         </div>
       </div>
 
-      {/* ── Movement: Pseudo planche push-up ── */}
-      <div className="border-b border-border">
-        <div className="flex items-baseline justify-between border-b border-border bg-secondary/30 px-6 py-3">
-          <p className="text-foreground"><span className="text-muted-foreground">movement_02</span> &nbsp; pseudo_planche_push_up</p>
-          <p className="text-muted-foreground">sets: 3 / reps_counted: 18 / effective: 16.8</p>
-        </div>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4 px-6 py-5 sm:grid-cols-4">
-          <Field label="lean_angle_avg" value="22°" tone="emerald" />
-          <Field label="wrist_extension" value="68°" tone="emerald" />
-          <Field label="elbow_flare" value="36°" tone="emerald" />
-          <Field label="form_score" value="0.93" tone="emerald" />
-        </div>
-        <div className="border-t border-border bg-secondary/20 px-6 py-4">
-          <p className="text-muted-foreground uppercase tracking-wider text-[10px] mb-2">progression status</p>
-          <p className="text-foreground leading-relaxed font-sans">
-            Week 4 of 8 in current progression. Form quality consistent across volume.
-            Connective tissue adaptation window: 4 weeks remaining before tuck planche
-            attempt clearance. Continue current intensity.
-          </p>
-        </div>
-      </div>
-
-      {/* ── Session summary ── */}
+      {/* Session summary */}
       <div className="grid grid-cols-2 gap-x-8 gap-y-4 px-6 py-5 sm:grid-cols-4">
         <Field label="weekly_volume" value="68 sets" />
         <Field label="weekly_load" value="nominal" tone="emerald" />
@@ -484,9 +447,9 @@ function SessionReport() {
 function Field({ label, value, tone = "fg" }: { label: string; value: string; tone?: "fg" | "emerald" | "amber" | "red" }) {
   const colorMap = {
     fg: "text-foreground",
-    emerald: "text-emerald-700",
-    amber: "text-amber-700",
-    red: "text-red-700",
+    emerald: "text-emerald-400",
+    amber: "text-amber-400",
+    red: "text-red-400",
   };
   return (
     <div>
@@ -504,25 +467,19 @@ function SpecTable() {
   const rows: { domain: string; metric: string; unit: string; rate: string }[] = [
     { domain: "Kinematic", metric: "Joint angles (33 landmarks)", unit: "degrees", rate: "30 Hz" },
     { domain: "Kinematic", metric: "Angular velocity", unit: "deg/s", rate: "30 Hz" },
-    { domain: "Kinematic", metric: "Joint trajectory deviation", unit: "mm", rate: "30 Hz" },
-    { domain: "Kinematic", metric: "Bilateral asymmetry", unit: "percent", rate: "per rep" },
+    { domain: "Kinematic", metric: "3D Body Surface Mesh (SMPL)", unit: "6,890 vertices", rate: "frame-by-frame" },
+    { domain: "Kinematic", metric: "Bilateral asymmetry matrix", unit: "percent", rate: "per rep" },
     { domain: "Performance", metric: "Effective rep count", unit: "reps", rate: "per set" },
     { domain: "Performance", metric: "Velocity loss across set", unit: "percent", rate: "per set" },
     { domain: "Performance", metric: "Form degradation index", unit: "0–1", rate: "per rep" },
-    { domain: "Performance", metric: "Inter-rep rest pattern", unit: "seconds", rate: "per set" },
     { domain: "Periodisation", metric: "Weekly volume (sets)", unit: "sets/week", rate: "rolling 7d" },
-    { domain: "Periodisation", metric: "Volume distribution (P/P/C/L)", unit: "ratio", rate: "rolling 7d" },
     { domain: "Periodisation", metric: "Connective tissue exposure", unit: "weeks", rate: "per movement" },
-    { domain: "Periodisation", metric: "Deload markers", unit: "boolean", rate: "session-end" },
-    { domain: "Physiological", metric: "Resting HR (via wearable)", unit: "bpm", rate: "daily" },
-    { domain: "Physiological", metric: "HRV trend", unit: "ms", rate: "daily" },
-    { domain: "Physiological", metric: "Sleep duration", unit: "hours", rate: "daily" },
   ];
 
   let lastDomain = "";
   return (
-    <div className="border border-border">
-      <div className="border-b border-border bg-secondary/30 grid grid-cols-12 px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+    <div className="border border-border font-mono text-xs">
+      <div className="border-b border-border bg-secondary/30 grid grid-cols-12 px-4 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground">
         <div className="col-span-3">Domain</div>
         <div className="col-span-5">Metric</div>
         <div className="col-span-2">Unit</div>
@@ -535,14 +492,14 @@ function SpecTable() {
           return (
             <div
               key={i}
-              className="grid grid-cols-12 px-4 py-2.5 text-xs items-baseline border-b border-border/60 last:border-b-0"
+              className="grid grid-cols-12 px-4 py-2.5 items-baseline border-b border-border/60 last:border-b-0"
             >
-              <div className={`col-span-3 font-mono ${newDomain ? "text-foreground" : "text-muted-foreground/30"}`}>
+              <div className={`col-span-3 ${newDomain ? "text-foreground font-bold" : "text-muted-foreground/30"}`}>
                 {newDomain ? r.domain : "·"}
               </div>
               <div className="col-span-5 text-foreground">{r.metric}</div>
-              <div className="col-span-2 font-mono text-muted-foreground">{r.unit}</div>
-              <div className="col-span-2 font-mono text-muted-foreground text-right">{r.rate}</div>
+              <div className="col-span-2 text-muted-foreground">{r.unit}</div>
+              <div className="col-span-2 text-muted-foreground text-right">{r.rate}</div>
             </div>
           );
         })}

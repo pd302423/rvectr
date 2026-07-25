@@ -22,7 +22,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "rvector — Professional Biomechanical Motion Capture & Telemetry Workspace",
+  title: "rvectr — Professional Biomechanical Motion Capture & Telemetry Workspace",
   description:
     "Industrial-grade markerless 3D computer vision and multi-camera motion capture telemetry platform for professional athletes and strength & conditioning coaches.",
 };

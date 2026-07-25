@@ -24,7 +24,7 @@ export function Navbar() {
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-sm tracking-widest uppercase font-mono text-[#ffffff]">
-              rvector_OS
+              rvectr_OS
             </span>
             <span className="text-[9px] font-mono text-[#a3a3a3] uppercase tracking-widest leading-none">
               Professional Biomechanics v1.0
