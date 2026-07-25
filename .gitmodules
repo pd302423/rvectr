@@ -1,0 +1,6 @@
+[submodule "backend/4D-Humans"]
+	path = backend/4D-Humans
+	url = https://github.com/shubham-goel/4D-Humans.git
+[submodule "backend/EasyMocap"]
+	path = backend/EasyMocap
+	url = https://github.com/zju3dv/EasyMocap.git

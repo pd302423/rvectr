@@ -3,8 +3,6 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -24,9 +22,9 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "rvector — Biomechanical precision for calisthenics",
+  title: "rvector — Professional Biomechanical Motion Capture & Telemetry Workspace",
   description:
-    "rvector analyses joint angles, force vectors, and movement patterns to generate precise, science-grounded calisthenics programming.",
+    "Industrial-grade markerless 3D computer vision and multi-camera motion capture telemetry platform for professional athletes and strength & conditioning coaches.",
 };
 
 export default function RootLayout({
@@ -37,18 +35,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased dark`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-300">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <body className="min-h-full flex flex-col bg-[#000000] text-[#ffffff] font-sans antialiased">
+        <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" disableTransitionOnChange>
           {children}
-          <div className="fixed bottom-6 right-6 z-50">
-            <ThemeToggle />
-          </div>
           <Toaster position="top-right" />
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   );

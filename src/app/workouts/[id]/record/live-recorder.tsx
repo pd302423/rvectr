@@ -46,9 +46,12 @@ export function LiveRecorder({
   }, []);
 
   useEffect(() => {
-    if (!isRecording) return;
-    setRecordingTime(0);
-    const interval = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+    let interval: NodeJS.Timeout;
+    if (isRecording) {
+      interval = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+    } else {
+      setRecordingTime(0);
+    }
     return () => clearInterval(interval);
   }, [isRecording]);
 

@@ -1,174 +1,160 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useBiomechanicsStore } from "@/lib/store";
-import { Box, RefreshCw, Eye } from "lucide-react";
+import { Box, Eye, RefreshCw } from "lucide-react";
 
 interface ThreeMeshCanvasProps {
   width?: string;
   height?: string;
+  glbUrl?: string;
+  defaultSource?: "obj" | "glb";
 }
 
-// MediaPipe 33 landmark connections for 3D skeleton rendering
-const SKELETON_CONNECTIONS: [number, number][] = [
-  // Head
-  [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8], [9, 10],
-  // Torso
-  [11, 12], [11, 23], [12, 24], [23, 24],
-  // Left Arm
-  [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
-  // Right Arm
-  [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
-  // Left Leg
-  [23, 25], [25, 27], [27, 29], [29, 31], [27, 31],
-  // Right Leg
-  [24, 26], [26, 28], [28, 30], [30, 32], [28, 32],
-];
+const objMeshCache: Record<number, THREE.Group> = {};
+const materialCache: Record<string, THREE.MeshStandardMaterial> = {};
 
-export function ThreeMeshCanvas({ height = "420px" }: ThreeMeshCanvasProps) {
+function getMeshMaterial(style: string) {
+  if (materialCache[style]) return materialCache[style];
+
+  let mat: THREE.MeshStandardMaterial;
+  switch (style) {
+    case "wireframe":
+      mat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.75,
+      });
+      break;
+    case "matte":
+      mat = new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0,
+        roughness: 0.35,
+        metalness: 0.05,
+      });
+      break;
+    case "glass":
+      mat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.25,
+      });
+      break;
+    case "chrome":
+    default:
+      mat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.1,
+        metalness: 0.9,
+        envMapIntensity: 1.5,
+      });
+      break;
+  }
+  materialCache[style] = mat;
+  return mat;
+}
+
+export function ThreeMeshCanvas({
+  height = "540px",
+  glbUrl = "/squat_multiview_animated.glb",
+  defaultSource = "glb",
+}: ThreeMeshCanvasProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const { currentAnalysis, activeFrame } = useBiomechanicsStore();
+  const { activeFrame } = useBiomechanicsStore();
 
+  const [meshStyle, setMeshStyle] = useState<"chrome" | "matte" | "wireframe" | "glass">("wireframe");
+  const [sourceType, setSourceType] = useState<"obj" | "glb">(defaultSource);
+  const [isLoadingMesh, setIsLoadingMesh] = useState(false);
+
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const mainGroupRef = useRef<THREE.Group | null>(null);
+  const currentMeshRef = useRef<THREE.Group | null>(null);
+  const loadedGlbSceneRef = useRef<THREE.Group | null>(null);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+
+  // Initialize Scene, Lights, Floor Grid
   useEffect(() => {
     if (!mountRef.current) return;
     const container = mountRef.current;
-    const width = container.clientWidth || 500;
-    const h = container.clientHeight || 420;
+    const width = container.clientWidth || 650;
+    const h = container.clientHeight || 540;
 
-    // Scene, Camera, Renderer setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f172a); // Deep slate dark blue
+    scene.background = new THREE.Color(0x000000);
+    sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, width / h, 0.1, 1000);
-    camera.position.set(0, 1.2, 3);
-    camera.lookAt(0, 1, 0);
+    camera.position.set(2.4, 1.2, 2.4);
+    camera.lookAt(0, 0.5, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(width, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
     // Grid Helper
-    const gridHelper = new THREE.GridHelper(10, 20, 0x3b82f6, 0x1e293b);
-    gridHelper.position.y = -0.5;
+    const gridHelper = new THREE.GridHelper(10, 20, 0xffffff, 0x333333);
+    gridHelper.position.y = 0;
     scene.add(gridHelper);
 
-    // Ambient & Directional Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    // Floor Plane
+    const floorGeo = new THREE.PlaneGeometry(10, 10);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.8, metalness: 0.2 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.005;
+    scene.add(floor);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0x60a5fa, 1.5);
-    dirLight.position.set(5, 10, 7);
-    scene.add(dirLight);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    keyLight.position.set(5, 10, 7);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
 
-    // Group for Skeleton
-    const skeletonGroup = new THREE.Group();
-    scene.add(skeletonGroup);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    rimLight.position.set(-5, 8, -5);
+    scene.add(rimLight);
 
-    // Joint Spheres & Line Meshes
-    const jointSpheres: THREE.Mesh[] = [];
-    const jointMaterial = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8, // Sky blue
-      roughness: 0.3,
-      metalness: 0.5,
-    });
-    const jointGeometry = new THREE.SphereGeometry(0.035, 16, 16);
+    const fillLight = new THREE.DirectionalLight(0xaaaaaa, 0.8);
+    fillLight.position.set(0, -5, 5);
+    scene.add(fillLight);
 
-    for (let i = 0; i < 33; i++) {
-      const sphere = new THREE.Mesh(jointGeometry, jointMaterial);
-      sphere.position.set((Math.random() - 0.5) * 0.5, Math.random() * 1.5, 0);
-      skeletonGroup.add(sphere);
-      jointSpheres.push(sphere);
-    }
+    const mainGroup = new THREE.Group();
+    scene.add(mainGroup);
+    mainGroupRef.current = mainGroup;
 
-    // Bone Lines
-    const lineMaterial = new THREE.LineBasicMaterial({ color: 0x818cf8, linewidth: 2 });
-    const lineGeometries: THREE.BufferGeometry[] = [];
-    const boneLines: THREE.Line[] = [];
+    // Orbit Controls for viewport camera movement
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0, 0.8, 0);
+    controls.update();
 
-    SKELETON_CONNECTIONS.forEach(() => {
-      const geom = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, 0),
-      ]);
-      const line = new THREE.Line(geom, lineMaterial);
-      skeletonGroup.add(line);
-      lineGeometries.push(geom);
-      boneLines.push(line);
-    });
-
-    // Simple Mouse Drag Orbit Controls implementation
-    let isDragging = false;
-    let previousMousePosition = { x: 0, y: 0 };
-
-    const onMouseDown = (e: MouseEvent) => {
-      isDragging = true;
-      previousMousePosition = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      const deltaX = e.clientX - previousMousePosition.x;
-      const deltaY = e.clientY - previousMousePosition.y;
-
-      skeletonGroup.rotation.y += deltaX * 0.01;
-      skeletonGroup.rotation.x += deltaY * 0.01;
-
-      previousMousePosition = { x: e.clientX, y: e.clientY };
-    };
-
-    const onMouseUp = () => {
-      isDragging = false;
-    };
-
-    container.addEventListener("mousedown", onMouseDown);
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-
-    // Animation Loop
-    let animationFrameId: number;
+    // Render loop
+    let animId: number;
     const animate = () => {
-      animationFrameId = requestAnimationFrame(animate);
+      animId = requestAnimationFrame(animate);
+      controls.update();
       renderer.render(scene, camera);
     };
     animate();
 
-    // Store references for landmark updates
-    (container as any).__updateSkeleton = (landmarks: Record<string, { x: number; y: number; z: number }>) => {
-      if (!landmarks) return;
-      const landmarkKeys = Object.keys(landmarks);
-
-      landmarkKeys.forEach((key, idx) => {
-        if (idx < jointSpheres.length) {
-          const pt = landmarks[key];
-          // Map MediaPipe normalized coords (0-1) to 3D Scene space
-          const x = (pt.x - 0.5) * 2;
-          const y = (0.8 - pt.y) * 2;
-          const z = pt.z ? pt.z * -2 : 0;
-          jointSpheres[idx].position.set(x, y, z);
-        }
-      });
-
-      // Update bone connection lines
-      SKELETON_CONNECTIONS.forEach(([idxA, idxB], lineIdx) => {
-        if (idxA < jointSpheres.length && idxB < jointSpheres.length) {
-          const posA = jointSpheres[idxA].position;
-          const posB = jointSpheres[idxB].position;
-          const geom = lineGeometries[lineIdx];
-          geom.setFromPoints([posA, posB]);
-        }
-      });
-    };
-
-    // Clean up
     return () => {
-      cancelAnimationFrame(animationFrameId);
-      container.removeEventListener("mousedown", onMouseDown);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      cancelAnimationFrame(animId);
+      controls.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
@@ -176,31 +162,211 @@ export function ThreeMeshCanvas({ height = "420px" }: ThreeMeshCanvasProps) {
     };
   }, []);
 
-  // Update skeleton positions whenever activeFrame changes
+  // Effect to load GLB model when sourceType === "glb"
   useEffect(() => {
-    if (!mountRef.current || !currentAnalysis?.frame_analyses) return;
-    const frames = currentAnalysis.frame_analyses;
-    const targetFrame = frames[activeFrame] || frames[0];
-    if (targetFrame && targetFrame.landmarks && (mountRef.current as any).__updateSkeleton) {
-      (mountRef.current as any).__updateSkeleton(targetFrame.landmarks);
+    if (sourceType !== "glb" || !mainGroupRef.current) return;
+    const mainGroup = mainGroupRef.current;
+    const mat = getMeshMaterial(meshStyle);
+
+    if (loadedGlbSceneRef.current) {
+      // Update materials on already loaded GLB
+      loadedGlbSceneRef.current.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          (child as THREE.Mesh).material = mat;
+        }
+      });
+      return;
     }
-  }, [activeFrame, currentAnalysis]);
+
+    setIsLoadingMesh(true);
+    const loader = new GLTFLoader();
+    loader.load(
+      glbUrl,
+      (gltf) => {
+        const model = gltf.scene;
+        model.traverse((child) => {
+          if ((child as THREE.Mesh).isMesh) {
+            const mesh = child as THREE.Mesh;
+            mesh.geometry.computeVertexNormals();
+            mesh.material = mat;
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+          }
+        });
+
+        if (gltf.animations && gltf.animations.length > 0) {
+          const mixer = new THREE.AnimationMixer(model);
+          const action = mixer.clipAction(gltf.animations[0]);
+          action.play();
+          mixerRef.current = mixer;
+        }
+
+        if (currentMeshRef.current) {
+          mainGroup.remove(currentMeshRef.current);
+        }
+
+        loadedGlbSceneRef.current = model;
+        mainGroup.add(model);
+        currentMeshRef.current = model;
+        setIsLoadingMesh(false);
+      },
+      undefined,
+      (err) => {
+        console.error("GLB load error:", err);
+        setIsLoadingMesh(false);
+      }
+    );
+  }, [sourceType, glbUrl, meshStyle]);
+
+  // Synchronize GLB animation mixer with activeFrame
+  useEffect(() => {
+    if (sourceType === "glb" && mixerRef.current) {
+      const targetTime = (activeFrame / 291.0) * (mixerRef.current.getRoot() ? 9.7 : 1);
+      mixerRef.current.setTime(targetTime);
+    }
+  }, [activeFrame, sourceType]);
+
+  // Update OBJ mesh geometry dynamically based on activeFrame when sourceType === "obj"
+  useEffect(() => {
+    if (sourceType !== "obj" || !mainGroupRef.current) return;
+    const mainGroup = mainGroupRef.current;
+    const mat = getMeshMaterial(meshStyle);
+
+    const frameIdx = Math.min(290, Math.max(0, activeFrame));
+    const frameStr = String(frameIdx).padStart(4, "0");
+    const objPath = `/meshes/frame_${frameStr}.obj`;
+
+    if (objMeshCache[frameIdx]) {
+      const cachedObj = objMeshCache[frameIdx];
+      cachedObj.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          (child as THREE.Mesh).material = mat;
+        }
+      });
+
+      if (currentMeshRef.current && currentMeshRef.current !== cachedObj) {
+        mainGroup.remove(currentMeshRef.current);
+      }
+      mainGroup.add(cachedObj);
+      currentMeshRef.current = cachedObj;
+    } else {
+      setIsLoadingMesh(true);
+      const loader = new OBJLoader();
+      loader.load(
+        objPath,
+        (obj) => {
+          obj.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              const mesh = child as THREE.Mesh;
+              mesh.geometry.computeVertexNormals();
+              mesh.material = mat;
+              mesh.castShadow = true;
+              mesh.receiveShadow = true;
+            }
+          });
+
+          objMeshCache[frameIdx] = obj;
+
+          if (currentMeshRef.current) {
+            mainGroup.remove(currentMeshRef.current);
+          }
+          mainGroup.add(obj);
+          currentMeshRef.current = obj;
+          setIsLoadingMesh(false);
+        },
+        undefined,
+        () => {
+          setIsLoadingMesh(false);
+        }
+      );
+    }
+  }, [activeFrame, meshStyle, sourceType]);
 
   return (
-    <div className="relative rounded-xl border border-border bg-slate-950 overflow-hidden shadow-md">
+    <div className="relative rounded-none border border-[#262626] bg-[#000000] overflow-hidden flex flex-col shadow-2xl font-mono">
       {/* 3D Control Header Overlay */}
-      <div className="absolute top-3 left-3 z-10 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-700/60 backdrop-blur-md text-xs font-mono text-slate-200">
-        <Box className="h-3.5 w-3.5 text-sky-400" />
-        <span>3D WebGL SMPL Mesh View</span>
+      <div className="p-3 border-b border-[#262626] bg-[#0a0a0a] flex flex-wrap items-center justify-between gap-2 z-10">
+        <div className="flex items-center gap-2 text-xs text-[#ffffff]">
+          <Box className="h-4 w-4 text-[#ffffff]" />
+          <span className="font-bold uppercase tracking-widest">EASYMOCAP 6,890-VERTEX 3D MESH VIEWPORT</span>
+          {isLoadingMesh && <RefreshCw className="h-3 w-3 text-[#a3a3a3] animate-spin ml-2" />}
+        </div>
+
+        {/* Viewport Source & Material Controls */}
+        <div className="flex items-center gap-2 text-[10px]">
+          {/* Mesh Source Mode Switcher */}
+          <div className="flex items-center gap-1 bg-[#000000] border border-[#262626] p-1">
+            <button
+              onClick={() => {
+                if (currentMeshRef.current && mainGroupRef.current) {
+                  mainGroupRef.current.remove(currentMeshRef.current);
+                  currentMeshRef.current = null;
+                }
+                setSourceType("glb");
+              }}
+              className={`px-2.5 py-0.5 transition-all uppercase font-bold ${
+                sourceType === "glb"
+                  ? "bg-[#ffffff] text-[#000000]"
+                  : "text-[#a3a3a3] hover:text-[#ffffff] hover:bg-[#171717]"
+              }`}
+            >
+              Animated GLB (.blend)
+            </button>
+            <button
+              onClick={() => {
+                if (currentMeshRef.current && mainGroupRef.current) {
+                  mainGroupRef.current.remove(currentMeshRef.current);
+                  currentMeshRef.current = null;
+                }
+                setSourceType("obj");
+              }}
+              className={`px-2.5 py-0.5 transition-all uppercase font-bold ${
+                sourceType === "obj"
+                  ? "bg-[#ffffff] text-[#000000]"
+                  : "text-[#a3a3a3] hover:text-[#ffffff] hover:bg-[#171717]"
+              }`}
+            >
+              OBJ Sequence (291F)
+            </button>
+          </div>
+
+          {/* Viewport Material Controls */}
+          <div className="flex items-center gap-1 bg-[#000000] border border-[#262626] p-1">
+            {[
+              { id: "wireframe", label: "Wireframe" },
+              { id: "chrome", label: "Chrome" },
+              { id: "matte", label: "Matte" },
+              { id: "glass", label: "Translucent" },
+            ].map((m) => (
+              <button
+                key={m.id}
+                onClick={() => setMeshStyle(m.id as any)}
+                className={`px-2.5 py-0.5 transition-all uppercase ${
+                  meshStyle === m.id
+                    ? "bg-[#ffffff] text-[#000000] font-bold"
+                    : "text-[#a3a3a3] hover:text-[#ffffff] hover:bg-[#171717]"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-2 text-[10px] font-mono text-slate-400 bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
-        <Eye className="h-3 w-3 text-indigo-400" />
-        <span>Drag to rotate 360°</span>
-      </div>
+      {/* Three.js Rendering Container */}
+      <div ref={mountRef} style={{ height }} className="w-full cursor-grab active:cursor-grabbing relative" />
 
-      {/* Three.js Mounting Container */}
-      <div ref={mountRef} style={{ height }} className="w-full cursor-grab active:cursor-grabbing" />
+      {/* Footer Info */}
+      <div className="p-2.5 border-t border-[#262626] bg-[#0a0a0a] text-[10px] text-[#a3a3a3] flex justify-between items-center px-4">
+        <span>
+          {sourceType === "glb" ? "squat_multiview_animated.glb (.blend export)" : `Frame ${activeFrame + 1} / 291`}{" "}
+          • Sub-centimeter SMPL Surface Mesh
+        </span>
+        <span className="flex items-center gap-1 text-[#ffffff]">
+          <Eye className="h-3 w-3 text-[#ffffff]" /> Drag mouse to rotate 360°
+        </span>
+      </div>
     </div>
   );
 }

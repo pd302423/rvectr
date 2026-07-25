@@ -2,7 +2,7 @@
 
 import { useBiomechanicsStore } from "@/lib/store";
 import { Play, Pause, SkipBack, SkipForward, RotateCcw } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 interface TimelineScrubberProps {
   totalFrames: number;
@@ -10,8 +10,7 @@ interface TimelineScrubberProps {
 }
 
 export function TimelineScrubber({ totalFrames, fps = 30 }: TimelineScrubberProps) {
-  const { activeFrame, isPlaying, setActiveFrame, togglePlay, setPlaying } = useBiomechanicsStore();
-  const animRef = useRef<number | null>(null);
+  const { activeFrame, isPlaying, setActiveFrame, togglePlay } = useBiomechanicsStore();
 
   useEffect(() => {
     if (isPlaying) {
@@ -30,47 +29,46 @@ export function TimelineScrubber({ totalFrames, fps = 30 }: TimelineScrubberProp
 
   const currentTime = (activeFrame / fps).toFixed(2);
   const totalTime = (totalFrames / fps).toFixed(2);
-  const progressPercent = totalFrames > 0 ? (activeFrame / totalFrames) * 100 : 0;
 
   return (
-    <div className="p-4 rounded-xl border border-border bg-card shadow-xs">
+    <div className="p-3 border border-[#262626] bg-[#0a0a0a] text-[#ffffff] font-mono">
       <div className="flex items-center justify-between gap-4">
-        {/* Controls */}
-        <div className="flex items-center gap-2">
+        {/* Playback Controls */}
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveFrame(0)}
-            className="p-2 rounded-lg bg-secondary hover:bg-muted text-secondary-foreground transition-colors"
+            className="p-2 border border-[#262626] bg-[#000000] text-[#ffffff] hover:bg-[#ffffff] hover:text-[#000000] transition-colors"
             title="Reset to frame 0"
           >
-            <RotateCcw className="h-4 w-4" />
+            <RotateCcw className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setActiveFrame(Math.max(0, activeFrame - 1))}
-            className="p-2 rounded-lg bg-secondary hover:bg-muted text-secondary-foreground transition-colors"
-            title="Step Back 1 Frame"
+            className="p-2 border border-[#262626] bg-[#000000] text-[#ffffff] hover:bg-[#ffffff] hover:text-[#000000] transition-colors"
+            title="Previous Frame"
           >
-            <SkipBack className="h-4 w-4" />
+            <SkipBack className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={togglePlay}
-            className="p-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs"
+            className="p-2 border border-[#ffffff] bg-[#ffffff] text-[#000000] hover:bg-[#a3a3a3] transition-colors font-bold"
             title={isPlaying ? "Pause" : "Play"}
           >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+            {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 fill-current" />}
           </button>
           <button
             onClick={() => setActiveFrame(Math.min(totalFrames - 1, activeFrame + 1))}
-            className="p-2 rounded-lg bg-secondary hover:bg-muted text-secondary-foreground transition-colors"
-            title="Step Forward 1 Frame"
+            className="p-2 border border-[#262626] bg-[#000000] text-[#ffffff] hover:bg-[#ffffff] hover:text-[#000000] transition-colors"
+            title="Next Frame"
           >
-            <SkipForward className="h-4 w-4" />
+            <SkipForward className="h-3.5 w-3.5" />
           </button>
         </div>
 
-        {/* Scrubber Track */}
+        {/* Timeline Slider Track */}
         <div className="flex-1 mx-4">
-          <div className="flex justify-between items-center text-[10px] font-mono text-muted-foreground mb-1">
-            <span>Frame {activeFrame} / {totalFrames}</span>
+          <div className="flex justify-between items-center text-[10px] text-[#a3a3a3] mb-1 font-mono uppercase">
+            <span>Frame {activeFrame + 1} / {totalFrames}</span>
             <span>{currentTime}s / {totalTime}s</span>
           </div>
           <input
@@ -79,13 +77,13 @@ export function TimelineScrubber({ totalFrames, fps = 30 }: TimelineScrubberProp
             max={Math.max(0, totalFrames - 1)}
             value={activeFrame}
             onChange={(e) => setActiveFrame(Number(e.target.value))}
-            className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary focus:outline-none"
+            className="w-full h-1 bg-[#262626] appearance-none cursor-pointer accent-[#ffffff]"
           />
         </div>
 
-        {/* Telemetry info */}
-        <div className="text-right font-mono text-xs">
-          <span className="px-2 py-1 rounded bg-muted/60 text-muted-foreground">{fps} FPS</span>
+        {/* FPS Indicator */}
+        <div className="text-right text-[10px] font-mono text-[#ffffff] border border-[#262626] px-2.5 py-1 bg-[#000000]">
+          <span>{fps} FPS</span>
         </div>
       </div>
     </div>
