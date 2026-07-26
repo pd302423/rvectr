@@ -107,3 +107,8 @@ backend/**/__pycache__/
 backend/haarcascade_frontalface_default.xml
 
 
+
+# CI workflow: tracked at docs/ci-workflow.yml instead, because the current
+# GitHub token lacks `workflow` scope and rejects pushes touching this path.
+# Once the token has that scope: git rm --cached nothing, just `git add -f`.
+.github/workflows/ci.yml

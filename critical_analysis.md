@@ -266,7 +266,7 @@ Kept short deliberately, but it is real and worth not discarding:
 | 10, 11 | Untestable hypotheses, scope inflation | Robotics claim removed from hypotheses; H₂ made falsifiable; velocity hypothesis stated |
 | 12 | Hardcoded paths | All eliminated via `backend/rvectr_paths.py` with env overrides |
 | 13 | No dependency spec | `requirements-core.txt`, `requirements-hmr2.txt`, three-environment split documented |
-| 15 | No CI | `.github/workflows/ci.yml` — tests, typecheck, build, fabricated-claims guard |
+| 15 | No CI | `.github/workflows/ci.yml` written — tests, typecheck, build, fabricated-claims guard. **Not yet pushed:** the stored token lacks `workflow` scope (see Partial) |
 | 16 | SaaS still shipped | 42 files removed; 14 routes → 5; build passes clean |
 | 17 | Silent config fallbacks | Removed with the Supabase layer |
 | 18 | "Clinical" language | Removed from README and WORKSPACE_SUMMARY |
@@ -280,6 +280,7 @@ Kept short deliberately, but it is real and worth not discarding:
 | 0 | EasyMocap synthesises instead of capturing | Labelled honestly, but **you must decide** whether to implement real triangulation or convert it into the ground-truth harness. Provenance of existing result files still unverified. |
 | 2 | Submodule work unbacked-up | Committed locally in both submodules; bundles at `~/rvectr-backups/`. **Still single-disk — forking and pushing needs your GitHub auth.** |
 | 9 | No pre-registration | Full draft at `docs/osf_preregistration_draft.md`; needs an OSF account and submission |
+| 15 | CI not on GitHub | Workflow file exists locally but is untracked — push rejected for missing `workflow` token scope. Regenerate the token or paste via the web UI. |
 | 14 | Script sprawl | Documented with status per script in `backend/README.md`; not consolidated |
 
 ## Open
