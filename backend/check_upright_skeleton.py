@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test_upright_skeleton.py
+check_upright_skeleton.py
 
 Tests exact MediaPipe 3D landmark coordinate transformation into Blender 3D upright coordinate frame.
 """

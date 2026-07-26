@@ -16,6 +16,7 @@ import subprocess
 import numpy as np
 import trimesh
 from scipy.signal import savgol_filter
+from meshio import load_smpl_faces, write_obj
 
 VIDEOS2_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos2"))
 VIDEOS1_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos"))
@@ -27,24 +28,6 @@ SINGLE_BLEND_PATH = os.path.join(VIDEOS2_DIR, "squat_3d_mesh.blend")
 
 REF_OBJ_PATH = os.path.join(VIDEOS1_DIR, "squat_3d_mesh.obj")
 VERT_NPY_PATH = os.path.join(VIDEOS1_DIR, "squat_vertices_anim.npy")
-
-def load_smpl_faces(ref_obj_path):
-    faces = []
-    with open(ref_obj_path, "r") as f:
-        for line in f:
-            if line.startswith("f "):
-                parts = line.strip().split()
-                face = [int(p.split("/")[0]) for p in parts[1:]]
-                faces.append(face)
-    return faces
-
-def export_smpl_obj(verts, faces, obj_path):
-    with open(obj_path, "w") as f:
-        f.write("# Upright Muscular SMPL 3D Human Body Surface Mesh\n")
-        for v in verts:
-            f.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
-        for face in faces:
-            f.write(f"f {face[0]} {face[1]} {face[2]}\n")
 
 def main():
     os.makedirs(OBJ_DIR, exist_ok=True)
@@ -84,7 +67,7 @@ def main():
 
     for i in range(num_frames):
         obj_file = os.path.join(OBJ_DIR, f"frame_{i:04d}.obj")
-        export_smpl_obj(centered_verts[i], faces, obj_file)
+        write_obj(centered_verts[i], faces, obj_file, source=__file__, measured=None, note="reoriented upright and centred")
 
         avg_y = np.mean(centered_verts[i][:, 1])
         if avg_y < min_hip_y:
@@ -92,7 +75,7 @@ def main():
             min_hip_idx = i
 
     # Save peak depth single OBJ
-    export_smpl_obj(centered_verts[min_hip_idx], faces, SINGLE_OBJ_PATH)
+    write_obj(centered_verts[min_hip_idx], faces, SINGLE_OBJ_PATH, source=__file__, measured=None, note="reoriented upright and centred")
     print(f"[✓] Exported peak depth upright SMPL OBJ: {SINGLE_OBJ_PATH} (frame {min_hip_idx})")
 
     # Save numpy datasets in videos2

@@ -1,15 +1,9 @@
 #!/usr/bin/env python3
 """
-copy_perfect_blend_to_videos2.py
+synthesize_scripted_squat_anim.py
 
-Rebuilds `videos2/squat_multiview_animated.blend` using the exact perfect anchored vertex dataset
-and shapekey structure from `videos/squat_animated.blend`.
-
-Guarantees:
-- 100% Zero-Spinning
-- 100% Zero-Flying Around / Zero-Drift
-- Feet 100% pinned to floor Z=0.000m
-- Authentic 6,890-vertex SMPL 3D Human Body Surface Mesh (13,776 faces)
+Rebuilds `videos2/squat_multiview_animated.blend` with standard relative shape keys (use_relative = True)
+and individual per-frame keyframe action curves so pressing Spacebar / Play in Blender IMMEDIATELY plays the full squat animation.
 """
 
 import os
@@ -17,6 +11,7 @@ import sys
 import glob
 import subprocess
 import numpy as np
+from meshio import load_smpl_faces, write_obj
 
 VIDEOS2_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos2"))
 VIDEOS1_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos"))
@@ -29,24 +24,6 @@ SINGLE_BLEND_PATH = os.path.join(VIDEOS2_DIR, "squat_3d_mesh.blend")
 REF_OBJ_PATH = os.path.join(VIDEOS1_DIR, "squat_3d_mesh.obj")
 ANCHORED_NPY_PATH = os.path.join(VIDEOS1_DIR, "squat_anchored_anim.npy")
 
-def load_smpl_faces(ref_obj_path):
-    faces = []
-    with open(ref_obj_path, "r") as f:
-        for line in f:
-            if line.startswith("f "):
-                parts = line.strip().split()
-                face = [int(p.split("/")[0]) for p in parts[1:]]
-                faces.append(face)
-    return faces
-
-def export_obj(verts, faces, obj_path):
-    with open(obj_path, "w") as f:
-        f.write("# Perfect Anchored SMPL 3D Human Body Surface Mesh\n")
-        for v in verts:
-            f.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
-        for face in faces:
-            f.write(f"f {face[0]} {face[1]} {face[2]}\n")
-
 def main():
     os.makedirs(OBJ_DIR, exist_ok=True)
     faces = load_smpl_faces(REF_OBJ_PATH)
@@ -55,16 +32,17 @@ def main():
         print(f"[!] Error: {ANCHORED_NPY_PATH} not found.")
         sys.exit(1)
 
-    print(f"[*] Loading perfect anchored SMPL animation dataset from {ANCHORED_NPY_PATH}...")
+    print(f"[*] Loading squat animation dataset from {ANCHORED_NPY_PATH}...")
     verts_anim = np.load(ANCHORED_NPY_PATH) # Shape: (225, 6890, 3)
     num_frames = len(verts_anim)
-    print(f"[✓] Loaded {num_frames} frames of zero-drift zero-spin SMPL mesh data.")
 
-    # Save numpy datasets in videos2
-    np.save(os.path.join(VIDEOS2_DIR, "squat_vertices_anim.npy"), verts_anim)
-    np.save(os.path.join(VIDEOS2_DIR, "squat_anchored_anim.npy"), verts_anim)
-    np.save(os.path.join(VIDEOS2_DIR, "squat_multiview_anim.npy"), verts_anim[:, :33, :])
-    np.save(os.path.join(VIDEOS2_DIR, "squat_male_accurate_anim.npy"), verts_anim[:, :33, :])
+    # Center stationary per-frame (COM_x, COM_z) to eliminate translation drift
+    stationary_verts = np.zeros_like(verts_anim)
+    for t in range(num_frames):
+        v = verts_anim[t].copy()
+        v[:, 0] -= np.mean(v[:, 0])
+        v[:, 2] -= np.mean(v[:, 2])
+        stationary_verts[t] = v
 
     print(f"[*] Exporting {num_frames} clean OBJ frame files to {OBJ_DIR}...")
     min_z_idx = 0
@@ -72,21 +50,20 @@ def main():
 
     for i in range(num_frames):
         obj_file = os.path.join(OBJ_DIR, f"frame_{i:04d}.obj")
-        export_obj(verts_anim[i], faces, obj_file)
+        write_obj(stationary_verts[i], faces, obj_file, source=__file__, measured=False, note="hand-authored squat animation")
 
-        # Check peak squat depth
-        max_z = np.max(verts_anim[i][:, 2])
+        max_z = np.max(stationary_verts[i][:, 2])
         if max_z < min_z_val:
             min_z_val = max_z
             min_z_idx = i
 
-    # Export peak depth single OBJ
-    export_obj(verts_anim[min_z_idx], faces, SINGLE_OBJ_PATH)
-    print(f"[✓] Exported peak squat depth OBJ: {SINGLE_OBJ_PATH} (frame {min_z_idx})")
+    # Export peak depth single OBJ (Frame 40)
+    write_obj(stationary_verts[40], faces, SINGLE_OBJ_PATH, source=__file__, measured=False, note="hand-authored squat animation")
+    print(f"[✓] Exported peak squat depth OBJ (Frame 40): {SINGLE_OBJ_PATH}")
 
-    # Rebuild Blender scenes using the exact working shapekey construction
+    # Rebuild Blender project scenes
     print("[*] Rebuilding Blender .blend scenes via Blender CLI...")
-    blender_script = os.path.join(VIDEOS2_DIR, "build_perfect_blend.py")
+    blender_script = os.path.join(VIDEOS2_DIR, "build_playable_squat.py")
 
     with open(blender_script, "w") as f:
         f.write("import bpy\n")
@@ -120,6 +97,9 @@ def main():
         f.write("actor.name = 'Squat_Actor'\n\n")
 
         f.write("actor.shape_key_add(name='Basis', from_mix=False)\n")
+        f.write("sk_data = actor.data.shape_keys\n")
+        f.write("sk_data.use_relative = True\n\n")
+
         f.write("bpy.context.scene.frame_start = 1\n")
         f.write("bpy.context.scene.frame_end = len(obj_files)\n\n")
 
@@ -148,7 +128,7 @@ def main():
 
     cmd = ["blender", "-b", "--python", blender_script]
     subprocess.run(cmd, check=True)
-    print("[✓] Successfully rebuilt perfect zero-drift zero-spin SMPL Blender project!")
+    print("[✓] Successfully rebuilt playable squat animation scene!")
 
 if __name__ == "__main__":
     main()

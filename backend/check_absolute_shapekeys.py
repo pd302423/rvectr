@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test_absolute_shapekeys.py
+check_absolute_shapekeys.py
 
 Builds Absolute Shape Keys (use_relative = False) in Blender where shape keys
 directly define exact vertex positions without additive deformation or warping.

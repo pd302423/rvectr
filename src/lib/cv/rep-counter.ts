@@ -1,5 +1,3 @@
-import type { Landmark } from "@/lib/cv/angles";
-import { getKneeAngle } from "@/lib/cv/angles";
 
 // ---------------------------------------------------------------------------
 // Types

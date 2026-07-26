@@ -21,10 +21,14 @@ const instrumentSerif = Instrument_Serif({
   style: ["normal", "italic"],
 });
 
+// This description is the site's search-result and link-preview text, so it is
+// the single most-read sentence in the project. It described a coaching product
+// for professional athletes that did not exist, in language ("industrial-grade", ci-allow)
+// asserting a maturity nothing here has demonstrated.
 export const metadata: Metadata = {
-  title: "rvectr — Professional Biomechanical Motion Capture & Telemetry Workspace",
+  title: "rvectr — Markerless 3D Motion Capture & Kinematics Research Prototype",
   description:
-    "Industrial-grade markerless 3D computer vision and multi-camera motion capture telemetry platform for professional athletes and strength & conditioning coaches.",
+    "An open research prototype studying velocity-dependent error in markerless 3D human pose estimation. Not a medical device; accuracy has not been validated against any reference standard.",
 };
 
 export default function RootLayout({

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, ShieldAlert, Scale } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Scale } from "lucide-react";
 
 interface AsymmetryItem {
   parameter: string;

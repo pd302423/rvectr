@@ -1,7 +1,7 @@
 "use client";
 
 import { useBiomechanicsStore } from "@/lib/store";
-import { Compass, Ruler, Pencil, Trash2, Camera, UserCheck, Shield } from "lucide-react";
+import { Compass, Ruler, Pencil, Trash2, UserCheck, Shield } from "lucide-react";
 
 export function TelestratorToolbar() {
   const { userRole, setUserRole, telestratorTool, setTelestratorTool } = useBiomechanicsStore();
