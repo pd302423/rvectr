@@ -17,6 +17,7 @@ import cv2
 import numpy as np
 import mediapipe as mp
 from mediapipe.tasks.python import vision, BaseOptions
+from scipy.signal import savgol_filter
 
 VIDEOS2_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos2"))
 CE3_PATH = os.path.join(VIDEOS2_DIR, "CE 3", "VID_20260723_202801.mp4")
@@ -125,22 +126,26 @@ def extract_landmarks_from_video(video_path: str):
     print(f"[✓] Extracted pose keypoints for {detected_frames}/{frame_idx} frames from {os.path.basename(video_path)}")
     return np.array(all_landmarks_2d), np.array(all_landmarks_3d)
 
-def smooth_trajectory(data: np.ndarray, kernel_size=7, sigma=1.5) -> np.ndarray:
-    """Applies temporal Gaussian smoothing filter to remove joint landmark jitter."""
-    if len(data) < kernel_size:
+def smooth_trajectory(data: np.ndarray, window_length=7, polyorder=3) -> np.ndarray:
+    """
+    Temporal Savitzky-Golay smoothing of joint landmark trajectories.
+
+    Savitzky-Golay rather than Gaussian: a Gaussian kernel attenuates local
+    extrema, and peak joint angles are exactly what this project measures.
+    The attenuation grows with movement speed, which would fabricate a
+    velocity-dependent error trend even from a perfect estimator.
+
+    Also replaces a hand-rolled np.convolve(mode='same') implementation whose
+    comment claimed reflect padding but which actually zero-pads, dragging the
+    first and last window_length//2 frames toward the origin.
+
+    data: (frames, joints, coords)
+    """
+    if len(data) < window_length or window_length <= polyorder:
         return data
 
-    # Create 1D Gaussian kernel
-    x = np.arange(-kernel_size // 2 + 1, kernel_size // 2 + 1)
-    kernel = np.exp(-0.5 * (x / sigma) ** 2)
-    kernel = kernel / np.sum(kernel)
-
-    smoothed = np.zeros_like(data)
-    for j in range(data.shape[1]):
-        for c in range(data.shape[2]):
-            # Convolve along time axis with reflect padding
-            smoothed[:, j, c] = np.convolve(data[:, j, c], kernel, mode='same')
-    return smoothed
+    win = window_length if window_length % 2 == 1 else window_length - 1
+    return savgol_filter(data, window_length=win, polyorder=polyorder, axis=0)
 
 def triangulate_multiview(lm3d_cam1: np.ndarray, lm3d_cam2: np.ndarray) -> np.ndarray:
     """Combines and aligns 3D world pose estimations from multi-cam views."""

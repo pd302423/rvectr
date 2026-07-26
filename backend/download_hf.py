@@ -3,7 +3,12 @@ import requests
 import time
 
 url = "https://huggingface.co/spaces/brjathu/HMR2.0/resolve/main/logs/train/multiruns/hmr2/0/checkpoints/epoch%3D35-step%3D1000000.ckpt"
-dest = "/home/pd/.cache/4DHumans/logs/train/multiruns/hmr2/0/checkpoints/epoch=35-step=1000000.ckpt"
+from rvectr_paths import CACHE_DIR
+
+dest = os.path.join(
+    CACHE_DIR, "logs", "train", "multiruns", "hmr2", "0", "checkpoints",
+    "epoch=35-step=1000000.ckpt",
+)
 
 os.makedirs(os.path.dirname(dest), exist_ok=True)
 

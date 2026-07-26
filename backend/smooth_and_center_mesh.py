@@ -61,6 +61,24 @@ def smooth_and_center(obj_dir, out_dir, window_length=15, polyorder=3):
         print(f"[✓] Exported centered 3D GLB model to {glb_path}")
 
 if __name__ == "__main__":
-    obj_in = "/home/pd/Downloads/20260723_121036_3d_mesh/obj_sequence"
-    obj_out = "/home/pd/Downloads/20260723_121036_3d_mesh/obj_sequence_smoothed"
-    smooth_and_center(obj_in, obj_out)
+    import argparse
+
+    from rvectr_paths import OUT_DIR
+
+    parser = argparse.ArgumentParser(
+        description="Temporally smooth and center an OBJ mesh sequence."
+    )
+    parser.add_argument(
+        "obj_in", nargs="?", default=OUT_DIR,
+        help="Directory of input .obj files (default: $RVECTR_OUT_DIR)",
+    )
+    parser.add_argument(
+        "obj_out", nargs="?", default=None,
+        help="Output directory (default: <obj_in>_smoothed)",
+    )
+    parser.add_argument("--window-length", type=int, default=15)
+    parser.add_argument("--polyorder", type=int, default=3)
+    args = parser.parse_args()
+
+    obj_out = args.obj_out or (args.obj_in.rstrip(os.sep) + "_smoothed")
+    smooth_and_center(args.obj_in, obj_out, args.window_length, args.polyorder)

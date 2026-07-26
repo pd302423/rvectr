@@ -1,0 +1,23 @@
+# rvectr — core kinematics & mesh processing dependencies
+#
+# This is the LIGHT environment: enough to run extract_kinematics.py, the
+# pipeline/ modules, the mesh smoothing scripts, and the test suite. It does
+# NOT include the deep-learning backends — see requirements-hmr2.txt (Python
+# 3.10) and EasyMocap/requirements.txt (Python 3.11) for those.
+#
+#   python3 -m venv .venv-core && source .venv-core/bin/activate
+#   pip install -r requirements-core.txt
+#   pytest tests/
+
+numpy>=1.24,<2.0
+scipy>=1.10
+opencv-python>=4.8
+trimesh>=4.0
+requests>=2.31
+tqdm>=4.66
+
+# Realtime pose backend (also used by the multi-view keypoint extraction step)
+mediapipe>=0.10.9
+
+# Tests
+pytest>=8.0

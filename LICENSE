@@ -1,0 +1,84 @@
+rvectr — Research and Non-Commercial Use License
+Copyright (c) 2026 Parth Dalal
+
+====================================================================
+IMPORTANT — WHY THIS IS NOT AN MIT LICENSE
+====================================================================
+
+This project depends on EasyMocap (Zhejiang University, CAD&CG), which is
+distributed for "educational, research and non-profit purposes only" and
+states that "any modification based on this work must be open-source and
+prohibited for commercial use."
+
+Because rvectr incorporates and builds upon EasyMocap, it CANNOT be
+distributed under the MIT License. This repository is therefore licensed
+under terms at least as restrictive as its most restrictive dependency.
+
+====================================================================
+GRANT OF RIGHTS
+====================================================================
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to use, copy, modify, merge, publish, and distribute the Software for
+EDUCATIONAL, RESEARCH, AND NON-PROFIT PURPOSES ONLY, subject to the
+following conditions:
+
+1. COMMERCIAL USE IS PROHIBITED. The Software may not be used, in whole
+   or in part, for commercial purposes, including but not limited to sale,
+   licensing for a fee, or incorporation into a commercial product or
+   service, without separate written permission from all upstream
+   copyright holders (see ATTRIBUTIONS below).
+
+2. MODIFICATIONS MUST REMAIN OPEN SOURCE. Any derivative work must be
+   distributed in source form under terms no less restrictive than these.
+
+3. ATTRIBUTION MUST BE RETAINED. The above copyright notice, this
+   permission notice, and all upstream copyright, patent, trademark, and
+   attribution notices must be included in all copies or substantial
+   portions of the Software.
+
+4. NO ACCURACY OR FITNESS CLAIM IS MADE. See the disclaimer below.
+
+====================================================================
+ATTRIBUTIONS — UPSTREAM COMPONENTS AND THEIR TERMS
+====================================================================
+
+EasyMocap — https://github.com/zju3dv/EasyMocap
+  Copyright 2020-2021 3D Vision Group, State Key Lab of CAD&CG,
+  Zhejiang University. All Rights Reserved.
+  Educational, research and non-profit use only. Modifications must be
+  open-source. Commercial use prohibited without permission
+  (contact: xwzhou@zju.edu.cn).
+  >>> THIS IS THE MOST RESTRICTIVE DEPENDENCY AND GOVERNS THE WHOLE
+  >>> PROJECT'S DISTRIBUTION TERMS.
+
+4D-Humans / HMR2 — https://github.com/shubham-goel/4D-Humans
+  MIT License. Copyright (c) 2023 UC Regents, Shubham Goel.
+
+SMPL / SMPL-X body models — https://smpl.is.tue.mpg.de
+  Max Planck Institute for Intelligent Systems. Distributed under a
+  separate model license requiring individual registration and
+  acceptance. NOT redistributed with this repository — users must obtain
+  the model files themselves and accept MPI's terms.
+
+MediaPipe — https://github.com/google-ai-edge/mediapipe
+  Apache License 2.0. Copyright Google LLC.
+
+====================================================================
+DISCLAIMER — NOT A MEDICAL OR CLINICAL DEVICE
+====================================================================
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+THIS SOFTWARE IS A RESEARCH PROTOTYPE. It is NOT a medical device, NOT a
+diagnostic tool, and has NOT been validated against any reference
+standard. No accuracy claim is made. It must not be used to inform
+medical, rehabilitative, or training decisions where inaccuracy could
+cause harm.

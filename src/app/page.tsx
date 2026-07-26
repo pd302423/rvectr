@@ -1,22 +1,6 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export default async function Home() {
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarded")
-        .eq("id", user.id)
-        .single();
-      redirect(profile?.onboarded ? "/dashboard" : "/onboarding");
-    }
-  }
-
   return (
     <main className="bg-background text-foreground min-h-screen">
 
@@ -336,6 +320,11 @@ function SessionReport() {
           <p className="text-foreground"><span className="text-muted-foreground">movement_01</span> &nbsp; pull_up</p>
           <p className="text-muted-foreground">sets: 4 / reps_counted: 26 / effective: 22.4</p>
         </div>
+
+        <p className="border-b border-border bg-amber-500/10 px-6 py-2 text-[11px] text-amber-600 dark:text-amber-400">
+          Illustrative mock-up of the intended output format. These are not
+          measured values — no validated measurement exists yet.
+        </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2">
 

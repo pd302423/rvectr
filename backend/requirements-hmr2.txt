@@ -1,0 +1,24 @@
+# rvectr — 4D-Humans / HMR2 monocular mesh recovery environment
+#
+# REQUIRES PYTHON 3.10. 4D-Humans and detectron2 do not build cleanly on 3.11+.
+# This is a SEPARATE virtualenv from requirements-core.txt and from EasyMocap
+# (which wants 3.11) — the three environments cannot be merged.
+#
+#   python3.10 -m venv .venv-hmr2 && source .venv-hmr2/bin/activate
+#   pip install -r requirements-core.txt
+#   # install torch matching your CUDA version FIRST, e.g. for CUDA 12.1:
+#   #   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements-hmr2.txt
+#   pip install -e 4D-Humans/
+#
+# detectron2 has no PyPI wheel and must be installed from source AFTER torch:
+#   pip install 'git+https://github.com/facebookresearch/detectron2.git'
+
+-r requirements-core.txt
+
+# torch/torchvision are intentionally NOT pinned here — the correct build
+# depends on your CUDA version. Install them before this file.
+torch>=2.0
+torchvision>=0.15
+
+transformers>=4.38

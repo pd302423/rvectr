@@ -4,7 +4,9 @@ import glob
 import os
 from scipy.signal import savgol_filter
 
-out_dir = "/home/pd/Documents/rvector/backend/squat_demo_out"
+from rvectr_paths import OUT_DIR
+
+out_dir = OUT_DIR
 obj_files = sorted(glob.glob(os.path.join(out_dir, "*.obj")))
 
 meshes = []

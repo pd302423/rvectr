@@ -20,7 +20,7 @@ Understanding and quantifying 3D human body kinematics in real time is a foundat
 
 **rvector** introduces a universal, markerless **3D Kinematic Spatial Telemetry Engine** leveraging **Monocular 3D Human Mesh Recovery (HMR2 / 4D-Humans)** and **Multi-View Spatial Triangulation (EasyMocap)**. By fitting a 6,890-vertex parametric **SMPL (Skinned Multi-Person Linear Model)** surface mesh over standard video feeds, **rvector** extracts 72 structural joint rotation parameters without physical markers.
 
-In the **Athletic & Biomechanical Domain**, **rvector** evaluates bodyweight movements (squats, planches, levers), computes frame-by-frame 3D joint angles with sub- $2.4^\circ$ mean absolute error, and calculates Bilateral Asymmetry Indices (ASI) to prevent acute injuries. 
+In the **Athletic & Biomechanical Domain**, **rvector** evaluates bodyweight movements (squats, planches, levers), computes frame-by-frame 3D joint angles, and calculates Bilateral Asymmetry Indices (ASI). **The accuracy of these measurements has not yet been validated against a reference standard** — quantifying that error is the current research objective.
 
 In the **Emerging Technology & Robotics Domain**, **rvector** maps SMPL joint rotation matrices ($\mathbf{R} \in \mathbb{SO}(3)$) directly to robotic inverse kinematics pipelines—enabling real-time humanoid robot teleoperation, ergonomic workplace safety monitoring, and adaptive joint-torque assistance in motorized rehabilitation exoskeletons. **rvector** democratizes clinical-grade biomechanics, transforming consumer hardware into a universal human-robot spatial intelligence engine.
 
@@ -50,7 +50,10 @@ Human motion analysis bridges biological movement and mechanical actuation. Whet
 
 ### 2.2 Hypotheses
 * **$\mathbf{H_1}$ (Precision Kinematics):** Surface mesh fitting over RGB video will match digital goniometric standards within $3.0^\circ$ of error.
-* **$\mathbf{H_2}$ (Cross-Domain Scalability):** Extracting 72 3D SMPL rotation parameters will allow identical kinematic algorithms to serve human athletic injury prevention and humanoid robot inverse kinematics.
+* **$\mathbf{H_2}$ (Velocity-Dependent Degradation):** Per-joint error will increase monotonically with joint angular velocity, with a measurable threshold beyond which the measurement is no longer meaningful for the intended application. *(Untested — this is the primary hypothesis of the current research program.)*
+
+> [!NOTE]
+> A previous $\mathbf{H_2}$ claimed cross-domain transfer to humanoid robot inverse kinematics. **No such implementation exists in this project** — no IK code, no ROS2 integration, no robot or simulation. It has been removed from the hypotheses and is retained only as speculative future work.
 
 ---
 
@@ -99,14 +102,16 @@ Used in athletics to flag hamstring/knee compensation, and in robotics to balanc
 
 ## 5. EXPERIMENTAL RESULTS & PERFORMANCE METRICS
 
-### 5.1 Joint Angle Accuracy (Goniometer Validation)
-* **Squat Knee Depth Error:** $\mathbf{0.8^\circ}$ MAE ($99.1\%$ Accuracy)
-* **Push-Up Elbow Lockout Error:** $\mathbf{1.6^\circ}$ MAE ($99.1\%$ Accuracy)
-* **Planche Shoulder Extension Error:** $\mathbf{2.4^\circ}$ MAE ($94.6\%$ Accuracy)
+### 5.1 Joint Angle Accuracy — NOT YET MEASURED
 
-### 5.2 Processing Benchmarks
-* **Local GPU Worker (NVIDIA RTX 5060):** 38 FPS (Monocular HMR2), 24 FPS (Multi-View EasyMocap)
-* **Client Browser (WebGL / MediaPipe Tasks-Vision):** **60 FPS** at **14 ms latency**.
+> [!IMPORTANT]
+> **No accuracy validation has been performed.** An earlier revision reported per-joint MAE against "goniometer validation." Those figures had no measurement protocol or script behind them, could not be reproduced, and have been removed. $\mathbf{H_1}$ remains an **open, untested hypothesis**.
+
+Validation via synthetic SMPL ground truth is the subject of the current research program — see [`docs/RESEARCH_ROADMAP.md`](../RESEARCH_ROADMAP.md). No accuracy figure will be restated until a committed script regenerates it from committed data.
+
+### 5.2 Processing Benchmarks — UNVERIFIED
+
+Informal development observations, **not backed by a benchmark script**; re-measure before citing. Local GPU worker (RTX 5060): ~38 FPS monocular HMR2, ~24 FPS multi-view EasyMocap. Client browser (MediaPipe): ~60 FPS.
 
 ---
 

@@ -4,6 +4,8 @@ import glob
 import mediapipe as mp
 import numpy as np
 
+from rvectr_paths import OUT_DIR, RENDER_DIR, HAAR_CASCADE, ensure
+
 def process_and_compile(input_dir, output_file, fps=30):
     search_path = os.path.join(input_dir, '*_all.png')
     files = sorted(glob.glob(search_path))
@@ -13,7 +15,7 @@ def process_and_compile(input_dir, output_file, fps=30):
         return
 
     # Load OpenCV face detector
-    face_cascade = cv2.CascadeClassifier('/home/pd/Documents/rvector/backend/haarcascade_frontalface_default.xml')
+    face_cascade = cv2.CascadeClassifier(HAAR_CASCADE)
 
     first_frame = cv2.imread(files[0])
     height, width, layers = first_frame.shape
@@ -49,6 +51,6 @@ def process_and_compile(input_dir, output_file, fps=30):
     print("Video saved successfully!")
 
 if __name__ == '__main__':
-    input_directory = '/home/pd/Documents/rvector/backend/squat_demo_out'
-    output_video = '/home/pd/.gemini/antigravity-cli/brain/0ee7170b-bb9a-4e93-9706-2c2d4575d277/final_squat_overlay_blackbox.mp4'
+    input_directory = OUT_DIR
+    output_video = os.path.join(ensure(RENDER_DIR), 'final_squat_overlay_blackbox.mp4')
     process_and_compile(input_directory, output_video, fps=30)

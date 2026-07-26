@@ -7,7 +7,9 @@ bpy.ops.object.select_all(action='DESELECT')
 bpy.ops.object.select_by_type(type='MESH')
 bpy.ops.object.delete()
 
-obj_dir = "/home/pd/Documents/rvector/backend/squat_demo_out"
+from rvectr_paths import OUT_DIR, RENDER_DIR, ensure
+
+obj_dir = OUT_DIR
 obj_files = sorted(glob.glob(os.path.join(obj_dir, "*.obj")))
 
 # Set end frame
@@ -52,6 +54,6 @@ for i, obj_path in enumerate(obj_files):
         print(f"Imported frame {frame_num}/{len(obj_files)}")
 
 # Save the blend file
-save_path = "/home/pd/.gemini/antigravity-cli/brain/0ee7170b-bb9a-4e93-9706-2c2d4575d277/animated_squat.blend"
+save_path = os.path.join(ensure(RENDER_DIR), "animated_squat.blend")
 bpy.ops.wm.save_as_mainfile(filepath=save_path)
 print(f"Successfully saved complete animation to {save_path}")

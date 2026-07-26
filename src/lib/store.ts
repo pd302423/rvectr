@@ -83,45 +83,55 @@ export interface AthleteRecord {
   lastAnalysisDate: string;
 }
 
-const mockDefaultAnalysis: AnalysisResultData = {
-  video_id: "SQUAT_MULTIVIEW_01",
-  analysis_type: "EasyMocap 3D Triangulation & SMPL Mesh Fitting",
+/**
+ * SAMPLE DATA — NOT A MEASUREMENT.
+ *
+ * Synthetic placeholder used to render the UI before any real analysis is
+ * loaded. Every value below is generated from a sine wave. It is NOT the output
+ * of any capture pipeline.
+ *
+ * A previous version of this constant was labelled
+ * "EasyMocap 3D Triangulation & SMPL Mesh Fitting" and carried a
+ * 94.8 / "Excellent" grade with clinical-sounding prose. That attributed
+ * fabricated numbers to a real pipeline that never ran. Do not reintroduce a
+ * backend name, a grade, or a recommendation that reads as a finding.
+ */
+const SAMPLE_PLACEHOLDER_ANALYSIS: AnalysisResultData = {
+  video_id: "SAMPLE — NOT A MEASUREMENT",
+  analysis_type: "Synthetic sample data (no pipeline was run)",
   metadata: {
-    width: 3840,
-    height: 2160,
+    width: 1920,
+    height: 1080,
     fps: 30,
     total_frames: 291,
     duration: 9.7,
-    codec: "H.264 / EasyMocap 3D",
-    file_size_mb: 48.5,
+    codec: "n/a — synthetic",
   },
   analysis: {
     overview: {
-      video_id: "SQUAT_MULTIVIEW_01",
-      analysis_type: "Multi-View MoCap 3D Surface Reconstruction",
+      video_id: "SAMPLE — NOT A MEASUREMENT",
+      analysis_type: "Synthetic sample data (no pipeline was run)",
       duration: 9.7,
       frames_analyzed: 291,
       total_frames: 291,
       coverage: 100.0,
     },
     joint_analysis: [
-      { joint: "Left Knee Flexion", mean_angle: 98.4, range_of_motion: 85.2, stability: 97.5, status: "normal", normal_range: "40° - 140°", left_angle: 45.2, right_angle: 46.1, asymmetry_index: 1.2 },
-      { joint: "Right Knee Flexion", mean_angle: 97.8, range_of_motion: 84.8, stability: 96.8, status: "normal", normal_range: "40° - 140°", left_angle: 45.2, right_angle: 46.1, asymmetry_index: 1.2 },
-      { joint: "Hip Extension / Hinge", mean_angle: 72.1, range_of_motion: 62.4, stability: 95.2, status: "normal", normal_range: "30° - 90°", left_angle: 68.4, right_angle: 69.1, asymmetry_index: 0.8 },
-      { joint: "Spinal Forward Lean", mean_angle: 22.4, range_of_motion: 28.5, stability: 94.0, status: "normal", normal_range: "10° - 35°", left_angle: 22.1, right_angle: 22.1, asymmetry_index: 0.0 },
-      { joint: "Ankle Dorsiflexion", mean_angle: 34.2, range_of_motion: 25.1, stability: 98.1, status: "normal", normal_range: "20° - 45°", left_angle: 32.5, right_angle: 33.1, asymmetry_index: 1.8 },
+      { joint: "Left Knee Flexion (sample)", mean_angle: 98.4, range_of_motion: 85.2, stability: 97.5, status: "normal", normal_range: "40° - 140°", left_angle: 45.2, right_angle: 46.1, asymmetry_index: 1.2 },
+      { joint: "Right Knee Flexion (sample)", mean_angle: 97.8, range_of_motion: 84.8, stability: 96.8, status: "normal", normal_range: "40° - 140°", left_angle: 45.2, right_angle: 46.1, asymmetry_index: 1.2 },
+      { joint: "Hip Extension / Hinge (sample)", mean_angle: 72.1, range_of_motion: 62.4, stability: 95.2, status: "normal", normal_range: "30° - 90°", left_angle: 68.4, right_angle: 69.1, asymmetry_index: 0.8 },
+      { joint: "Spinal Forward Lean (sample)", mean_angle: 22.4, range_of_motion: 28.5, stability: 94.0, status: "normal", normal_range: "10° - 35°", left_angle: 22.1, right_angle: 22.1, asymmetry_index: 0.0 },
+      { joint: "Ankle Dorsiflexion (sample)", mean_angle: 34.2, range_of_motion: 25.1, stability: 98.1, status: "normal", normal_range: "20° - 45°", left_angle: 32.5, right_angle: 33.1, asymmetry_index: 1.8 },
     ],
     posture_report: {
-      grade: "Excellent",
-      score: 94.8,
-      description: "Parallel squat depth achieved with optimal lumbar neutrality, zero knee valgus collapse, and butter-smooth temporal acceleration curves.",
-      consistency: 96.5,
-      score_range: { min: 88, max: 98 },
+      grade: "Fair",
+      score: 0,
+      description: "No analysis has been run. These values are synthetic placeholders for UI layout only and do not describe any recorded movement.",
+      consistency: 0,
+      score_range: { min: 0, max: 0 },
     },
     recommendations: [
-      "Maintain ankle dorsiflexion mobility during deep squat turnaround at Frame 107.",
-      "Spinal forward lean angle (22.1°) is optimal for midfoot bar path balance.",
-      "Bilateral knee flexion asymmetry is exceptionally low (1.2% delta).",
+      "This is sample data. Upload a video and run the pipeline to see real output.",
     ],
   },
   frame_analyses: Array.from({ length: 291 }, (_, i) => ({
@@ -136,6 +146,10 @@ const mockDefaultAnalysis: AnalysisResultData = {
     },
   })),
 };
+
+/** True when the store still holds the synthetic placeholder, not real output. */
+export const isSampleAnalysis = (a: AnalysisResultData | null) =>
+  a?.video_id === "SAMPLE — NOT A MEASUREMENT";
 
 interface BiomechanicsStore {
   currentAnalysis: AnalysisResultData | null;
@@ -161,7 +175,7 @@ interface BiomechanicsStore {
 }
 
 export const useBiomechanicsStore = create<BiomechanicsStore>((set) => ({
-  currentAnalysis: mockDefaultAnalysis,
+  currentAnalysis: SAMPLE_PLACEHOLDER_ANALYSIS,
   activeFrame: 106,
   isPlaying: false,
   activeTab: 'overview',
@@ -181,7 +195,7 @@ export const useBiomechanicsStore = create<BiomechanicsStore>((set) => ({
   toggleAnatomicalPlanes: () => set((state) => ({ showAnatomicalPlanes: !state.showAnatomicalPlanes })),
   reset: () =>
     set({
-      currentAnalysis: mockDefaultAnalysis,
+      currentAnalysis: SAMPLE_PLACEHOLDER_ANALYSIS,
       activeFrame: 106,
       isPlaying: false,
       activeTab: 'overview',

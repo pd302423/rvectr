@@ -3,7 +3,9 @@ import requests
 import time
 
 url = "https://www.cs.utexas.edu/~pavlakos/4dhumans/hmr2_data.tar.gz"
-dest = "/home/pd/.cache/4DHumans/hmr2_data.tar.gz"
+from rvectr_paths import CACHE_DIR
+
+dest = os.path.join(CACHE_DIR, "hmr2_data.tar.gz")
 
 os.makedirs(os.path.dirname(dest), exist_ok=True)
 

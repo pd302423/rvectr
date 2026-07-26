@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Box, Activity, Video, Camera, Users, Cpu } from "lucide-react";
+import { Box, Activity, Camera } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -11,7 +11,6 @@ export function Navbar() {
     { href: "/demo", label: "3D Motion Command", icon: Box },
     { href: "/analysis", label: "Kinematic Workspace", icon: Activity },
     { href: "/test/squat", label: "Live Optical CV", icon: Camera },
-    { href: "/roster", label: "Athlete Roster", icon: Users },
   ];
 
   return (

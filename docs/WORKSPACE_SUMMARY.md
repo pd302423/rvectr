@@ -4,7 +4,7 @@
 # rvector — Workspace Architecture & Computer Vision Stack Summary
 
 > [!NOTE]
-> **rvector** is a clinical biomechanical precision coaching system for calisthenics & athletic performance. It measures rep execution, diagnoses form breakdowns against peer-reviewed sports science standards, and renders 3D human body meshes and telemetry curves in real time.
+> **rvector** is a markerless 3D human motion capture and kinematics research system. It reconstructs SMPL body meshes from consumer-camera video, extracts frame-by-frame joint angles, and renders meshes and telemetry curves. Measurement accuracy is unvalidated — see the status note above.
 
 ---
 
@@ -13,7 +13,7 @@
 | Parameter | Details |
 |---|---|
 | **Core Product** | Biomechanical Precision Coaching System ("The Qoves of Calisthenics") |
-| **Primary Moat** | Monocular & Multi-view 3D Body Mesh Recovery + Clinical Kinematic Telemetry |
+| **Core Capability** | Monocular & multi-view 3D body mesh recovery + joint kinematic telemetry (accuracy unvalidated) |
 | **Target Hardware** | Local NVIDIA RTX 5060 GPU (Inference & Training) + Consumer Smartphones |
 | **Web Tech Stack** | Next.js 16 (App Router), TypeScript, Tailwind CSS, Supabase, Three.js / WebGL |
 | **Core Reference Docs** | [RESEARCH_ROADMAP.md](RESEARCH_ROADMAP.md), [HANDOFF.md](archive/HANDOFF.md) (archived), [ROADMAP.md](archive/ROADMAP.md) (archived), [AGENTS.md](../AGENTS.md) |

@@ -24,7 +24,7 @@ SLIDE 1: Title Slide
 - Subtitle: Real-Time Kinematic Telemetry for Athletic Performance, Physical Rehabilitation, and Robotic Teleoperation
 - Theme Badge: CBSE Science Exhibition — Category: Emerging Technologies (AI & Robotics)
 - Author: Student Developer & Innovator
-- Key Metrics Highlight Card: < 2.4° Joint Angle Error | 60 FPS WebGL Telemetry | $0 Equipment Cost vs $50k Motion Capture Labs
+- Key Metrics Highlight Card: 6,890-Vertex SMPL Mesh from Consumer Video | 3 Capture Backends Integrated | $0 Equipment Cost vs $50k Motion Capture Labs
 
 --------------------------------------------------------------------------------
 
@@ -88,15 +88,19 @@ SLIDE 6: Emerging Tech Application: Humanoid Robotics & Exoskeleton Mapping
 
 --------------------------------------------------------------------------------
 
-SLIDE 7: Experimental Results & Accuracy Benchmarks
-- Layout: Benchmark Data Table & Metrics Cards
-- Data Table:
-  - Movement | rvector Angle | Goniometer Ground Truth | Mean Absolute Error (MAE) | Accuracy
-  - Squat Knee Flexion | 84.2° | 85.0° | 0.8° | 99.1%
-  - Squat Hip Depth | 78.6° | 80.1° | 1.5° | 98.1%
-  - Push-Up Elbow Lockout | 176.4° | 178.0° | 1.6° | 99.1%
-  - Planche Extension | 42.1° | 44.5° | 2.4° | 94.6%
-- Key Takeaway: Achieves clinical goniometric accuracy (< 2.4° MAE) without physical markers.
+SLIDE 7: What Is Measured, and What Is Not
+- Layout: Two-column honest-status panel (no data table — there is no validation data yet)
+- Column A "Built and working":
+  - Monocular SMPL mesh recovery (4D-Humans / HMR2) running locally on RTX 5060
+  - Multi-view triangulation with camera calibration (EasyMocap)
+  - Frame-by-frame joint angle extraction — 161 frames squat, 90 frames running
+- Column B "Not yet measured":
+  - Accuracy against any reference standard — no validation has been performed
+  - Open question: how does error scale with joint angular velocity?
+- Key Takeaway: The pipeline works end-to-end. Quantifying how accurate it is, is the current research program — not a solved result.
+- NOTE TO PRESENTER: An earlier version of this deck contained a goniometer-comparison
+  table with MAE and accuracy percentages. Those numbers were never measured and have
+  been removed. Do not reintroduce any accuracy figure without a script behind it.
 
 --------------------------------------------------------------------------------
 
@@ -144,9 +148,9 @@ SLIDE 11: Future Enhancements & Vision
 SLIDE 12: Conclusion & Q&A
 - Title: Democratizing 3D Spatial Intelligence
 - Summary Bullets:
-  - rvector proves monocular 3D body mesh recovery matches clinical goniometer accuracy (< 2.4° error).
-  - Solves 2D depth collapse and removes the $50k barrier for sports science and robotics.
-  - Scales seamlessly from bodyweight athletic coaching to humanoid robot teleoperation.
-- Call to Action: "Transforming every camera into a clinical 3D biomechanics lab and robotic controller."
+  - rvector runs monocular and multi-view 3D body mesh recovery end-to-end on consumer hardware.
+  - Addresses 2D depth collapse without the $50k barrier of laboratory motion capture.
+  - Open question driving the next phase: at what movement velocity does markerless capture stop being accurate enough to be useful?
+- Call to Action: "Measuring how well a camera can measure a body — and where it stops working."
 - Thank You & Open for Viva-Voce Questions
 ```

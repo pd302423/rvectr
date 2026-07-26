@@ -2,13 +2,26 @@
 """
 run_easymocap_videos2.py
 
-Full Multi-View EasyMocap 3D Reconstruction & SMPL/SMPL-X Motion Capture Pipeline for videos2:
-1. Calibrates camera intrinsics & extrinsics (CE 3 + Nord) using chessboard calibration targets.
-2. Extracts multi-view 2D pose keypoints across all frames.
-3. Performs 3D spatial triangulation & SMPL/SMPL-X 72-parameter joint fitting with inverted elbow flexion (forearms flexed UPWARDS in front of chest) and Gaussian temporal smoothing filter.
-4. Generates 6,890-vertex upright SMPL/SMPL-X OBJ sequence files in `videos2/obj_sequence/`.
-5. Exports `videos2/squat_vertices_anim.npy` and `videos2/squat_multiview_anim.npy`.
-6. Assembles clean Blender project file (`videos2/squat_multiview_animated.blend`) and web-playable GLB (`videos2/squat_multiview_animated.glb`).
+!!! WARNING — THIS SCRIPT DOES NOT PRODUCE MOTION CAPTURE OUTPUT. !!!
+
+Steps 1 and 2 do real work. Step 3 THROWS IT AWAY and substitutes a
+hand-authored sine-wave animation. Everything downstream (OBJ, NPY, BLEND,
+GLB) is therefore SYNTHETIC and must never be presented as a capture result.
+
+1. REAL — Calibrates camera intrinsics & extrinsics (CE 3 + Nord) from
+   chessboard targets. Falls back to *estimated* 4K lens parameters if
+   chessboard detection fails, which is itself unvalidated.
+2. REAL — Extracts multi-view 2D pose keypoints with MediaPipe, writes
+   per-frame annotations to `annots/`.
+3. FAKE — `synthesize_scripted_squat_smpl()` ignores the keypoints from
+   step 2 entirely. No triangulation. No SMPL fitting. It writes hardcoded
+   joint angles (`raw_poses[f, 12] = 1.45 * progress`, etc.) into a 72-param
+   pose vector driven by `sin(pi * t)`, then smooths them.
+4-6. Exports the synthetic animation to OBJ / NPY / BLEND / GLB.
+
+TO MAKE THIS A REAL PIPELINE, step 3 must be replaced with actual EasyMocap
+triangulation + fitting against the step-2 keypoints. Until then, treat this
+as an authored-animation generator.
 """
 
 import os
@@ -20,7 +33,7 @@ import subprocess
 import cv2
 import numpy as np
 import torch
-from scipy.ndimage import gaussian_filter1d
+from scipy.signal import savgol_filter
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 VIDEOS2_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "videos2"))
@@ -148,9 +161,33 @@ def extract_2d_keypoints():
         detector.close()
         print(f"[✓] Saved 2D keypoint annotations for Cam {cam_id} ({frame_idx} frames)")
 
-def fit_easymocap_3d_smpl():
-    """Runs EasyMocap multi-view 3D triangulation and SMPL/SMPL-X body & hand fitting with inverted elbow flexion (forearms flexed UPWARDS in front of chest)."""
-    print("[*] Step 3: Running EasyMocap multi-view 3D triangulation & SMPL/SMPL-X body & hand model fitting...")
+def synthesize_scripted_squat_smpl():
+    """
+    !!! THIS DOES NOT PERFORM MOTION CAPTURE. !!!
+
+    Generates a HAND-AUTHORED squat animation from a hardcoded sine wave. The
+    output SMPL mesh sequence is SYNTHETIC and has NO relationship to the
+    recorded video beyond borrowing its frame count.
+
+    Specifically: the dataset and body model are loaded, but `dataset` is used
+    ONLY for `len(dataset)`. No 2D keypoints are read, no triangulation is
+    performed, and no fitting occurs. Every joint angle below is a literal
+    authored by hand (e.g. `raw_poses[f, 12] = 1.45 * progress` for left knee).
+
+    This function was previously named `fit_easymocap_3d_smpl` and announced
+    itself as "EasyMocap multi-view 3D triangulation & SMPL fitting". Any mesh,
+    GLB, OBJ, or kinematics file produced through it is an animation, NOT a
+    measurement, and must never be presented as a capture result.
+
+    RETAINED because authored-pose synthesis is exactly what the ground-truth
+    harness needs (see docs/RESEARCH_ROADMAP.md) — a known theta, rendered.
+    To become that harness it needs: the authored theta persisted alongside the
+    mesh, and a real recovery path to compare against. Until then it produces
+    ground truth with nothing measured against it.
+    """
+    print("[!] Step 3: SYNTHESIZING a scripted squat animation from hardcoded joint")
+    print("[!]         angles. THIS IS NOT MOTION CAPTURE. No triangulation or SMPL")
+    print("[!]         fitting is performed. Output is an authored animation.")
     from easymocap.smplmodel import load_model
     from easymocap.dataset import CONFIG, MV1PMF
     
@@ -175,7 +212,7 @@ def fit_easymocap_3d_smpl():
     
     body_model = load_model(gender="neutral", model_type="smpl", model_path=model_dir)
     
-    print("[*] Fitting SMPL/SMPL-X pose trajectories with inverted elbow flexion (forearms UPWARDS in front of chest)...")
+    print("[!] Writing hardcoded joint angles into a 72-param SMPL pose vector (authored, not fitted)...")
     num_frames = len(dataset)
     
     raw_poses = np.zeros((num_frames, 72))
@@ -206,8 +243,23 @@ def fit_easymocap_3d_smpl():
         raw_poses[f, 55] = -0.75 * progress   # Left Elbow inverted (UPWARDS)
         raw_poses[f, 58] = 0.75 * progress    # Right Elbow inverted (UPWARDS)
 
-    # Apply Gaussian temporal 1D filter (sigma=3.5) across all joint pose parameters
-    smoothed_poses = gaussian_filter1d(raw_poses, sigma=3.5, axis=0)
+    # Savitzky-Golay, NOT Gaussian. A Gaussian filter attenuates local extrema,
+    # and peak joint angles (max knee flexion, max hip flexion) are exactly the
+    # quantities this project measures. Attenuation worsens as movement speeds
+    # up, which would manufacture a velocity-dependent error trend even from a
+    # perfect estimator. Savitzky-Golay fits a local polynomial and preserves
+    # peak amplitude far better at comparable noise rejection.
+    # Window must be odd and <= number of frames.
+    win_len = min(15, num_frames if num_frames % 2 == 1 else num_frames - 1)
+    if win_len >= 5:
+        smoothed_poses = savgol_filter(raw_poses, window_length=win_len, polyorder=3, axis=0)
+    else:
+        smoothed_poses = raw_poses  # too few frames to filter meaningfully
+
+    # NOTE: these are axis-angle rotation parameters. Filtering axis-angle
+    # component-wise is not rotation-correct (it ignores the manifold and can
+    # misbehave near pi). The roadmap specifies `roma` for rotation handling;
+    # this should convert to a continuous representation before filtering.
     
     all_smpl_vertices = []
     for f in range(num_frames):
@@ -360,11 +412,11 @@ def main():
     
     calibrate_cameras()
     extract_2d_keypoints()
-    verts_np, faces = fit_easymocap_3d_smpl()
+    verts_np, faces = synthesize_scripted_squat_smpl()
     export_objs_and_datasets(verts_np, faces)
     build_blender_and_glb()
     
-    print("\n[🎉 SUCCESS] Inverted-elbow SMPL/SMPL-X body & hand animation regenerated cleanly with EasyMocap!")
+    print("\n[DONE] Synthetic authored squat animation written. NOT a capture result —\n       do not present these meshes as motion capture output.")
 
 if __name__ == "__main__":
     main()

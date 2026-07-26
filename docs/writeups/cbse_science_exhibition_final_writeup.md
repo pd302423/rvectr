@@ -19,7 +19,7 @@ Accurate 3D spatial human motion tracking is a foundational requirement across c
 
 **rvector** presents a novel, markerless **3D Kinematic Spatial Telemetry Engine** leveraging **Monocular 3D Human Mesh Recovery (HMR2 / 4D-Humans)** and **Multi-View Spatial Triangulation (EasyMocap)**. The system fits a 6,890-vertex parametric **SMPL (Skinned Multi-Person Linear Model)** surface mesh over standard video feeds, extracting 72 structural joint rotation parameters without physical markers.
 
-In the **Athletic & Biomechanical Domain**, **rvector** evaluates bodyweight movements (squats, planches, levers), computes frame-by-frame 3D joint angles with sub- $2.4^\circ$ mean absolute error (MAE), and calculates Bilateral Asymmetry Indices (ASI) to prevent acute injuries. 
+In the **Athletic & Biomechanical Domain**, **rvector** evaluates bodyweight movements (squats, planches, levers), computes frame-by-frame 3D joint angles, and calculates Bilateral Asymmetry Indices (ASI). **The accuracy of these measurements has not yet been validated against a reference standard** — quantifying that error, and how it scales with movement velocity, is the current research objective.
 
 In the **Emerging Technology & Robotics Domain**, **rvector** maps SMPL joint rotation matrices ($\mathbf{R} \in \mathbb{SO}(3)$) directly to robotic inverse kinematics pipelines—enabling real-time humanoid robot teleoperation, ergonomic workplace safety monitoring, and adaptive joint-torque assistance in motorized rehabilitation exoskeletons. **rvector** democratizes clinical-grade biomechanics, transforming consumer hardware into a universal human-robot spatial intelligence engine.
 
@@ -47,8 +47,11 @@ Biomechanical motion analysis measures human joint movement, angular velocity, a
 
 ### 2.2 Research Hypotheses
 * **$\mathbf{H_1}$ (Kinematic Precision):** Fitting a 3D parametric SMPL mesh surface over RGB video feeds will yield 3D joint angle measurements within $3.0^\circ$ of digital goniometric ground truth.
-* **$\mathbf{H_2}$ (Occlusion Elimination):** Multi-camera synchronized triangulation will eliminate self-occlusion errors during complex multi-planar movements.
-* **$\mathbf{H_3}$ (Cross-Domain Robotics Mapping):** Extracting 72 3D SMPL rotation parameters will allow identical kinematic algorithms to serve human athletic coaching and humanoid robot inverse kinematics.
+* **$\mathbf{H_2}$ (Occlusion Reduction):** Multi-camera synchronized triangulation will *reduce* per-joint error during self-occluding phases of movement, relative to monocular recovery on the same footage, by a margin to be quantified. *(Untested. Stated as a bounded, falsifiable reduction — not elimination.)*
+* **$\mathbf{H_3}$ (Velocity-Dependent Degradation):** Per-joint error will increase monotonically with joint angular velocity, with a measurable threshold beyond which the measurement is no longer meaningful for the intended application. *(This is the primary hypothesis of the current research program.)*
+
+> [!NOTE]
+> A previous $\mathbf{H_3}$ claimed that SMPL rotation parameters enable humanoid robot teleoperation and exoskeleton control. **No such implementation exists in this project** — there is no inverse-kinematics code, no ROS2 integration, and no robot or simulation. That claim has been removed from the hypotheses and is discussed only as potential future work in §6.
 
 ---
 
@@ -110,16 +113,24 @@ $$\text{ASI} (\%) = \frac{|\theta_{\text{left}} - \theta_{\text{right}}|}{\max(\
 
 ## 5. EXPERIMENTAL OBSERVATIONS & RESULTS
 
-### 5.1 Joint Angle Accuracy (Goniometer Validation)
-* **Squat Knee Flexion Error:** $\mathbf{0.8^\circ}$ MAE ($99.1\%$ Accuracy)
-* **Squat Hip Depth Error:** $\mathbf{1.5^\circ}$ MAE ($98.1\%$ Accuracy)
-* **Push-Up Elbow Lockout Error:** $\mathbf{1.6^\circ}$ MAE ($99.1\%$ Accuracy)
-* **Planche Extension Error:** $\mathbf{2.4^\circ}$ MAE ($94.6\%$ Accuracy)
+### 5.1 Joint Angle Accuracy — NOT YET MEASURED
 
-### 5.2 System Performance & Latency
-* **Monocular HMR2 (NVIDIA RTX 5060):** 38 FPS | Latency: 26 ms
-* **Multi-View EasyMocap:** 24 FPS | Latency: 41 ms
-* **Client WebGL Browser (MediaPipe):** **60 FPS** | Latency: **14 ms**
+> [!IMPORTANT]
+> **No accuracy validation has been performed.** An earlier revision of this document reported per-joint MAE figures against "goniometer validation." Those figures were not produced by any measurement protocol or script, could not be reproduced, and have been removed.
+>
+> $\mathbf{H_1}$ (Kinematic Precision) remains an **open, untested hypothesis**.
+
+Accuracy validation is the subject of the current research program (see [`docs/RESEARCH_ROADMAP.md`](../RESEARCH_ROADMAP.md)). The planned method is synthetic ground truth: author a known SMPL pose $\boldsymbol{\theta}$, render it through a virtual multi-camera rig, recover it through each backend, and report per-joint error against the authored $\boldsymbol{\theta}$. No accuracy number will be restated here until a committed script regenerates it from committed data.
+
+### 5.2 System Performance & Latency — UNVERIFIED
+
+The throughput figures below were observed informally during development and are **not backed by a benchmark script**. They are retained as rough operating characteristics, not as results, and must be re-measured before any submission cites them.
+
+| Backend | Observed throughput | Status |
+|---|---|---|
+| Monocular HMR2 (NVIDIA RTX 5060) | ~38 FPS | Unverified — needs benchmark script |
+| Multi-View EasyMocap | ~24 FPS | Unverified — needs benchmark script |
+| Client WebGL (MediaPipe) | ~60 FPS | Unverified — needs benchmark script |
 
 ---
 
@@ -144,7 +155,9 @@ $$\text{ASI} (\%) = \frac{|\theta_{\text{left}} - \theta_{\text{right}}|}{\max(\
 
 ## 8. CONCLUSION
 
-**rvector** proves that markerless 3D human mesh recovery can achieve clinical joint angle accuracy ($\text{MAE} < 2.4^\circ$) without expensive hardware. By bridging human athletic kinematics with robotic teleoperation, **rvector** establishes a scalable foundation for sports science, rehabilitation, and emerging cyber-physical systems.
+**rvector** demonstrates a working markerless 3D human mesh recovery pipeline running end-to-end on consumer hardware — monocular and multi-view capture, SMPL mesh fitting, and frame-by-frame joint angle extraction — without laboratory infrastructure or physical markers.
+
+**What this project has not yet established** is how accurate that pipeline is. No validation against a reference standard has been performed, so no accuracy claim is made here. Quantifying that error — specifically, how it scales with joint angular velocity, and at what velocity consumer-hardware capture stops being meaningful — is the subject of the ongoing research program described in [`docs/RESEARCH_ROADMAP.md`](../RESEARCH_ROADMAP.md).
 
 ---
 

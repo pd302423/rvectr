@@ -256,7 +256,10 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         video_input = sys.argv[1]
     else:
-        video_input = "/home/pd/Downloads/20260723_121036.mp4"
+        sys.exit(
+            "usage: process_video_3d.py <video.mp4> [output_dir]\n"
+            "  (no default input video — pass the path explicitly)"
+        )
 
     if len(sys.argv) > 2:
         out_dir = sys.argv[2]

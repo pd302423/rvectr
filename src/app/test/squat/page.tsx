@@ -471,10 +471,10 @@ export default function SquatTestPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link
-              href="/dashboard"
+              href="/"
               className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 border border-border rounded"
             >
-              ← Dashboard
+              ← Home
             </Link>
           </div>
         </header>

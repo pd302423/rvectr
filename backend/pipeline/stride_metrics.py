@@ -76,18 +76,21 @@ def cadence(gait_cycles: List[Dict], fps: float) -> float:
     """
     if len(gait_cycles) < 2:
         return 0.0
-        
+
     sorted_cycles = sorted(gait_cycles, key=lambda x: x['start_frame'])
     start_frame = sorted_cycles[0]['start_frame']
     end_frame = sorted_cycles[-1]['start_frame']
-    
+
     total_time_minutes = (end_frame - start_frame) / fps / 60.0
-    
+
     if total_time_minutes == 0:
         return 0.0
-        
-    # Each gait cycle starts with a step
-    return len(sorted_cycles) / total_time_minutes
+
+    # N step onsets span N-1 intervals, and the elapsed time measured above runs
+    # from the FIRST onset to the LAST one. Dividing by N instead of N-1
+    # overestimates cadence by a factor of N/(N-1) — 33% at 4 steps, and it does
+    # not vanish for realistic captures.
+    return (len(sorted_cycles) - 1) / total_time_minutes
 
 def vertical_oscillation(pelvis_positions: np.ndarray, gait_cycle: Dict) -> float:
     """

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
-import { useBiomechanicsStore } from "@/lib/store";
+import { useBiomechanicsStore, isSampleAnalysis } from "@/lib/store";
 import { DualViewport } from "@/components/biomechanics/DualViewport";
 import { ScoreGauge } from "@/components/biomechanics/ScoreGauge";
 import { TelemetryTable } from "@/components/biomechanics/TelemetryTable";
@@ -32,7 +32,20 @@ export default function AnalysisPage() {
       <Navbar />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6 font-mono">
-        
+
+        {isSampleAnalysis(currentAnalysis) && (
+          <div
+            role="status"
+            className="border border-amber-500/60 bg-amber-500/10 text-amber-200 px-4 py-3 text-xs leading-relaxed"
+          >
+            <strong className="uppercase tracking-widest">Sample data — not a measurement.</strong>{" "}
+            Nothing has been analysed. Every number on this page is a synthetic
+            placeholder generated from a sine wave, shown so the interface can be
+            laid out. It is not the output of any capture pipeline and must not be
+            cited or screenshotted as a result.
+          </div>
+        )}
+
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#262626] pb-4">
           <div>
