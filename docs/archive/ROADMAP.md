@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Retired 2026-07-26.** This SaaS launch plan is superseded by [`docs/RESEARCH_ROADMAP.md`](../RESEARCH_ROADMAP.md). Kept for historical reference only.
+
 # rvector — Launch Roadmap
 
 **Target:** $10,000 MRR by Feb 1, 2027

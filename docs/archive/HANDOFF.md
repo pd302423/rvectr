@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Archived 2026-07-26.** This handoff describes the retired SaaS phase and a Windows working directory that no longer applies. Current direction: [`docs/RESEARCH_ROADMAP.md`](../RESEARCH_ROADMAP.md).
+
 # rvector — Handoff Document
 
 **Last updated:** 2026-07-13

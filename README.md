@@ -2,7 +2,10 @@
 
 > **Markerless 3D Human Mesh Recovery & Real-Time Kinematic Telemetry Engine**
 
-`rvectr` is a clinical-grade biomechanical precision coaching system for athletic performance, physical rehabilitation, and calisthenics. It reconstructs full 3D human body surface meshes (6,890 SMPL vertices), diagnoses form breakdowns against sports science standards, and visualizes real-time joint angular velocity and kinetic curves in an interactive 3D WebGL viewport.
+`rvectr` reconstructs full 3D human body surface meshes (6,890 SMPL vertices) from consumer-camera video, extracts frame-by-frame joint kinematics, and visualizes real-time joint angular velocity and kinetic curves in an interactive 3D WebGL viewport.
+
+> [!IMPORTANT]
+> **Project status (July 2026):** rvectr has pivoted from a SaaS coaching product to an open research program studying **velocity-dependent error in markerless 3D human pose estimation** — benchmarking EasyMocap, 4D-Humans/HMR2, and MediaPipe against synthetic SMPL ground truth. See [`docs/RESEARCH_ROADMAP.md`](docs/RESEARCH_ROADMAP.md) for the research question, methodology, and timeline. The earlier SaaS launch plan is archived in [`docs/archive/`](docs/archive/).
 
 ---
 
@@ -53,7 +56,11 @@ rvectr/
 │   ├── pipeline/                 # Kinematic extraction, pelvic & gait mechanics
 │   ├── extract_kinematics.py     # Frame-by-frame 3D joint telemetry calculation
 │   └── run_4d_humans_videos2.py  # Local GPU inference runner
-├── WORKSPACE_SUMMARY.md          # Full clinical & architectural documentation
+├── docs/                         # Project documentation
+│   ├── RESEARCH_ROADMAP.md       # Current research program & 12-week plan
+│   ├── WORKSPACE_SUMMARY.md      # Architecture & CV stack reference
+│   ├── writeups/                 # Science exhibition writeups
+│   └── archive/                  # Retired SaaS-era planning docs
 └── README.md                     # Overview & Quickstart Guide
 ```
 

@@ -45,6 +45,9 @@ coverage/
 # Misc
 .cache/
 
+# Unrelated local tooling (separate git repo, not part of this project)
+claude-desktop-fedora/
+
 # Claude Code local settings (machine-specific permissions cache)
 .claude/settings.local.json
 .env*

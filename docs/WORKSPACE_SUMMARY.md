@@ -1,3 +1,6 @@
+> [!IMPORTANT]
+> **Status (2026-07-26):** The SaaS coaching-product framing below is retired — the project is now a research program on velocity-dependent error in markerless 3D pose estimation. See [`RESEARCH_ROADMAP.md`](RESEARCH_ROADMAP.md). The computer-vision architecture documented here remains accurate.
+
 # rvector — Workspace Architecture & Computer Vision Stack Summary
 
 > [!NOTE]
@@ -13,7 +16,7 @@
 | **Primary Moat** | Monocular & Multi-view 3D Body Mesh Recovery + Clinical Kinematic Telemetry |
 | **Target Hardware** | Local NVIDIA RTX 5060 GPU (Inference & Training) + Consumer Smartphones |
 | **Web Tech Stack** | Next.js 16 (App Router), TypeScript, Tailwind CSS, Supabase, Three.js / WebGL |
-| **Core Reference Docs** | [HANDOFF.md](file:///home/pd/Documents/rvector/HANDOFF.md), [ROADMAP.md](file:///home/pd/Documents/rvector/ROADMAP.md), [AGENTS.md](file:///home/pd/Documents/rvector/AGENTS.md) |
+| **Core Reference Docs** | [RESEARCH_ROADMAP.md](RESEARCH_ROADMAP.md), [HANDOFF.md](archive/HANDOFF.md) (archived), [ROADMAP.md](archive/ROADMAP.md) (archived), [AGENTS.md](../AGENTS.md) |
 
 ---
 
@@ -39,11 +42,11 @@ graph TD
 ```
 
 ### A. Repositories & Engine Frameworks
-1. **EasyMocap** ([run_easymocap_videos2.py](file:///home/pd/Documents/rvector/backend/run_easymocap_videos2.py))
+1. **EasyMocap** ([run_easymocap_videos2.py](../backend/run_easymocap_videos2.py))
    - **Multi-View 3D Motion Capture**: Processes multi-camera synchronized recordings (e.g., Nothing Phone CE 3 & OnePlus Nord camera views in `videos2/`).
    - Calibrates camera intrinsics & extrinsics using chessboard calibration patterns.
    - Performs 3D spatial keypoint triangulation and SMPL joint fitting, solving single-camera self-occlusion issues.
-2. **4D-Humans / HMR2** ([run_4d_humans_videos2.py](file:///home/pd/Documents/rvector/backend/run_4d_humans_videos2.py))
+2. **4D-Humans / HMR2** ([run_4d_humans_videos2.py](../backend/run_4d_humans_videos2.py))
    - **Monocular 3D Human Mesh Recovery**: Fits a 6,890-vertex SMPL body surface mesh directly from single-view video clips.
    - Runs locally on GPU (PyTorch, ViTDet detector, HMR2 network).
 3. **MediaPipe Pose (`@mediapipe/tasks-vision`)**
@@ -52,7 +55,7 @@ graph TD
 ### B. SMPL / SMPL-X Body Models & Asset Formats
 - **SMPL Parametric Mesh**: 6,890 vertices, 72 structural joint rotation parameters.
 - **Blender & Mesh Automation**:
-  - [zero_drift_perfect_smpl_builder.py](file:///home/pd/Documents/rvector/backend/zero_drift_perfect_smpl_builder.py): Applies Gaussian temporal filtering to remove joint jitter and anchors stationary root positions during static exercises.
+  - [zero_drift_perfect_smpl_builder.py](../backend/zero_drift_perfect_smpl_builder.py): Applies Gaussian temporal filtering to remove joint jitter and anchors stationary root positions during static exercises.
   - Generates `.obj` frame sequences (`videos2/obj_sequence/`), `.blend` project files (`squat_multiview_animated.blend`), `.glb` web models (`squat_3d_mesh.glb`), and numpy matrices (`squat_vertices_anim.npy`).
 
 ---
@@ -60,7 +63,7 @@ graph TD
 ## 3. Kinematics & Biomechanics Pipeline
 
 Located in `backend/` and `backend/pipeline/`:
-- **Kinematic Extraction** ([extract_kinematics.py](file:///home/pd/Documents/rvector/backend/extract_kinematics.py)): Computes frame-by-frame 3D joint angles (hip depth, knee flexion, elbow angle, spinal posture).
+- **Kinematic Extraction** ([extract_kinematics.py](../backend/extract_kinematics.py)): Computes frame-by-frame 3D joint angles (hip depth, knee flexion, elbow angle, spinal posture).
 - **Movement Analysis** (`gait_events.py`, `pelvic_analysis.py`, `stride_metrics.py`): Performs phase detection (eccentric vs. concentric phases), pelvic tilt analysis, and bilateral symmetry metrics.
 
 ---
@@ -77,16 +80,16 @@ The web application is located under `src/` (and root web workspace):
 - `/onboarding` & `/signin` — User auth and profiling
 
 ### Biomechanical Visualizer Components
-- [ThreeMeshCanvas.tsx](file:///home/pd/Documents/rvector/src/components/biomechanics/ThreeMeshCanvas.tsx): 360° interactive 3D WebGL skeleton and SMPL mesh canvas built with Three.js.
-- [KinematicWaveformChart.tsx](file:///home/pd/Documents/rvector/src/components/biomechanics/KinematicWaveformChart.tsx): Real-time angular velocity and joint motion curves.
-- [BilateralAsymmetryMatrix.tsx](file:///home/pd/Documents/rvector/src/components/biomechanics/BilateralAsymmetryMatrix.tsx): Left vs. right joint imbalance breakdown.
-- [DualViewport.tsx](file:///home/pd/Documents/rvector/src/components/biomechanics/DualViewport.tsx): Side-by-side synchronized view comparing raw video with the 3D mesh model.
+- [ThreeMeshCanvas.tsx](../src/components/biomechanics/ThreeMeshCanvas.tsx): 360° interactive 3D WebGL skeleton and SMPL mesh canvas built with Three.js.
+- [KinematicWaveformChart.tsx](../src/components/biomechanics/KinematicWaveformChart.tsx): Real-time angular velocity and joint motion curves.
+- [BilateralAsymmetryMatrix.tsx](../src/components/biomechanics/BilateralAsymmetryMatrix.tsx): Left vs. right joint imbalance breakdown.
+- [DualViewport.tsx](../src/components/biomechanics/DualViewport.tsx): Side-by-side synchronized view comparing raw video with the 3D mesh model.
 
 ---
 
 ## 5. Multi-Agent Development Architecture
 
-Configured in [AGENTS.md](file:///home/pd/Documents/rvector/AGENTS.md) with a 6-agent system topology:
+Configured in [AGENTS.md](../AGENTS.md) with a 6-agent system topology:
 1. `orchestrator` — Task planner and master architect
 2. `frontend-designer` — UI/UX & Tailwind styling
 3. `frontend-critic` — Visual hierarchy & accessibility auditor
