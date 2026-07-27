@@ -21,6 +21,11 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
+          # Required: the pip cache globs for **/requirements.txt or
+          # **/pyproject.toml, and this repo has neither — the deps live in
+          # backend/requirements-core.txt. Without this the step errors out
+          # before installing anything, so no test ever runs.
+          cache-dependency-path: backend/requirements-core.txt
 
       - name: Install core dependencies
         working-directory: backend
