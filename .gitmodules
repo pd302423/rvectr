@@ -1,6 +1,8 @@
 [submodule "backend/4D-Humans"]
 	path = backend/4D-Humans
-	url = https://github.com/shubham-goel/4D-Humans.git
+	url = https://github.com/pd302423/4D-Humans.git
+	branch = rvectr
 [submodule "backend/EasyMocap"]
 	path = backend/EasyMocap
-	url = https://github.com/zju3dv/EasyMocap.git
+	url = https://github.com/pd302423/EasyMocap.git
+	branch = rvectr
