@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-zero_drift_perfect_smpl_builder.py
+build_root_anchored_smpl.py
 
 100% Zero-Drift & Zero-Spin SMPL 3D Human Body Surface Mesh Generator:
 1. Locks Pelvis translation to origin (0, 0, 0) — eliminates ALL flying around.
@@ -16,6 +16,7 @@ import glob
 import subprocess
 import numpy as np
 from scipy.signal import savgol_filter
+from meshio import load_smpl_faces, write_obj
 
 VIDEOS2_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos2"))
 VIDEOS1_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "videos"))
@@ -31,16 +32,6 @@ VERT_NPY_PATH = os.path.join(VIDEOS1_DIR, "squat_vertices_anim.npy")
 # SMPL Hip Indices for pelvic origin & facing alignment
 LEFT_HIP_IDX = 3028
 RIGHT_HIP_IDX = 6489
-
-def load_smpl_faces(ref_obj_path):
-    faces = []
-    with open(ref_obj_path, "r") as f:
-        for line in f:
-            if line.startswith("f "):
-                parts = line.strip().split()
-                face = [int(p.split("/")[0]) for p in parts[1:]]
-                faces.append(face)
-    return faces
 
 def apply_muscular_physique_morph(verts):
     """Enhances shoulder breadth, chest depth, and quadriceps volume on SMPL body mesh."""
@@ -65,14 +56,6 @@ def apply_muscular_physique_morph(verts):
             m_verts[i, 1] *= lf
 
     return m_verts
-
-def export_obj(verts, faces, obj_path):
-    with open(obj_path, "w") as f:
-        f.write("# Upright Zero-Drift SMPL 3D Human Body Surface Mesh\n")
-        for v in verts:
-            f.write(f"v {v[0]:.6f} {v[1]:.6f} {v[2]:.6f}\n")
-        for face in faces:
-            f.write(f"f {face[0]} {face[1]} {face[2]}\n")
 
 def main():
     os.makedirs(OBJ_DIR, exist_ok=True)
@@ -132,7 +115,7 @@ def main():
 
     for i in range(num_frames):
         obj_file = os.path.join(OBJ_DIR, f"frame_{i:04d}.obj")
-        export_obj(blender_frames[i], faces, obj_file)
+        write_obj(blender_frames[i], faces, obj_file, source=__file__, measured=None, note="root drift anchored")
 
         # Peak squat depth check (lowest hip Z height)
         hip_z = (blender_frames[i][LEFT_HIP_IDX][2] + blender_frames[i][RIGHT_HIP_IDX][2]) / 2.0
@@ -141,7 +124,7 @@ def main():
             min_hip_z_idx = i
 
     # Export peak depth single OBJ
-    export_obj(blender_frames[min_hip_z_idx], faces, SINGLE_OBJ_PATH)
+    write_obj(blender_frames[min_hip_z_idx], faces, SINGLE_OBJ_PATH, source=__file__, measured=None, note="root drift anchored")
     print(f"[✓] Exported peak depth zero-drift SMPL OBJ: {SINGLE_OBJ_PATH} (frame {min_hip_z_idx})")
 
     # Save numpy datasets in videos2

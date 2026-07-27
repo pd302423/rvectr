@@ -1,8 +1,8 @@
 # rvectr backend
 
 Python 3D vision and kinematics pipeline. **Read this before running anything** —
-several scripts here are superseded, and one produces synthetic output that must
-not be mistaken for a measurement.
+two scripts here produce synthetic output that must not be mistaken for a
+measurement.
 
 ## Environments
 
@@ -18,7 +18,7 @@ Three incompatible Python environments. They cannot be merged; 4D-Humans needs
 ```bash
 python3.11 -m venv .venv-core && source .venv-core/bin/activate
 pip install -r requirements-core.txt
-pytest tests/          # 31 tests, no GPU or model weights needed
+pytest                 # 44 tests, no GPU or model weights needed
 ```
 
 ## Paths
@@ -32,6 +32,7 @@ through `rvectr_paths.py`, overridable by environment variable:
 | `RVECTR_RENDER_DIR` | `backend/render_out` | rendered video, `.blend` files |
 | `RVECTR_VIDEOS_DIR` | `<repo>/videos2` | multi-view source footage |
 | `RVECTR_CACHE_DIR` | `~/.cache/4DHumans` | model weights |
+| `RVECTR_SMPL_MODEL` | inside the EasyMocap submodule | `SMPL_NEUTRAL.pkl` (separately licensed, never committed) |
 
 ## Which script to run
 
@@ -63,32 +64,61 @@ through `rvectr_paths.py`, overridable by environment variable:
 | `pipeline/pelvic_analysis.py` | current | Trendelenburg, trunk rotation — **untested** |
 | `pipeline/running_kinematics.py` | current | **untested** |
 
+`pipeline/gait_events.py` used a broken hysteresis test that required the signal
+to clear the whole band between two adjacent samples. On smooth (i.e. real)
+trajectories it dropped events, and dropped *more* of them as the frame rate
+rose — 16/16 detected at 30 fps, 4/16 at 120 fps with a threshold near ground
+contact. The square-wave test fixtures could not catch it because a square wave
+clears any band by construction. Fixed with a proper two-state detector; the
+regression tests sweep frame rate on smooth signals.
+
 ### Mesh post-processing — pick ONE
 
-Seven scripts overlap here, written in sequence as problems were found. Later
-ones subsume earlier ones. Prefer the current entry and ignore the rest unless
-you need a specific behaviour.
+These were written in sequence as problems were found, so they overlap. Prefer
+the entry marked current and ignore the rest unless you need a specific
+behaviour. The two fully superseded scripts have been deleted.
 
 | Script | Status | Notes |
 |---|---|---|
 | `smooth_and_center_mesh.py` | **current** | Savitzky–Golay smoothing + centering. Has a CLI. |
-| `zero_drift_perfect_smpl_builder.py` | current | Adds root-drift anchoring for stationary movements |
-| `fix_jitter.py` | superseded | Earliest smoother; no centering, no CLI |
+| `build_root_anchored_smpl.py` | current | Adds root-drift anchoring for stationary movements |
 | `fix_smpl_orientation_and_centering.py` | situational | Only when the mesh comes out rotated |
-| `lock_stationary_smpl.py` | superseded | Folded into `zero_drift_perfect_smpl_builder.py` |
-| `make_perfect_squat_anim.py` | ⚠️ synthetic | Authored animation, not capture |
-| `enhance_muscular_anchored_smpl.py` | ⚠️ avoid for measurement | Adjusts body shape for visual appeal. Shape parameters move joint centres, which biases every angle downstream. Presentation only. |
+| `synthesize_scripted_squat_anim.py` | ⚠️ synthetic | Authored animation, not capture |
+| `restyle_body_shape_for_render.py` | ⚠️ never for measurement | Adjusts body shape for visual appeal. Shape parameters move joint centres, which biases every angle downstream. Presentation only. |
+
+`fix_jitter.py` and `lock_stationary_smpl.py` were deleted — both were superseded
+and git retains them. Four scripts were renamed away from names that asserted a
+quality rather than describing an operation (`perfect`, `zero_drift`, `accurate`,
+`enhance`); `git log --follow` tracks them across the rename.
 
 ### Utilities
 
 `download_model.py`, `download_hf.py` (model weights) · `convert_obj_to_glb.py`,
 `export_obj_and_blend.py`, `import_objs_blender.py` (format conversion) ·
-`make_video.py` (overlay video) · `verify_orientation.py` (sanity check)
+`make_video.py` (overlay video) · `verify_orientation.py`,
+`check_absolute_shapekeys.py`, `check_upright_skeleton.py` (Blender sanity
+checks — these are scripts, not pytest tests, despite the two latter having once
+been named `test_*.py`, which made bare `pytest` try to collect them)
 
-## Naming caveat
+## Mesh provenance
 
-Scripts named `perfect`, `enhance`, or `zero_drift` describe a desired
-appearance, not a verified property. Nothing in this directory has been
-validated against a reference standard, and no accuracy claim is supported by
-anything here. See `docs/RESEARCH_ROADMAP.md` for the work that would change
-that.
+All OBJ writing goes through `meshio.write_obj`, which requires the caller to
+declare where the geometry came from and records it in the file:
+
+```
+# provenance: SYNTHETIC (authored or stylised — NOT a measurement)
+# written by: synthesize_scripted_squat_anim.py
+```
+
+Three states: `RECOVERED` (from video), `SYNTHETIC` (authored or stylised), and
+`INHERITED` (a transform — smoothing, anchoring, reorienting — whose provenance
+is whatever its input had). A transform cannot upgrade authored geometry into a
+measurement, so it must not claim to. Read the header before trusting any mesh
+you find on disk.
+
+## Standing caveat
+
+Nothing in this directory has been validated against a reference standard, and
+no accuracy claim is supported by anything here. See `docs/RESEARCH_ROADMAP.md`
+for the work that would change that, and `docs/ASSETS.md` for what is missing
+from a fresh clone and why.

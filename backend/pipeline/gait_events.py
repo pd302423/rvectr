@@ -1,26 +1,73 @@
 import numpy as np
-from typing import List, Dict, Union
+from typing import List, Dict
 
-def _detect_crossings(signal: np.ndarray, threshold: float, direction: str, fps: float, side: str) -> List[Dict]:
-    """Helper to find threshold crossings with hysteresis and minimum duration."""
-    events = []
-    min_frames = int(0.2 * fps)  # 200ms minimum between events
+REFRACTORY_S = 0.2      # 200 ms minimum between events on one side
+HYSTERESIS_FRAC = 0.01  # band half-width, as a fraction of signal range
+
+
+def _detect_crossings(signal: np.ndarray, threshold: float, direction: str, fps: float,
+                      side: str, refractory_s: float = REFRACTORY_S,
+                      hysteresis_frac: float = HYSTERESIS_FRAC) -> List[Dict]:
+    """
+    Find confirmed threshold crossings with a two-state (Schmitt trigger) detector.
+
+    The detector arms on the far side of the hysteresis band and fires only once
+    the signal has traversed to the near side. Event timing is taken from the
+    frame the signal first passed the *nominal* threshold, so widening the band
+    rejects noise without shifting event times later.
+
+    An earlier implementation compared `signal[i-1]` against one edge of the band
+    and `signal[i]` against the other in a single test, which required the signal
+    to clear the entire band between two adjacent samples. Any sample landing
+    inside the band silently dropped the event — so raising the frame rate, which
+    shrinks the per-frame step, lost *more* events rather than fewer. On a smooth
+    2 Hz signal it found 16/16 events at 30 fps but only 4/16 at 120 fps with a
+    threshold placed near ground contact. See the smooth-signal tests in
+    tests/test_gait_events.py, which the old square-wave fixtures could not catch.
+    """
+    n = len(signal)
+    if n == 0:
+        return []
+
+    events: List[Dict] = []
+    min_frames = max(1, int(refractory_s * fps))
     last_frame = -min_frames
-    
-    # Simple hysteresis margin to prevent jitter
-    margin = 0.01 * np.ptp(signal) if len(signal) > 0 else 0
-    upper_thresh = threshold + margin
-    lower_thresh = threshold - margin
 
-    for i in range(1, len(signal)):
-        if direction == 'down' and signal[i-1] >= upper_thresh and signal[i] < lower_thresh:
-            if (i - last_frame) >= min_frames:
-                events.append({'frame': i, 'time': i / fps, 'side': side})
-                last_frame = i
-        elif direction == 'up' and signal[i-1] <= lower_thresh and signal[i] > upper_thresh:
-            if (i - last_frame) >= min_frames:
-                events.append({'frame': i, 'time': i / fps, 'side': side})
-                last_frame = i
+    margin = hysteresis_frac * float(np.ptp(signal))
+    upper = threshold + margin
+    lower = threshold - margin
+
+    descending = direction == 'down'
+    # Armed means "waiting on the far side"; the first sample sets the initial state.
+    armed = signal[0] > threshold if descending else signal[0] < threshold
+    pending = None  # frame at which the nominal threshold was first passed
+
+    for i in range(1, n):
+        v = signal[i]
+
+        if not armed:
+            # Re-arm once the signal has retreated fully past the far edge.
+            if (descending and v >= upper) or (not descending and v <= lower):
+                armed = True
+            continue
+
+        if pending is None:
+            if (descending and v < threshold) or (not descending and v > threshold):
+                pending = i
+        elif (descending and v >= upper) or (not descending and v <= lower):
+            pending = None  # bounced back before confirming; it was noise
+
+        if pending is None:
+            continue
+
+        confirmed = v <= lower if descending else v >= upper
+        if confirmed:
+            if (pending - last_frame) >= min_frames:
+                events.append({'frame': pending, 'time': pending / fps, 'side': side})
+                last_frame = pending
+            armed = False
+            pending = None
+
     return events
 
 def detect_foot_strikes(ankle_positions: np.ndarray, threshold: float, fps: float) -> List[Dict]:

@@ -1,7 +1,7 @@
 "use client";
 
 import { useBiomechanicsStore } from "@/lib/store";
-import { LineChart, Activity, Zap, Shield } from "lucide-react";
+import { Activity } from "lucide-react";
 import { useRef, useCallback } from "react";
 
 interface KinematicWaveformChartProps {

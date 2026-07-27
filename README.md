@@ -54,12 +54,16 @@ rvectr/
 │   ├── 4D-Humans/                # Monocular 3D Mesh Recovery Submodule (MIT)
 │   ├── EasyMocap/                # Multi-view 3D Triangulation Submodule (Non-Commercial)
 │   ├── pipeline/                 # Gait events, stride metrics, pelvic analysis
-│   ├── tests/                    # 31 tests — run with `pytest tests/`
+│   ├── tests/                    # 44 tests — run with `pytest`
 │   ├── rvectr_paths.py           # Path resolution (env-overridable, no hardcoded paths)
+│   ├── meshio.py                 # Shared OBJ I/O; stamps provenance into every mesh
 │   ├── extract_kinematics.py     # Frame-by-frame 3D joint telemetry calculation
 │   └── run_4d_humans_videos2.py  # Local GPU inference runner
+├── scripts/
+│   └── rescue-submodules.sh      # Check/fix unfetchable submodule pointers
 ├── docs/
 │   ├── RESEARCH_ROADMAP.md       # Current research program & 12-week plan
+│   ├── ASSETS.md                 # What is not committed, and how to obtain it
 │   ├── WORKSPACE_SUMMARY.md      # Architecture & CV stack reference
 │   ├── osf_preregistration_draft.md
 │   ├── log/                      # Dated engineering log
@@ -73,22 +77,33 @@ rvectr/
 > **Not everything in `backend/` measures what its name suggests.**
 > `run_easymocap_videos2.py` calibrates cameras and extracts 2D keypoints, then
 > **discards them** and emits a hand-authored animation. Its outputs are not
-> capture results. Read [`backend/README.md`](backend/README.md) before running
-> or citing anything, and [`critical_analysis.md`](critical_analysis.md) for the
-> full list of known defects.
+> capture results — including `squat_3d_mesh.glb` and
+> `squat_multiview_animated.glb`, the assets the web viewer renders. Every mesh
+> written by the backend now carries a provenance header stating which of these
+> it is. Read [`backend/README.md`](backend/README.md) before running or citing
+> anything, and [`critical_analysis.md`](critical_analysis.md) for the full list
+> of known defects.
 
 ---
 
 ## 🚀 Quickstart Guide
 
-### 1. Clone the Repository (with Submodules)
+### 1. Clone the Repository
 
 ```bash
-git clone --recursive https://github.com/pd302423/rvectr.git
+git clone https://github.com/pd302423/rvectr.git
 cd rvectr
 ```
 
-If you already cloned without submodules, initialize them:
+> [!WARNING]
+> **`--recursive` currently fails.** Both submodules record commits that exist
+> only on the original author's machine, while `.gitmodules` still points at the
+> upstream repositories. Verify with `./scripts/rescue-submodules.sh --check`;
+> that script also performs the fix once you have forked both repos. Until then,
+> clone without `--recursive` — the web app and the core test suite do not need
+> the submodules.
+
+Once the submodules are pushable:
 ```bash
 git submodule update --init --recursive
 ```
@@ -103,9 +118,17 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for the viewer. Note that
+Open [http://localhost:3000](http://localhost:3000) for the viewer.
+
+> [!NOTE]
+> **The 3D viewports will be empty on a fresh clone.** Mesh assets (~400 MB of
+> `.glb`/`.obj`) are generated output and are not committed. The viewer shows a
+> "Mesh asset not found" panel naming the missing file. See
+> [`docs/ASSETS.md`](docs/ASSETS.md) for what is missing and why.
+
 `/analysis` displays clearly-labelled **sample data** until a real analysis is
-loaded — nothing on that page is a measurement.
+loaded, and `/demo` renders a hand-authored animation behind a banner saying so
+— nothing on either page is a measurement.
 
 ### 3. Setup Python Backend Pipeline
 
@@ -119,7 +142,7 @@ cd backend
 python3.11 -m venv .venv-core && source .venv-core/bin/activate
 pip install -r requirements-core.txt
 
-pytest tests/    # 31 tests
+pytest    # 44 tests; those needing the licensed SMPL model skip with a reason
 ```
 
 For the deep-learning backends see `requirements-hmr2.txt` (Python 3.10) and

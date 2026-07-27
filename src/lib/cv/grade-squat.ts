@@ -1,6 +1,5 @@
 import {
   type Landmark,
-  angleBetweenPoints,
   getHipAngle,
   getKneeAngle,
   LANDMARKS,

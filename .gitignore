@@ -103,12 +103,12 @@ backend/glb_output/
 backend/**/venv/
 backend/**/__pycache__/
 
-# Backend — Haar cascade (930KB, downloadable from OpenCV)
-backend/haarcascade_frontalface_default.xml
+# NOTE: backend/haarcascade_frontalface_default.xml is deliberately TRACKED.
+# It used to be listed here while also being committed, which made this rule
+# silently inert. OpenCV 5 no longer ships the Haar cascades in the wheel
+# (cv2.data.haarcascades exists but is empty), so vendoring the 930 KB file is
+# the only way make_video.py works on a fresh clone. rvectr_paths still prefers
+# a packaged copy when one exists.
 
 
 
-# CI workflow: tracked at docs/ci-workflow.yml instead, because the current
-# GitHub token lacks `workflow` scope and rejects pushes touching this path.
-# Once the token has that scope: git rm --cached nothing, just `git add -f`.
-.github/workflows/ci.yml

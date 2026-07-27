@@ -35,6 +35,8 @@ import json
 import pickle
 import argparse
 
+import rvectr_paths
+
 
 # ---------------------------------------------------------------------------
 # SMPL joint indices (standard 24-joint ordering)
@@ -69,9 +71,11 @@ R_HAND       = 23
 # Paths
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SMPL_MODEL_PATH = os.path.join(
-    SCRIPT_DIR, "EasyMocap", "data", "smplx", "SMPL_NEUTRAL.pkl"
-)
+
+# Resolved through rvectr_paths so RVECTR_SMPL_MODEL can point at a copy outside
+# the submodule. The default still lives in EasyMocap/data, which is gitignored
+# and unfetched on CI — see rvectr_paths.have_smpl_model().
+SMPL_MODEL_PATH = rvectr_paths.SMPL_MODEL
 
 
 # ---------------------------------------------------------------------------

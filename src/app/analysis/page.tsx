@@ -9,7 +9,7 @@ import { TelemetryTable } from "@/components/biomechanics/TelemetryTable";
 import { TimelineScrubber } from "@/components/biomechanics/TimelineScrubber";
 import { KinematicWaveformChart } from "@/components/biomechanics/KinematicWaveformChart";
 import { BilateralAsymmetryMatrix } from "@/components/biomechanics/BilateralAsymmetryMatrix";
-import { Activity, Award, Lightbulb, FileText, Upload, RefreshCw, Scale, LineChart, ShieldCheck } from "lucide-react";
+import { Activity, Award, Lightbulb, FileText, RefreshCw, Scale, LineChart, ShieldCheck } from "lucide-react";
 
 export default function AnalysisPage() {
   const { currentAnalysis, activeTab, setActiveTab } = useBiomechanicsStore();
@@ -72,7 +72,7 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        {/* Dual Viewport (EasyMocap 3D Surface Mesh) */}
+        {/* Dual Viewport (SMPL surface mesh — provenance depends on the loaded asset) */}
         <DualViewport />
 
         {/* Timeline Scrubber */}
@@ -86,7 +86,7 @@ export default function AnalysisPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-widest transition-colors border ${
                   isActive
                     ? "bg-[#ffffff] text-[#000000] border-[#ffffff]"

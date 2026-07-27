@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-rebuild_accurate_3d_skeleton.py
+rebuild_3d_skeleton.py
 
 Fixes 3D skeleton topology, orientation, and limb proportions for videos2:
 1. Extracts 3D MediaPipe pose world landmarks.

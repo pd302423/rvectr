@@ -1,7 +1,8 @@
 # rvectr — Critical Analysis
 
 **Written:** 2026-07-26
-**Revised:** 2026-07-26 (remediation pass — status markers added, finding 0 added, finding 7 corrected)
+**Revised:** 2026-07-26 (second remediation pass — findings 20–24 added from an independent
+re-audit; 4, 6, 14, 15 reopened and then closed; 2 reclassified as a regression)
 **Scope:** Full repository audit against the goals in [`docs/RESEARCH_ROADMAP.md`](docs/RESEARCH_ROADMAP.md)
 **Posture:** Adversarial. This document lists what is wrong, not what works. Every item cites a file or a command output that was actually checked.
 
@@ -11,7 +12,7 @@
 
 Items are ordered by severity, not by area. **Tier 1** items can end the project or the submission — a data-loss event, a research-integrity finding, a license violation. **Tier 2** items are why the current project would not score well at an ISEF-aligned fair. **Tier 3** and **Tier 4** are engineering debt and positioning problems that cost points but do not sink anything.
 
-Twenty findings. Five are Tier 1.
+Twenty-five findings. Five were Tier 1 at first writing; the re-audit added two more.
 
 Each carries a status: **FIXED**, **PARTIAL**, or **OPEN**.
 
@@ -187,7 +188,7 @@ There is no `requirements.txt`, no lockfile, no environment file, and no Docker 
 
 Nobody — including you in three months, and including a judge who wants to verify a result — can rebuild this environment.
 
-## 14. Mesh-processing script sprawl with no entry point — PARTIAL
+## 14. Mesh-processing script sprawl with no entry point — FIXED
 
 Seven overlapping scripts, ~1,018 lines, all transforming SMPL output with unclear precedence:
 
@@ -204,6 +205,21 @@ zero_drift_perfect_smpl_builder.py    218
 Nothing documents which to run, in what order, or which superseded which. `backend/` holds 30+ loose top-level scripts with no `main` or CLI.
 
 The naming is its own finding. `perfect`, `enhance_muscular`, `zero_drift` describe **desired appearance**, not operations — the vocabulary of making output look right rather than measuring how wrong it is. `enhance_muscular_anchored_smpl.py` adjusts body shape for visual appeal, which in a measurement study is a confound: shape parameters affect joint centers, and therefore angles.
+
+**Done (second pass):** the two fully superseded scripts (`fix_jitter.py`,
+`lock_stationary_smpl.py`) deleted; four renamed to describe what they do rather
+than how the output should look —
+
+| Was | Now |
+|---|---|
+| `make_perfect_squat_anim.py` | `synthesize_scripted_squat_anim.py` |
+| `zero_drift_perfect_smpl_builder.py` | `build_root_anchored_smpl.py` |
+| `rebuild_accurate_3d_skeleton.py` | `rebuild_3d_skeleton.py` |
+| `enhance_muscular_anchored_smpl.py` | `restyle_body_shape_for_render.py` |
+| `copy_perfect_blend_to_videos2.py` | `copy_blend_to_videos2.py` |
+
+— and the duplicated helpers consolidated into `backend/meshio.py` (see finding
+25), which replaced the appearance-asserting file headers with provenance.
 
 ## 15. No CI — FIXED
 
@@ -249,6 +265,147 @@ Kept short deliberately, but it is real and worth not discarding:
 - A test suite exists and passes cleanly. Trivial in coverage, correct in habit.
 - The pivot in `docs/RESEARCH_ROADMAP.md` diagnoses most of the above independently. The plan is right. Nothing in it has been executed yet.
 
+
+---
+
+# Findings added by the independent re-audit (2026-07-26, second pass)
+
+These were missed by the first audit, or introduced by the first remediation pass.
+
+## 20. The repository cannot be cloned as documented — OPEN (needs your GitHub auth)
+
+A **regression** created by the fix for finding 2. Committing the submodule work
+locally, without pushing it anywhere, converted "work that is backed up nowhere"
+into "work that is backed up nowhere *and* a parent repo recording gitlinks that
+resolve nowhere."
+
+```
+backend/EasyMocap  00d4b82  ->  0 matches on zju3dv/EasyMocap
+backend/4D-Humans  ec0e8c9  ->  0 matches on shubham-goel/4D-Humans
+```
+
+`git branch -r --contains HEAD` is empty in both. `git clone --recursive` — step 1
+of the README quickstart — therefore fails for everyone, including you on a second
+machine.
+
+**Done:** `scripts/rescue-submodules.sh` performs the whole fix and `--check`
+verifies it; a `submodule-pointers` CI job fails the build while the condition
+persists; the README quickstart warns and drops `--recursive`.
+
+**Still open — needs your credentials:** fork both repos, then run
+`./scripts/rescue-submodules.sh --fork-owner <you>`.
+
+## 21. `/demo` still attributed the fabricated animation to EasyMocap — FIXED
+
+Finding 4 was marked FIXED; `src/lib/store.ts` was fixed and the demo page was
+not. `src/app/demo/page.tsx` labelled the viewport `EasyMocap Output:
+public/squat_3d_mesh.glb` — a file `backend/README.md` names explicitly as
+hand-authored — listed "EasyMocap SMPL/SMPL-X Parametric Fitting" as a working
+stage, described a "1D Gaussian temporal low-pass filter (sigma = 3.5)" when the
+code uses Savitzky–Golay, and claimed to eliminate "100% of monocular 3D depth
+noise". The banner and page header claimed "sub-centimeter accurate" and
+"industrial-grade".
+
+Also found: `src/app/layout.tsx` set the site's **search-result and link-preview
+description** to "Industrial-grade markerless 3D computer vision… for
+professional athletes" — the most-read sentence in the project, describing a
+product that does not exist.
+
+**Done:** provenance banner added to `/demo`; every pipeline stage tagged BUILT or
+NOT BUILT; the filter described correctly along with its bias on peak angular
+velocity; "innovations" restated as goals; site metadata rewritten. Three CI
+greps now fail the build if an accuracy claim, an "industrial-grade"-class
+adjective, or a synthetic asset credited to a real backend reappears in `src/`.
+
+## 22. Gait event detection dropped events, and got worse at higher frame rates — FIXED
+
+`pipeline/gait_events.py:_detect_crossings` tested `signal[i-1]` against one edge
+of the hysteresis band and `signal[i]` against the other in a single comparison,
+requiring the signal to clear the entire band between two adjacent samples. Any
+sample landing inside the band silently dropped the event. Because a higher frame
+rate means a smaller per-frame step, **a better camera lost more events**:
+
+| | 30 fps | 60 fps | 120 fps | 240 fps |
+|---|---|---|---|---|
+| mid-range threshold | 16/16 | 16/16 | 8/16 | 8/16 |
+| threshold near ground contact | 16/16 | 12/16 | 4/16 | 4/16 |
+
+`stride_metrics` (GCT, cadence, flight time) and `pelvic_analysis` all consume
+these events. Replaced with a two-state Schmitt trigger that takes event timing
+from the nominal threshold crossing, so widening the band rejects noise without
+shifting event times. Now 16/16 in every cell above.
+
+## 23. The test suite was structurally unable to catch finding 22 — FIXED
+
+`tests/test_gait_events.py` built its fixtures as a **square wave** — values
+exactly 0.0 and 1.0, instantaneous transitions — which clears any hysteresis band
+by construction. The file's own docstring said "A test that merely asserts
+'returns a list' would pass against a broken detector." So did this one.
+
+Added smooth-sinusoid fixtures swept across four frame rates and two threshold
+placements, a slow-traversal case, and a jitter case. Verified these fail 6 ways
+against the old implementation and pass against the new one — the check that
+distinguishes a regression test from a test.
+
+## 24. The CI could never have gone green, and was never run — FIXED
+
+Three compounding problems:
+
+1. `.github/workflows/ci.yml` was listed in `.gitignore`, so the workflow was on
+   disk but not in git. The commit titled "ci: add workflow config" added
+   `docs/ci-workflow.yml`, a copy GitHub will never execute. **The
+   fabricated-results guard had never run once.**
+2. The `backend-tests` job would have **errored on its first run**:
+   `test_load_j_regressor` loads `SMPL_NEUTRAL.pkl` from inside the EasyMocap
+   submodule, which is gitignored *and* which the job deliberately does not
+   fetch. The fixture raised rather than skipped.
+3. The job ran `tsc` and `build` but never `npm run lint`, which was reporting
+   7 errors and 9 warnings.
+
+Also: bare `pytest` from `backend/` crashed with `INTERNALERROR` — no `testpaths`
+config, so collection recursed into `EasyMocap/3rdparty/pybind11/tests/conftest.py`,
+which calls `sys.exit(1)`.
+
+**Done:** workflow un-ignored and tracked, redundant copy deleted; SMPL path moved
+behind `rvectr_paths.have_smpl_model()` so it skips with an actionable message;
+`get_joints` given synthetic-input contract tests that run everywhere, so its
+coverage no longer depends on a licensed file; `pytest.ini` pins `testpaths`;
+lint added to CI and driven to zero.
+
+## 25. Assorted hygiene found during the re-audit — FIXED
+
+* **`ThreeMeshCanvas` hardcoded the filename** `squat_multiview_animated.glb` in
+  its footer regardless of the `glbUrl` prop, so `/demo` named a file it was not
+  rendering. It also carried "Sub-centimeter SMPL Surface Mesh" and an
+  "EASYMOCAP … VIEWPORT" header on every page that used it.
+* **OBJ loads had no cancellation.** Scrubbing the timeline fires one request per
+  frame; a slow earlier load could resolve last and leave the viewport on a frame
+  already scrubbed past. Added a `cancelled` guard, which also resolved the
+  `setState`-in-effect lint error.
+* **7 unused runtime dependencies** — `@anthropic-ai/sdk`,
+  `@aws-sdk/client-bedrock-runtime`, both Supabase packages, `@hookform/resolvers`,
+  `zod`, `@vercel/analytics` — plus an unused `ui/form.tsx` dragging in
+  `react-hook-form`. 28 dependencies → 17. `@types/three` moved to devDependencies;
+  package renamed from `web` to `rvectr`.
+* **`haarcascade_frontalface_default.xml` was tracked despite an explicit
+  `.gitignore` rule naming it**, which made the rule silently inert. It is the
+  largest tracked file in the repo. Resolved in favour of tracking: OpenCV 5 no
+  longer ships the Haar cascades in the wheel (`cv2.data.haarcascades` exists but
+  is empty), so vendoring it is what makes `make_video.py` work on a fresh clone.
+  `rvectr_paths` still prefers a packaged copy when one exists.
+* **`load_smpl_faces` was copy-pasted byte-identically into 7 scripts**, and the
+  OBJ writer into 7 more under two names, differing only in a header comment
+  asserting qualities of the output ("Perfect Anchored", "Muscular"). Consolidated
+  into `backend/meshio.py`, whose header records **provenance** instead:
+  `RECOVERED`, `SYNTHETIC`, or `INHERITED`. `measured` is a required argument with
+  no default — deciding whether an artefact is a measurement should not happen by
+  accident.
+* **Two Blender scripts were named `test_*.py`** and would be collected by pytest.
+  Renamed to `check_*`.
+* **`~400 MB of mesh assets in `public/` are gitignored**, so a fresh clone
+  rendered an empty viewport with only a console error. Documented in
+  `docs/ASSETS.md`; the viewer now shows a panel naming the missing file.
+
 ---
 
 # Remediation status
@@ -260,13 +417,13 @@ Kept short deliberately, but it is real and worth not discarding:
 | 1 | Unbacked MAE claims | Removed from all three writeups; replaced with explicit "not yet measured"; CI check fails if they reappear |
 | 3 | License contradiction | Root `LICENSE` added (research/non-commercial); README corrected; medical-device disclaimer added |
 | 4 | Fabricated demo output | Mock `/api/v1/analyze` deleted; store placeholder relabelled and de-graded; visible sample-data banners; **silent mock fallback on upload removed** — it now fails loudly |
-| 6 | Trivial tests | 12 → **31 tests**. Real coverage of `gait_events` and `stride_metrics` against synthetic signals with known ground truth |
+| 6 | Trivial tests | 12 → 31 → **44 tests**. See finding 23: the 31 included fixtures that could not fail |
 | 7 | Gaussian smoothing | Savitzky–Golay in both real locations; zero-padding bug fixed |
 | 8 | No engineering log | `docs/log/` opened with today's entry |
 | 10, 11 | Untestable hypotheses, scope inflation | Robotics claim removed from hypotheses; H₂ made falsifiable; velocity hypothesis stated |
 | 12 | Hardcoded paths | All eliminated via `backend/rvectr_paths.py` with env overrides |
 | 13 | No dependency spec | `requirements-core.txt`, `requirements-hmr2.txt`, three-environment split documented |
-| 15 | No CI | `.github/workflows/ci.yml` written — tests, typecheck, build, fabricated-claims guard. **Not yet pushed:** the stored token lacks `workflow` scope (see Partial) |
+| 15 | No CI | `.github/workflows/ci.yml` written. It was gitignored and would have errored on first run — see finding 24. Now tracked, green, and extended with lint, three claim guards and a submodule-pointer job |
 | 16 | SaaS still shipped | 42 files removed; 14 routes → 5; build passes clean |
 | 17 | Silent config fallbacks | Removed with the Supabase layer |
 | 18 | "Clinical" language | Removed from README and WORKSPACE_SUMMARY |
@@ -277,11 +434,9 @@ Kept short deliberately, but it is real and worth not discarding:
 
 | # | Finding | Remaining |
 |---|---|---|
-| 0 | EasyMocap synthesises instead of capturing | Labelled honestly, but **you must decide** whether to implement real triangulation or convert it into the ground-truth harness. Provenance of existing result files still unverified. |
-| 2 | Submodule work unbacked-up | Committed locally in both submodules; bundles at `~/rvectr-backups/`. **Still single-disk — forking and pushing needs your GitHub auth.** |
+| 0 | EasyMocap synthesises instead of capturing | Labelled honestly everywhere now, including the web UI (finding 21), and every mesh carries a provenance header. **You must still decide** whether to implement real triangulation or convert it into the ground-truth harness. Provenance of existing result files still unverified. |
+| 2 / 20 | Submodule work unbacked-up, and now unclonable | Reclassified as a regression — see finding 20. Tooling and CI enforcement are in place; **forking and pushing needs your GitHub auth.** |
 | 9 | No pre-registration | Full draft at `docs/osf_preregistration_draft.md`; needs an OSF account and submission |
-| 15 | CI not on GitHub | Workflow file exists locally but is untracked — push rejected for missing `workflow` token scope. Regenerate the token or paste via the web UI. |
-| 14 | Script sprawl | Documented with status per script in `backend/README.md`; not consolidated |
 
 ## Open
 
@@ -289,11 +444,27 @@ Kept short deliberately, but it is real and worth not discarding:
 |---|---|---|
 | 5 | **The harness does not exist** | The gate. Everything above is prerequisite hygiene; this is the project. |
 | 19 | Category framing | Your call: Systems Software is the defensible framing |
+| 20 | Submodules unfetchable | Needs your GitHub auth — one command once the forks exist |
 
 ## Next actions, in order
 
-1. **Fork both submodules and push.** Still the highest priority — the work is on one disk.
-2. **Decide what `run_easymocap_videos2.py` becomes.** Real triangulation, or the ground-truth generator. Not ambiguous.
-3. **Trace the provenance of every result file** before citing any of it.
-4. **Submit the OSF pre-registration** before the harness produces a number.
-5. **Build the harness.**
+1. **Fork both submodules and push.** Still the highest priority, and now also the
+   only thing making the repository unclonable:
+   `./scripts/rescue-submodules.sh --fork-owner <you>`
+2. **Push, and confirm CI goes green.** The `no-fabricated-results` and
+   `submodule-pointers` jobs have never run on GitHub. Job 2 is expected to fail
+   until action 1 is done — that is the job working.
+3. **Decide what `run_easymocap_videos2.py` becomes.** Real triangulation, or the
+   ground-truth generator. Not ambiguous.
+4. **Trace the provenance of every result file** before citing any of it. Meshes
+   regenerated from now on carry their own header; anything already on disk does not.
+5. **Submit the OSF pre-registration** before the harness produces a number.
+6. **Build the harness.**
+
+## What a second audit should look at next
+
+Untouched by either pass, and not yet known to be wrong:
+`pipeline/pelvic_analysis.py` and `pipeline/running_kinematics.py` remain
+untested, and `stride_metrics.flight_time` pairs consecutive cycles regardless of
+side while its docstring assumes they alternate — correct on the clean synthetic
+case that was checked, unverified on real overlapping strides.

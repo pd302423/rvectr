@@ -1,5 +1,7 @@
 "use client";
 
+import type { PoseLandmarker } from "@mediapipe/tasks-vision";
+
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -92,7 +94,7 @@ export default function SquatTestPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const poseLandmarkerRef = useRef<any>(null);
+  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
 
   // States
   const [modelState, setModelState] = useState<"loading" | "ready" | "error">("loading");
@@ -154,7 +156,7 @@ export default function SquatTestPage() {
 
         poseLandmarkerRef.current = poseLandmarker;
         setModelState("ready");
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to load MediaPipe Pose model:", err);
         if (active) {
           setModelState("error");
@@ -215,13 +217,15 @@ export default function SquatTestPage() {
           startProcessingLoop();
         };
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Camera access error:", err);
       setCameraState("error");
+      // getUserMedia rejects with DOMException; anything else is unexpected.
+      const denied = err instanceof DOMException && err.name === "NotAllowedError";
       setErrorMsg(
-        err.name === "NotAllowedError"
+        denied
           ? "Camera permission denied. Please enable camera access in your browser settings."
-          : `Failed to open camera: ${err.message}`
+          : `Failed to open camera: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -359,9 +363,14 @@ export default function SquatTestPage() {
       animationFrameRef.current = requestAnimationFrame(processFrame);
     }
 
-    lastFpsUpdateRef.current = performance.now();
     frameCountRef.current = 0;
-    animationFrameRef.current = requestAnimationFrame(processFrame);
+    // Seed the FPS window from the first frame's own timestamp rather than
+    // calling performance.now() here: same clock, and it keeps this function
+    // free of side effects that the React compiler must treat as render-phase.
+    animationFrameRef.current = requestAnimationFrame((frameTime) => {
+      lastFpsUpdateRef.current = frameTime;
+      processFrame();
+    });
   }
 
   // Draw skeleton connections, joint hubs, and text callouts on canvas
