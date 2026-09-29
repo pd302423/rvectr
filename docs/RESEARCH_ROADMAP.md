@@ -5,6 +5,9 @@
 **Written:** 2026-07-26 · **Revised:** 2026-07-26 (relocation constraint)
 **Supersedes:** `ROADMAP.md` (SaaS launch plan, retired)
 
+> [!WARNING]
+> **Added 2026-09-29.** Search results from the official IRIS site list the 2026–27 window as closing **3 Oct 2026, 18:00**, not 15 Oct as stated below. Verify on the registration portal. The implementation plan for the trust map, live demo and capture app, including a four-day IRIS option, is in [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md).
+
 ---
 
 ## The constraint that defines this document
