@@ -4,12 +4,12 @@
 **Scope:** (1) the research question — *where does consumer-hardware motion capture stop being trustworthy, per exercise?*; (2) a live demo — record someone, get a 3D model and an analysis; (3) a capture setup simple enough for other people to use.
 **Relationship to other docs:** builds on [`RESEARCH_ROADMAP.md`](RESEARCH_ROADMAP.md) (research question, relocation context, portfolio plan — all still valid). It replaces that document's "no web app, no server" stance, which a capture app for other people makes untenable. Every finding in §1 was checked against source code on 2026-09-29. Where this document contradicts [`critical_analysis.md`](../critical_analysis.md), this one is newer.
 
-> [!CAUTION]
-> **The IRIS 2026–27 window appears to close Saturday 3 Oct 2026, 18:00, not 15 Oct.** Read §0 before anything else.
+> [!NOTE]
+> **IRIS 2026–27 is skipped (decided 2026-09-29).** The fee (about ₹6,000) pays for screening only, with no guaranteed presentation. JSEC is now the only remaining route to ISEF; see §0.
 
 ## Summary
 
-1. **Deadline.** Search results from the official IRIS domain list the submission window as 1 Aug – 3 Oct 2026, with no extensions. That leaves 4 days. See §0.
+1. **No competition deadline for now.** IRIS 2026–27 is skipped. JSEC is the remaining route to ISEF, and whether you're eligible is unconfirmed, so ask JSEC now. See §0.
 2. **Recordings from other people can't measure accuracy.** Accuracy needs a reference. Crowd data can measure *reliability* and *robustness*, which also matter for trust, but they are different claims. See §3.5.
 3. **Average phone-mocap accuracy is already published.** With a biomechanically constrained pipeline it is about 4.5–4.8° MAE. In a 2025 study, off-the-shelf monocular estimators gave 14–26° on knee angles. What remains open, and what you can own, is *under which conditions* a reading can be trusted, and how a user would know at runtime. See §3.1–3.3.
 4. **Measurement defects come first.** Several defects in the current pipeline are larger than the 5° threshold the study tests against. Collecting data before fixing them wastes the data. See §1.2.
@@ -17,30 +17,21 @@
 
 ---
 
-## 0. This week: IRIS
+## 0. Competition timing after skipping IRIS
 
-Search results restricted to `irisnationalfair.org` state that the 2026–27 registration and submission window runs **1 Aug 2026 – 3 Oct 2026, 6:00 pm, with no extensions**. The fee is ₹5,000 + tax, and an EWS waiver is available. The required submission is an abstract, a synopsis PDF, a paper PDF and a video of up to 90 s. **I could not open the page directly from the build environment, so verify this on [register.irisnationalfair.org](https://register.irisnationalfair.org/) today.** `RESEARCH_ROADMAP.md` assumes 15 Oct and lists "discovering the deadline moved" as a failure mode.
+**Decision (2026-09-29): IRIS 2026–27 is skipped.** Search results from the official site list the window as closing 3 Oct 2026. The fee is ₹5,000 + tax (about ₹6,000) and pays for screening only, with no guaranteed presentation. Four days from a standing start would have produced a synthetic-only entry. Because IRIS requires enrolment at a school in India, this was the only possible IRIS cycle, so the India → ISEF route is now closed.
 
-Nothing has been pushed since 26 Jul: `main` and this branch are both at `8626ce6`. The Aug 30 harness gate therefore did not happen in this repository. If you have unpushed harness work locally, commit it; everything below shrinks accordingly.
+Nothing has been pushed since 26 Jul (`main` and this branch were both at `8626ce6` on 29 Sep). If you have unpushed harness work locally, commit it; Phases 1–2 shrink accordingly.
 
-**Decision: submit a thin, honest entry, or skip IRIS.** Because relocation makes IRIS a one-shot competition, my recommendation is to submit if you can clear about three full days. The October screening judges the synopsis and paper. The January fair judges the exhibit, and Phases 1–3 below are timed to be ready for it. A thin, real result now plus a live demo in January beats an unsubmitted perfect plan.
+What the decision changes:
 
-### Four-day minimum-viable submission (only if submitting)
-
-| Day | Work | Done when |
-|---|---|---|
-| **Tue 29 (tonight)** | Verify the deadline and register (the form autosaves). Update the OSF draft with the §3.4 rules and a blur on/off factor, then **register it on OSF before any error number exists**. Tonight is the last point at which it can precede the data. | OSF timestamp exists |
-| **Wed 30** | **Ground truth.** Lift the posing code out of `synthesize_scripted_squat_smpl()` (`run_easymocap_videos2.py`) into a generator that saves θ, β and the ground-truth joints (via `J_regressor`) for every frame to `gt.npz`. Author 5 reps at 1× (2 s/rep) and 20 reps at 4× (0.5 s/rep), both as 10 s clips at 30 fps. Render one side-view camera in Blender at 8× the frame rate (240 subframes/s). Average 4 of each 8 subframes to get **blur-on** (a 180° shutter); take every 8th subframe to get **blur-off**. One render pass produces both conditions. | 4 videos + `gt.npz` |
-| **Thu 1** | **Numbers.** Run HMR2 through `process_video_3d.py` at the **native** 30 fps (the default is 15; see M2). Run MediaPipe PoseLandmarker in IMAGE mode and take **world** landmarks. Compute knee and hip angles with *one* function applied identically to the ground truth and to each estimate. Report error per condition and bootstrap by **rep**, not by frame. Produce one table and one figure, both regenerated by a single script. **Stop coding at 22:00.** | `results.csv`, `fig1.png` |
-| **Fri 2** | Write the synopsis (section word budgets are in `RESEARCH_ROADMAP.md`) and the paper. State the limits plainly: one authored sequence, a synthetic render, two backends, no real-footage check yet. | PDFs |
-| **Sat 3** | Make the 90 s video: authored squat → render → estimates → error plot. **Submit by noon**, because portals slow down near a deadline. | Confirmation email |
-
-Two methodological points make this small experiment valid:
-
-- **Blur is not optional.** HMR2 and MediaPipe in IMAGE mode see one frame at a time. A time-warped render *without* blur is the same set of sharp images, with fewer of them per rep. A per-frame model therefore *cannot* show velocity-dependent error on it. Without blur, H1 fails trivially and tells you nothing (§3.2).
-- **Report the change in error, not only the level.** MediaPipe's hip landmark is not SMPL's hip joint, so MediaPipe-vs-SMPL angles carry a constant definitional bias. The change in error from 1× to 4×, and from blur-off to blur-on, cancels that bias. Headline the change, and report the level as a secondary result.
-
-If you skip IRIS, go straight to Phase 1.
+- **JSEC is the remaining ISEF route.** Whether a foreign student enrolled in Japan is eligible is still undocumented (`RESEARCH_ROADMAP.md`). Ask JSEC now rather than after relocating, because the answer decides whether this project has any fair deadline at all.
+- **ISEF judges only research inside a 12-month window.** For ISEF 2027 the window begins no earlier than January 2026 ([rules](https://www.societyforscience.org/isef/international-rules/rules-for-all-projects/)). By the same pattern, ISEF 2028, the cycle JSEC 2027 would feed, likely begins January 2027; confirm this in the 2027–28 rules. Work from 2026 would then be prior research in a continuation project (Form 7), and only a substantive expansion would be judged. The phases already split that way, so nothing needs delaying:
+  - Phases 1–3 (2026) build the tools and the first squat result.
+  - Phases 4–5 (2027: new exercise classes, crowd reliability) are the expansion.
+- **The ethics rules still apply.** JSEC follows ISEF's human-participant rules, and consent and privacy law cover recording other people whether or not a fair is involved (§5.3, §6).
+- **The portfolio doesn't depend on IRIS.** None of the ten items in `RESEARCH_ROADMAP.md` Part 2 requires a fair result.
+- **Relocation (mid-2027 per `RESEARCH_ROADMAP.md`) is the last hard date.** It bounds the Phase 4 pilot, which needs participants and approval from your current school in India, not the research itself.
 
 ---
 
@@ -242,6 +233,7 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 | Multi-view sync residual | velocity × sync error | Sync method: ±½ frame with audio sync plus constant-frame-rate resampling |
 
 **Implications worth testing:**
+- **Renders without simulated blur can't show a velocity effect.** A per-frame model, given a time-warped render without blur, sees the same set of sharp images, just fewer of them per rep. H1 would then fail for a trivial reason and tell you nothing.
 - **The "velocity threshold" is not a property of the pose model.** It depends on model × exposure × readout × fps × filter. The same squat speed can be trustworthy in daylight and untrustworthy under a dim ceiling light. For blur, report the boundary in *blur displacement* (ω·t_exp) rather than ω alone, and turn the result into advice ("bright light, 60 fps").
 - **Pre-registered H3 may be wrong for consumer rigs.** H3 says multi-view degrades most slowly, but sync residuals add a velocity-proportional error that single-camera setups don't have. Test it by injecting sync offsets of 0, 8, 17 and 33 ms in the harness.
 - **Compare MediaPipe IMAGE mode with VIDEO mode.** The difference between them isolates the tracking and smoothing mechanism for free.
@@ -281,6 +273,7 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 4. **Report detection failure as a separate outcome and never impute it.** The draft already says this; the code violates it (M3).
 5. **Use a 5° threshold, citing McGinley et al. 2009.** That review is a primary source, stronger than citing goniometer reliability, and the Sci Rep 2025 study uses the same line.
 6. **Trust boundary:** the condition at which the upper 95% confidence bound of the MAE crosses 5°.
+7. **Lead with the change in error, not only its level.** A backend's joint set rarely matches the reference's exactly (MediaPipe's hip landmark is not SMPL's hip joint), so absolute comparisons carry a constant definitional bias. Within-backend changes across conditions (1× → 4×, blur off → on) cancel that bias. Report absolute levels separately, alongside the bias.
 
 ### 3.5 Data tiers: only some data can measure accuracy
 
@@ -399,10 +392,8 @@ Treat every threshold above as a starting point, and tune it on your own pilot.
 
 This assumes about 12–15 focused hours a week alongside school; rescale if that's wrong. Each phase ends at a **gate**. The plumbing in Phase 3 (worker, upload, viewer wiring) can start during Phase 2 if you need a break from analysis; only the trust badges wait for Phase 2's trust table.
 
-### Phase 0 — IRIS (29 Sep – 3 Oct), only if submitting
-See §0.
-
-### Phase 1 — Make the numbers trustworthy (≈ 4–25 Oct)
+### Phase 1 — Make the numbers trustworthy (≈ 30 Sep – 25 Oct)
+- [ ] Email JSEC: is a foreign student enrolled at a Japanese school eligible? (§0)
 - [ ] M1: live angles from `worldLandmarks`, plus shared test vectors
 - [ ] M2 and M3: native frame rate, per-frame timestamps, `detected` mask, no imputation
 - [ ] M4: fixed β per clip; support the A-pose static trial
@@ -420,8 +411,8 @@ See §0.
 **Gate:** ground-truth joints → kinematics module → angles round-trips to within 0.1°; processing the same video twice gives byte-identical JSON; CI is green.
 
 ### Phase 2 — Ground truth and the first trust map (≈ 26 Oct – 22 Nov)
-- [ ] Harness: author θ for squat and sit-to-stand first; time-warp 0.5–4×; textured SMPL; Blender camera rig covering the views
-- [ ] Degradation stack: blur from 8× subframes, rolling shutter via per-row time offsets, frame rate, codec
+- [ ] Harness: start from the posing code in `synthesize_scripted_squat_smpl()`, saving θ, β and ground-truth joints for every frame; author squat and sit-to-stand first, with several reps per clip (the rep is the bootstrap unit); time-warp 0.5–4×; textured SMPL; Blender camera rig covering the views
+- [ ] Degradation stack: blur from 8× subframes (average 4 of every 8 for a 180° shutter; take every 8th for blur-off, so one render pass gives both); rolling shutter via per-row time offsets; frame rate; codec
 - [ ] OSF: add §3.4 to the draft and **register before the first error number**
 - [ ] Adapters for SAM 3D Body and OpenCap Monocular (check both licences)
 - [ ] OpenCap lab-dataset loader (video, IK `.mot`, sync) → evaluation in OpenSim coordinates
@@ -430,7 +421,7 @@ See §0.
 
 **Gate:** one command produces Figure 1 for the squat with two or more backends; corrupting the input increases the error; a synthetic-vs-OpenCap comparison exists. If synthetic and real disagree, that is a finding, not a failure.
 
-### Phase 3 — Live demo, exhibit-ready for January (≈ 23 Nov – 20 Dec)
+### Phase 3 — Live demo (≈ 23 Nov – 20 Dec)
 - [ ] FastAPI worker and job queue on the GPU machine: upload → process → poll
 - [ ] Viewer wired to real JSON: trust bands, per-rep summaries, CSV and `.mot` export, no hardcoded counts
 - [ ] Trust table v1 → badges, plus the cross-backend disagreement flag
@@ -477,7 +468,7 @@ See §0.
 
 ## 10. Decisions only you can make
 
-1. **IRIS by Saturday 3 Oct 18:00:** thin submission or skip?
+1. **Next venue:** JSEC (depends on the eligibility answer), a school exhibition, or no fair. This decides whether any phase has a deadline. *(IRIS 2026–27: skipped, decided 2026-09-29.)*
 2. **`run_easymocap_videos2.py`:** my recommendation is that step 3 becomes the ground-truth generator now, and real multi-view comes later via Pose2Sim or aniposelib, not EasyMocap. This settles the open question from July.
 3. **Pilot participants:** adults only (simpler consent), or peers under 18 (guardian forms)?
 4. **Canonical body model:** SMPL (existing code, restrictive licence) or MHR / SAM 3D Body (newer; check its licence)?
@@ -496,5 +487,5 @@ See §0.
 - [SAM 3D Body](https://arxiv.org/abs/2602.15989), 2026 · [weights](https://huggingface.co/facebook/sam-3d-body-dinov3)
 - McGinley et al., [The reliability of three-dimensional kinematic gait measurements](https://doi.org/10.1016/j.gaitpost.2008.09.003), Gait Posture 2009
 - Milanese et al., [Knee angle: smartphone app vs universal goniometer](https://www.sciencedirect.com/science/article/abs/pii/S1356689X14001118), Man Ther 2014
-- [ISEF Human Participants rules](https://www.societyforscience.org/isef/international-rules/human-participants/)
+- [ISEF Human Participants rules](https://www.societyforscience.org/isef/international-rules/human-participants/) · [ISEF Rules for All Projects](https://www.societyforscience.org/isef/international-rules/rules-for-all-projects/) (research window, continuation projects)
 - [Video-based markerless mocap for clinical and rehabilitation biomechanics: scoping review](https://arxiv.org/pdf/2609.18667), 2026
