@@ -14,8 +14,9 @@
 3. **Average phone-mocap accuracy is already published.** With a biomechanically constrained pipeline it is about 4.5–4.8° MAE. In a 2025 study, off-the-shelf monocular estimators gave 14–26° on knee angles. What remains open, and what you can own, is *under which conditions* a reading can be trusted, and how a user would know at runtime. See §3.1–3.3.
 4. **Measurement defects come first.** Several defects in the current pipeline are larger than the 5° threshold the study tests against. Collecting data before fixing them wastes the data. See §1.2.
 5. **The study and the demo share one code path.** The demo should display the study's error bars live, never an angle the study didn't evaluate. See §2.
-6. **The demo is a local Studio.** Drag a recorded video onto a page on your laptop and get a 3D body, angle graphs and a trust badge for each angle. It doesn't need EasyMocap. See §4.
+6. **The demo is a local platform with two faces.** In the Studio, the person recorded drops one or more videos and gets a 3D body with trusted angles. The Lab shows you every processing stage. Multiple phones are combined without calibration first, and calibrated later. See §4.
 7. **Clothing is part of the trust map.** On a multi-camera lab system during walking, clothing barely changed joint angles. Whether that holds for one phone during a deep squat is untested. See §3.7.
+8. **The headline question:** how accurate can a normal person get with the phones they own, and what does each extra step (a second phone, a calibration board, fitted clothes, good light) buy? See §3.3.
 
 ---
 
@@ -96,7 +97,7 @@ At `extract_kinematics.py:176`, phone pitch or roll goes directly into trunk lea
 - Calibration uses one chessboard image per camera, which is underdetermined, and falls back to invented values (`T2 = [0.5, 0, 0.1]`).
 - `sync_and_recalibrate_videos2.py` claims to produce extrinsics and RANSAC triangulation. In fact it writes hardcoded intrinsics and made-up distortion coefficients, and its audio-sync offset has the wrong sign: in testing, a 0.5 s offset became 1.0 s.
 
-*Fix:* replace the multi-view path wholesale (Stage 3).
+*Fix:* replace the multi-view path wholesale: angle fusion in Stage 1, calibrated triangulation in Stage 2 (§4.2).
 
 **M8 — Variable-frame-rate video is resampled to a constant frame rate.**
 `pipeline/smartphone_sync.py:62` uses `-r 30 -vsync cfr`. This adds up to half a frame (16.7 ms) of timing jitter per camera, which at 300°/s is about 5° of disagreement between views.
@@ -260,7 +261,8 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 - **Joint × plane:** sagittal flexion, frontal (valgus / adduction), transverse (rotation). Expect a steep ordering (McGinley).
 - **Camera:** azimuth 0/30/45/60/90°, elevation (floor, hip or head height), and distance.
 - **Capture settings:** fps, exposure, readout time, resolution, codec bitrate.
-- **Backend:** MediaPipe, HMR2, SAM 3D Body, OpenCap Monocular; multi-view in Stage 3.
+- **Backend:** MediaPipe, HMR2, SAM 3D Body, OpenCap Monocular.
+- **Setup:** the number of phones (1, 2 or 3), and how their positions are given (label only vs calibration board). Paired with setup time, this answers the headline question: how accurate can a normal person get, and what does each extra step buy? (§4.2)
 - **Clothing:** fitted (shorts or leggings), track pants, loose pants. Tested on real footage in §3.7.
 - **Body:** you and your teammate give two real bodies; synthetic data adds a wider range of shapes (β).
 
@@ -303,6 +305,7 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 - **Figure 3:** error predicted from synthetic data vs error measured on OpenCap footage. This is the sim-to-real check.
 - **Table:** MAE per backend and DOF on OpenCap squat and sit-to-stand trials, with Bland–Altman limits of agreement.
 - **Figure 4:** error vs clothing type, per camera view (§3.7).
+- **Figure 5:** error vs setup effort: 1 phone → 2 labelled phones → 2 calibrated phones, with setup time on the x-axis (§4.2).
 - **Released artifact:** a JSON trust table, which the Studio and capture app consume (§4.1).
 
 ### 3.7 Experiment B: clothing and camera view
@@ -312,81 +315,119 @@ On a multi-camera lab system (Theia3D) during walking, switching between sport a
 - **Subjects:** you and your teammate. As the student researchers you can be your own subjects, and two bodies beat one. Take turns: one holds the position while the other measures and records.
 - **Reference:** a phone angle-meter app (e.g. phyphox, which is free) measures the knee angle during each hold. Holds take speed out of the problem.
 - **Holds:** standing, quarter squat, half squat and a wall sit at about 90°, 5 s each. A wall sit is easy to repeat at the same depth.
-- **Conditions:** 3 clothing types (shorts, track pants, loose pants) × 2 camera views (side, 45°). Record following §4.4.
+- **Conditions:** 3 clothing types (shorts, track pants, loose pants) × 2 camera views (side, 45°), with both phones recording at once and synced by a clap. Record following §4.7. The same clips also test fusion: side alone, 45° alone, and fused.
 - **Result:** error vs clothing type for each view. Headline the change in error from shorts to loose pants; that cancels the constant offset between a surface angle-meter and a skeleton angle (§3.4 rule 7).
 - **Limit:** holds capture what fabric hides when still. Fabric swinging during fast reps is a later, harder test.
 
 ---
 
-## 4. The Studio: drag-and-drop video → 3D model → analysis
+## 4. The platform: Studio for the person recorded, Lab for you
 
-The demo is a local app on your laptop. You drag in a video you recorded and get back a 3D body you can rotate and scrub, joint-angle graphs, a rep summary, and a trust badge on every angle. Nothing needs the internet.
+Two faces on one system, like a film or game motion-capture stage: the performer gets a simple, polished experience, and the operator sees every step on their own screen. Everything runs locally on your laptop.
 
 ### 4.1 How the pieces connect
 
-| Piece | What it is | Role in the Studio |
+| Piece | What it is | Role |
 |---|---|---|
-| **SMPL** | A standard 3D template of the human body (6,890 surface points, 24 joints), controlled by pose numbers (θ) and body-shape numbers (β) | The "3D model" everything is expressed in |
-| **HMR2 (4D-Humans)** | An AI model that looks at one frame and outputs SMPL θ and β | The main engine for single videos |
+| **SMPL** | A standard 3D template of the human body (6,890 surface points, 24 joints), shaped by pose numbers (θ) and body-shape numbers (β) | The 3D model everything is expressed in |
+| **HMR2 (4D-Humans)** | An AI model: one frame in, SMPL θ and β out | The main engine, run on each video separately |
 | **MediaPipe** | A fast AI model that outputs 33 body points | The instant live view, and a second opinion for trust checks |
-| **SAM 3D Body** | A newer single-image model (it uses its own MHR body model, not SMPL) | An optional third opinion, later |
-| **EasyMocap** | Software that fits SMPL using **two or more cameras filming at the same time** | **Not needed for drag-and-drop.** Only for a future two-phone mode, where Pose2Sim or aniposelib may be simpler (M7) |
+| **SAM 3D Body** | A newer single-image model with its own MHR body model | An optional third opinion (Stage 2) |
+| **Sync** | Lines videos up in time using a clap in the audio | Needed whenever there's more than one video; first fix the sign bug in the old script (M7) |
+| **Fusion** | Combines each view's joint angles, weighting each view by the trust table | Multiple phones without calibration (§4.2, mode 2) |
+| **Pose2Sim / aniposelib** | Calibration from a printed board, then true 3D triangulation | Calibrated multi-phone mode (§4.2, mode 3) |
+| **EasyMocap** | Multi-camera SMPL fitting | Superseded here by the two rows above; stays parked (M7) |
 
-What happens to one dropped video:
-1. **Read** the file: rotation, per-frame timestamps, resolution.
-2. **Find the person** in every frame (person detector).
-3. **Estimate the body:** HMR2 gives SMPL θ and β per frame; MediaPipe gives 33 points per frame.
-4. **Build the mesh:** SMPL turns θ and β into the 3D body and its 24 joints.
-5. **Clean up** (M2–M5): one body shape for the whole clip; missed frames marked, never copied; a tested smoothing filter; "down" taken from gravity, not the camera.
-6. **Measure:** joint angles every frame, reps detected, a per-rep summary (depth, tempo, left/right difference).
-7. **Judge trust:** check speed, camera angle, the models' own confidence and HMR2-vs-MediaPipe disagreement against the trust table → *trusted*, *caution* or *not trusted* for each angle.
-8. **Save** to `runs/<id>/` with a manifest (M12): `result.json` (angles, reps, trust), the 3D animation and an overlay video.
-9. **Show:** the video and the 3D body on one scrubber, with angle graphs coloured by trust.
+### 4.2 Capture modes: what each extra step buys
 
-### 4.2 Architecture (all local)
+| Mode | What the person needs | How views are combined | Expected accuracy | When |
+|---|---|---|---|---|
+| **1. One phone** | One phone on a tripod | — | About 4.8° MAE for a published single-phone pipeline with biomechanical constraints; raw off-the-shelf output is far worse (14–26° on knees in one study) | Stage 1 |
+| **2. Two or three phones, positions labelled** | Extra phones, a clap at the start, and each video dragged to its spot on a floor plan | Each view measures the angles itself, because a joint angle doesn't depend on where the camera stands. Each angle is then a trust-weighted average: side views count most for knee bend, front views for knees caving in. No calibration needed | Unknown; this is what you measure | Stage 1 |
+| **3. Two or three phones, calibrated** | Also a printed checkerboard, shown to all phones for a few seconds | True 3D triangulation from exact camera positions | About 4.5° MAE with two calibrated iPhones (OpenCap) | Stage 2 |
 
-- **Page:** a `/studio` page in the existing Next.js app. It reuses `DualViewport`, `ThreeMeshCanvas`, `TimelineScrubber` and `KinematicWaveformChart`, wired to a real `result.json` instead of sample data.
-- **Server:** a small FastAPI server in the HMR2 Python environment. It accepts the upload, runs steps 1–8 as a background job and reports progress.
-- **One command** starts both (e.g. `./studio.sh`); then open `http://localhost:3000/studio`. Localhost counts as a secure origin, so the webcam and file drop both work without HTTPS.
-- **Animation format:** one binary file of per-frame vertex positions, loaded once and played by swapping positions, instead of hundreds of OBJ files.
-- **Speed target:** under 2 minutes for a 15 s clip on the laptop GPU. Measure it; don't assume it.
-- **No NVIDIA GPU available:** fall back to MediaPipe only, which gives a skeleton but no mesh.
+Two consequences:
+- **Saying where each camera is isn't enough for triangulation.** Triangulation needs camera positions and directions to within about a centimetre and a degree. A label like "side, 3 m" is far too rough, which is why mode 2 fuses angles instead and mode 3 uses a board.
+- **More cameras aren't automatically the biggest win.** On average, published one-phone and two-phone pipelines are close (4.8° vs 4.5°): the processing matters more than the camera count. Extra views should help most where one camera is blind: knees caving in (frontal plane), twisting (transverse plane), and the far side of the body. Measuring *how much* each extra step buys is the headline question (§3.3).
 
-### 4.3 Instant view
+OpenCap is the professional version of mode 3; its capture app needs iPhones and a checkerboard. Your version targets Android phones, adds a no-board mode, and adds trust badges.
 
-The live page (`/test/squat`) stays as the instant tier: webcam in, skeleton and angles out in real time, once M1 is fixed. It keeps judges engaged while the Studio processes a clip.
+### 4.3 The Studio (for the person recorded)
 
-### 4.4 Recording protocol
+Beautiful and simple, with five screens:
+1. **Home:** "New capture", plus recent captures.
+2. **Plan:** choose the exercise. A floor plan shows where to put each phone (from the trust table), with tips on light and clothing.
+3. **Upload:** drop one or more videos. Each becomes a card that you drag onto its spot on the floor plan (front, side, 45°). Fill in the person, clothing and notes.
+4. **Processing:** progress in plain words ("lining up videos", "building your 3D body", "measuring angles").
+5. **Results:**
+   - the 3D body replaying beside the video, which you can rotate and scrub
+   - per-rep numbers (depth, left/right difference, tempo) with trust badges in plain language ("Knee angle 94° ± 4° — trusted")
+   - **"How to get a more accurate result next time"**, e.g. "add a front phone to measure knees caving in". This advice comes straight from the trust table.
+
+### 4.4 The Lab (for you)
+
+Everything the Studio hides, stage by stage, for any session:
+- **Ingest:** resolution, fps, rotation, duration and codec for each video, plus a thumbnail strip.
+- **Sync:** the audio waveforms aligned, the offset of each video in ms, and how confident the match is.
+- **Detection:** person boxes drawn on the video, with frames where the person was lost marked on the timeline.
+- **2D points:** the MediaPipe overlay and each joint's confidence over time.
+- **3D per view:** the HMR2 mesh drawn over each video, and each view's angle curves.
+- **Fusion:** per-view vs fused angle curves, the weights used, and where the views disagree.
+- **Kinematics:** detected reps and a per-rep table.
+- **Trust:** a badge timeline with the reason for each badge.
+- **Performance:** time per stage and GPU memory.
+- **Provenance:** the run manifest (pipeline version, parameters, input hashes).
+- **Export:** JSON, CSV, OpenSim `.mot`, and BVH, the skeleton-animation format that film and game studios import into Blender, Unity and Unreal.
+- **Dataset page:** every session in one table, filterable by person, clothing, view, speed and mode, next to the experiment graphs. This is where the trust map lives.
+
+### 4.5 Under the hood
+
+- **Data model:**
+  - A *session* is one recorded take (person, exercise, clothing, notes).
+  - A session has one or more *views*: a video, its position label and the phone's details.
+  - A *run* processes a session with a given pipeline version and settings.
+  - Each *stage* of a run saves its outputs and metrics to `runs/<id>/<stage>/`.
+
+  The Lab simply displays those folders, so nothing is hidden and every result can be regenerated (M12).
+- **Server:** FastAPI in the HMR2 Python environment, with a job queue and SQLite for the session index.
+- **Web:** the existing Next.js app, with `/studio` and `/lab` pages that reuse `DualViewport`, `ThreeMeshCanvas`, `TimelineScrubber` and `KinematicWaveformChart`.
+- **One command:** e.g. `./studio.sh` starts both; then open `http://localhost:3000/studio`. Localhost counts as a secure origin, so the webcam and file drop work without HTTPS.
+- **Timing:** processing time adds up with every video, so 2 phones × 15 s is the demo sweet spot. Measure it.
+- **Phones at different frame rates:** combine views on timestamps, never on frame numbers.
+- **No NVIDIA GPU:** a MediaPipe-only fallback (skeleton, no mesh).
+
+### 4.6 Instant view
+
+The live page (`/test/squat`) stays as the instant tier: webcam in, skeleton and angles out in real time, once M1 is fixed. It keeps judges engaged while a session processes.
+
+### 4.7 Recording protocol
 
 Use the same protocol for demo clips, experiments and the exhibition:
-
-- **Phone placement:** on a tripod at hip height, 3–4 m away, with the whole body in frame and space above the head and below the feet.
-- **View:**
-  - side-on for squat depth
-  - front-on for knees caving in
-  - 45° when testing camera angle
+- **Each phone:** on a tripod at hip height, 3–4 m away, whole body in frame, with space above the head and below the feet.
+- **Views:** side-on for squat depth, front-on for knees caving in, and 45° as the in-between.
 - **Settings:**
-  - 1080p at 60 fps
+  - 1080p at 60 fps, the same on every phone if possible
   - focus and exposure locked (tap and hold)
   - stabilisation off
   - bright light facing the person
   - plain background, nobody else in frame
+- **Multiple phones:** start every recording, then give one sharp clap that all phones can hear.
+- **Mode 3 only:** hold the printed checkerboard where every phone can see it for 5 s at the start.
 - **Take structure:** stand still in an A-pose for 3 s → 5 reps → stand still for 2 s.
-- **File labels:** name every file by person, clothing, view, speed and lighting, e.g. `p1_shorts_side_normal_bright.mp4`. These labels become the trust-map factors.
-- **Transfer:** USB cable or Quick Share to the laptop, then drag the file into the Studio.
+- **File labels:** name each file by person, clothing, speed and view, e.g. `p1_shorts_normal_side.mp4` and `p1_shorts_normal_45.mp4`. These labels become the trust-map factors.
 
-### 4.5 Exhibit setup
+### 4.8 Exhibit setup
 
-- **Hardware:** the laptop (the GPU machine) and a phone on a tripod. No venue internet needed.
+- **Equipment:** two phones on tripods (side and 45°) and the laptop. No venue internet needed.
 - **Flow:**
-  1. A judge squats in front of the phone.
-  2. You drag the clip into the Studio.
-  3. While it processes, the live page shows their skeleton.
-  4. The Studio then shows their 3D body with trust badges, next to your experiment graphs.
+  1. A judge squats, after one clap.
+  2. You drop both videos into the Studio.
+  3. The Lab, on a second screen or tab, shows each stage as it runs.
+  4. The results appear with badges and advice.
 - **Demo mode keeps nothing.** Delete visitor clips after the session.
 - **Backup:** keep pre-processed fallback clips in case anything fails, and dry-run the whole setup three times.
 
-### 4.6 Mesh licensing
+### 4.9 Mesh licensing
 
 The SMPL model data (template, skinning weights) is licensed and may not be redistributed. A public web app that ships a skinned SMPL rig is therefore a licence risk; a local exhibit is not. For the public web, send per-frame vertex positions (compressed morph targets) or a skeleton-only view. Check the SMPL licence before publishing anything.
 
@@ -451,64 +492,69 @@ This assumes about 12–15 focused hours a week. Stage 1 is sized for the CBSE r
 
 ### Stage 1 — Exhibition-ready (≈ 30 Sep – end Oct)
 
-**1A. Build the Studio and connect every piece (weeks 1–2)**
-- [ ] FastAPI server + `/studio` page: drag-and-drop → job → progress → results (§4.2)
-- [ ] Pipeline steps 1–8 (§4.1), with the measurement fixes built in:
-  - native fps and timestamps (M2)
-  - missed frames marked (M3)
-  - one body shape per clip (M4)
-  - gravity plus one angle module (M5, M6)
-  - a phone-realistic focal length (M11)
-  - per-run folders with manifests (M12)
-- [ ] Viewer wired to a real `result.json`, with no hardcoded frame counts
+**Build the pipeline and the Lab first, and polish the Studio last.** The Lab is how you find bugs and how the science gets done; a beautiful Studio on top of wrong numbers is exactly the failure the July roadmap warned about.
+
+**Week 1 — One-video pipeline + Lab v1**
+- [ ] Build the pipeline as stages that save their outputs (§4.5): ingest → detect → MediaPipe → HMR2 → clean-up → angles → reps
+- [ ] Build in the measurement fixes:
+  - M2: native fps and timestamps
+  - M3: missed frames marked
+  - M4: one body shape per clip
+  - M5/M6: gravity plus one angle module
+  - M11: a phone-realistic focal length
+  - M12: run folders with manifests
+- [ ] Lab v1: a session list, plus every stage's output for one video
 - [ ] M1: live-page angles from `worldLandmarks`
+
+**Done when:** a squat video goes through, the Lab shows every stage, and a straight standing knee reads about 170–180°.
+
+**Week 2 — Multiple videos (mode 2)**
+- [ ] A position label for each video; clap sync (fix the sign bug first); each view processed separately
+- [ ] Angle fusion: combine the per-view angles with trust weights. Use equal weights until Week 3's trust table exists.
+- [ ] The Lab shows the sync, per-view vs fused curves, and where the views disagree
+- [ ] Record Experiment B with two phones at once, side and 45° (§3.7). One session tests clothing, view and fusion together.
+
+**Done when:** two synced videos of one squat produce one fused result, and the Lab shows how each view contributed.
+
+**Week 3 — Measure**
+- [ ] Experiment A: ground-truth squat renders (slow/fast × blur on/off), from several virtual camera positions, so fusion is also tested against exact truth
+- [ ] Experiment B: compare the holds with the angle-meter readings
+- [ ] Build the first trust table, and use it for the fusion weights and the badges
+- [ ] Recommended: register the OSF draft (§3.4) before this first number
+
+**Week 4 — Studio**
+- [ ] The five screens (§4.3): floor-plan position picker, upload, progress, and results with badges and advice
 - [ ] M10: remove the unbacked claims from the site and the write-ups
 
-**Done when:** you drag in a squat video and get a 3D body, angle graphs and a rep summary in under 2 minutes, and a standing knee reads about 170–180°.
+**Week 5 — Exhibit**
+- [ ] Set up the exhibit as in §4.8
+- [ ] Make sure the poster and write-up claim only what the platform shows
+- [ ] Do three dry runs and practise a 2-minute explanation
 
-**1B. Record (week 2, one weekend)**
-- [ ] Demo clips of you and your teammate, following §4.4
-- [ ] Experiment B sessions (§3.7)
+**If the regional date is early:** keep Weeks 1–3 and a plain version of Week 4. Drop the Studio's advice screen and the 45° view.
 
-**1C. Experiment A: speed and blur (weeks 2–3)**
-- [ ] Turn the scripted-squat generator into ground truth: save θ, β and the true joint angles for every frame
-- [ ] Render in Blender, slow and fast, each with and without blur (blur = 8 sub-frames averaged)
-- [ ] Run the renders through HMR2 and MediaPipe; produce one graph of error vs speed and blur
-- [ ] Recommended: finish the OSF draft (§3.4) and register it before this first number
+### Stage 2 — The most accurate a normal person can get (≈ Nov – Feb)
 
-**1D. Measure Experiment B (week 4)**
-- [ ] Run the hold clips through the Studio, compare with the angle-meter readings, and produce one graph of error vs clothing and view
+Judge every idea by re-running Experiments A and B and the OpenCap check, and comparing the error before and after.
 
-**1E. Trust badges (week 4)**
-- [ ] Turn Experiments A and B into a first trust table (e.g. "fast + blur" or "loose pants + 45°" → caution)
-- [ ] Show the badges in the Studio and on the live page
-
-**1F. Exhibit (final week)**
-- [ ] Set up the exhibit as in §4.5
-- [ ] Make sure the write-up and poster claim only what the Studio shows
-- [ ] Practise a 2-minute explanation
-
-**If the regional date is early:** drop the 45° view from Experiment B. Never cut 1A or 1E.
-
-### Stage 2 — Make it more accurate (≈ Nov – Feb)
-
-Judge every idea the same way: re-run Experiments A and B and compare the error before and after.
-
-- [ ] **Body calibration:** measure body shape once in fitted clothes (the A-pose), then reuse it in any clothing. This targets the clothing error directly.
-- [ ] **Physics rules:** planted feet, fixed bone lengths, gravity from the phone
-- [ ] **Error predictor:** a small model that predicts each angle's error from blur, view, confidence, speed and model disagreement. It powers better badges.
-- [ ] **Targeted retraining:** fine-tune part of HMR2 on blurred or clothed renders. On an 8 GB GPU, freeze most of the model or use free cloud GPUs. BEDLAM (clothed synthetic humans with ground truth) is an option; check its access and licence.
-- [ ] **Real-footage check:** the OpenCap dataset (phone video recorded alongside lab motion capture). Does the trust table hold on real people?
-- [ ] More exercise classes from §3.3 (lunge, push-up), if time
+- [ ] **Mode 3:** checkerboard calibration plus triangulation (Pose2Sim or aniposelib)
+- [ ] **Accuracy vs effort:** compare 1 phone, 2 labelled phones, 2 calibrated phones (and 3), each with its setup time. This is the headline figure (§3.6).
+- [ ] **Real-footage check on OpenCap:** it has 5 synchronized views plus marker mocap, so modes 1–3 can all be tested on real people
+- [ ] **Body calibration:** measure body shape once in fitted clothes, then reuse it in any clothing
+- [ ] **Physics rules:** planted feet, fixed bone lengths, gravity
+- [ ] **Error predictor:** a small model that learns when readings are wrong. It powers better badges and fusion weights.
+- [ ] **Targeted retraining:** fine-tune part of HMR2 on blurred or clothed renders. On an 8 GB GPU, freeze most of the model or use free cloud GPUs. BEDLAM is an option; check its access and licence.
+- [ ] SAM 3D Body as an alternative per-view engine
+- [ ] Polish the BVH export for animators
+- [ ] More exercise classes from §3.3, if time
 - [ ] Start the ethics paperwork for Stage 3
 
-**Done when:** at least one improvement lowers the measured error in Experiment A or B, shown as a before/after graph.
+**Done when:** the accuracy-vs-effort figure exists, and at least one improvement lowers the measured error.
 
 ### Stage 3 — 2027
 
 - The recording app for other people (§5), only after ethics approval
 - Fit3D exercises → the full trust map
-- Two-phone mode (Pose2Sim or aniposelib, or EasyMocap done properly)
 - Treadmill running
 - JSEC, if eligible (§0)
 
@@ -545,11 +591,12 @@ Judge every idea the same way: re-run Experiments A and B and compare the error 
 
 ## 10. Decisions only you can make
 
-1. **Laptop:** the Studio plan assumes the RTX 5060 is in the laptop you'll demo on, and that it runs Linux. If not, the MediaPipe-only fallback (§4.2) still works.
-2. **`run_easymocap_videos2.py`:** my recommendation is that step 3 becomes the ground-truth generator now, and real multi-view comes later via Pose2Sim or aniposelib, not EasyMocap. This settles the open question from July.
-3. **Stage 3 participants:** adults only (simpler consent), or peers under 18 (guardian forms)?
-4. **Canonical body model:** SMPL (existing code, restrictive licence) or MHR / SAM 3D Body (newer; check its licence)?
-5. **Hours per week.** Stages 1–2 are sized at 12–15.
+1. **Laptop:** the platform plan assumes the RTX 5060 is in the laptop you'll demo on, and that it runs Linux. If not, the MediaPipe-only fallback (§4.5) still works.
+2. **Phones:** how many can you use at once? The plan assumes at least two (the CE 3 and the Nord from July), plus your teammate's, all able to record at 60 fps.
+3. **`run_easymocap_videos2.py`:** my recommendation is that step 3 becomes the ground-truth generator now, and real multi-view is built as fusion (Stage 1) and Pose2Sim or aniposelib triangulation (Stage 2), not EasyMocap. This settles the open question from July.
+4. **Stage 3 participants:** adults only (simpler consent), or peers under 18 (guardian forms)?
+5. **Canonical body model:** SMPL (existing code, restrictive licence) or MHR / SAM 3D Body (newer; check its licence)?
+6. **Hours per week.** Stages 1–2 are sized at 12–15.
 
 *Decided so far: CBSE 2026–27 under Emerging technologies (team of two plus a mentor teacher; the school is expected to pay the fee); IRIS 2026–27 skipped.*
 
