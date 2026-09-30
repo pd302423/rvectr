@@ -1,37 +1,41 @@
 # rvectr — Implementation Roadmap
 
 **Written:** 2026-09-29 · **Status:** plan only — nothing in this document is implemented yet
-**Scope:** (1) the research question — *where does consumer-hardware motion capture stop being trustworthy, per exercise?*; (2) a live demo — record someone, get a 3D model and an analysis; (3) a capture setup simple enough for other people to use.
+**Scope:** (1) the research question — *where does consumer-hardware motion capture stop being trustworthy, per exercise?*; (2) a local Studio — drag in a recorded video, get a 3D model and an analysis; (3) a capture setup simple enough for other people to use.
 **Relationship to other docs:** builds on [`RESEARCH_ROADMAP.md`](RESEARCH_ROADMAP.md) (research question, relocation context, portfolio plan — all still valid). It replaces that document's "no web app, no server" stance, which a capture app for other people makes untenable. Every finding in §1 was checked against source code on 2026-09-29. Where this document contradicts [`critical_analysis.md`](../critical_analysis.md), this one is newer.
 
 > [!NOTE]
-> **IRIS 2026–27 is skipped (decided 2026-09-29).** The fee (about ₹6,000) pays for screening only, with no guaranteed presentation. JSEC is now the only remaining route to ISEF; see §0.
+> **Near-term venue: CBSE Science Exhibition 2026–27 (Emerging technologies).** Stage 1 (§7) is sized for the regional round. IRIS 2026–27 is skipped (decided 2026-09-29), and JSEC is the later route to ISEF. See §0.
 
 ## Summary
 
-1. **No competition deadline for now.** IRIS 2026–27 is skipped. JSEC is the remaining route to ISEF, and whether you're eligible is unconfirmed, so ask JSEC now. See §0.
+1. **Near-term venue: CBSE Science Exhibition 2026–27.** Stage 1 is sized for the regional round (last year it ran from late October to November). IRIS is skipped. JSEC is the later route to ISEF, pending eligibility. See §0.
 2. **Recordings from other people can't measure accuracy.** Accuracy needs a reference. Crowd data can measure *reliability* and *robustness*, which also matter for trust, but they are different claims. See §3.5.
 3. **Average phone-mocap accuracy is already published.** With a biomechanically constrained pipeline it is about 4.5–4.8° MAE. In a 2025 study, off-the-shelf monocular estimators gave 14–26° on knee angles. What remains open, and what you can own, is *under which conditions* a reading can be trusted, and how a user would know at runtime. See §3.1–3.3.
 4. **Measurement defects come first.** Several defects in the current pipeline are larger than the 5° threshold the study tests against. Collecting data before fixing them wastes the data. See §1.2.
 5. **The study and the demo share one code path.** The demo should display the study's error bars live, never an angle the study didn't evaluate. See §2.
+6. **The demo is a local Studio.** Drag a recorded video onto a page on your laptop and get a 3D body, angle graphs and a trust badge for each angle. It doesn't need EasyMocap. See §4.
+7. **Clothing is part of the trust map.** On a multi-camera lab system during walking, clothing barely changed joint angles. Whether that holds for one phone during a deep squat is untested. See §3.7.
 
 ---
 
-## 0. Competition timing after skipping IRIS
+## 0. Competitions: CBSE now, IRIS skipped, JSEC later
+
+**Near-term venue: CBSE Science Exhibition 2026–27.** You'll enter under the Emerging technologies sub-theme, as a team of two with a mentor teacher, and the school registers the project. Last year the regional round ran 29 Oct – 29 Nov and the national round was in January. Stage 1 (§7) is sized to be ready by late October.
 
 **Decision (2026-09-29): IRIS 2026–27 is skipped.** Search results from the official site list the window as closing 3 Oct 2026. The fee is ₹5,000 + tax (about ₹6,000) and pays for screening only, with no guaranteed presentation. Four days from a standing start would have produced a synthetic-only entry. Because IRIS requires enrolment at a school in India, this was the only possible IRIS cycle, so the India → ISEF route is now closed.
 
-Nothing has been pushed since 26 Jul (`main` and this branch were both at `8626ce6` on 29 Sep). If you have unpushed harness work locally, commit it; Phases 1–2 shrink accordingly.
+Nothing has been pushed since 26 Jul (`main` and this branch were both at `8626ce6` on 29 Sep). If you have unpushed harness work locally, commit it; Stage 1 shrinks accordingly.
 
 What the decision changes:
 
 - **JSEC is the remaining ISEF route.** Whether a foreign student enrolled in Japan is eligible is still undocumented (`RESEARCH_ROADMAP.md`). Ask JSEC now rather than after relocating, because the answer decides whether this project has any fair deadline at all.
-- **ISEF judges only research inside a 12-month window.** For ISEF 2027 the window begins no earlier than January 2026 ([rules](https://www.societyforscience.org/isef/international-rules/rules-for-all-projects/)). By the same pattern, ISEF 2028, the cycle JSEC 2027 would feed, likely begins January 2027; confirm this in the 2027–28 rules. Work from 2026 would then be prior research in a continuation project (Form 7), and only a substantive expansion would be judged. The phases already split that way, so nothing needs delaying:
-  - Phases 1–3 (2026) build the tools and the first squat result.
-  - Phases 4–5 (2027: new exercise classes, crowd reliability) are the expansion.
+- **ISEF judges only research inside a 12-month window.** For ISEF 2027 the window begins no earlier than January 2026 ([rules](https://www.societyforscience.org/isef/international-rules/rules-for-all-projects/)). By the same pattern, ISEF 2028, the cycle JSEC 2027 would feed, likely begins January 2027; confirm this in the 2027–28 rules. Work from 2026 would then be prior research in a continuation project (Form 7), and only a substantive expansion would be judged. The stages already split that way, so nothing needs delaying:
+  - Stage 1 and the 2026 part of Stage 2 would be prior research.
+  - The 2027 work (model improvements, new exercises, data from other people) would be the expansion.
 - **The ethics rules still apply.** JSEC follows ISEF's human-participant rules, and consent and privacy law cover recording other people whether or not a fair is involved (§5.3, §6).
 - **The portfolio doesn't depend on IRIS.** None of the ten items in `RESEARCH_ROADMAP.md` Part 2 requires a fair result.
-- **Relocation (mid-2027 per `RESEARCH_ROADMAP.md`) is the last hard date.** It bounds the Phase 4 pilot, which needs participants and approval from your current school in India, not the research itself.
+- **Relocation (mid-2027 per `RESEARCH_ROADMAP.md`) is the last hard date.** It bounds the Stage 3 pilot with other people, which needs participants and approval from your current school in India. It doesn't bound the research itself.
 
 ---
 
@@ -92,7 +96,7 @@ At `extract_kinematics.py:176`, phone pitch or roll goes directly into trunk lea
 - Calibration uses one chessboard image per camera, which is underdetermined, and falls back to invented values (`T2 = [0.5, 0, 0.1]`).
 - `sync_and_recalibrate_videos2.py` claims to produce extrinsics and RANSAC triangulation. In fact it writes hardcoded intrinsics and made-up distortion coefficients, and its audio-sync offset has the wrong sign: in testing, a 0.5 s offset became 1.0 s.
 
-*Fix:* replace the multi-view path wholesale (Phase 5).
+*Fix:* replace the multi-view path wholesale (Stage 3).
 
 **M8 — Variable-frame-rate video is resampled to a constant frame rate.**
 `pipeline/smartphone_sync.py:62` uses `-r 30 -vsync cfr`. This adds up to half a frame (16.7 ms) of timing jitter per camera, which at 300°/s is about 5° of disagreement between views.
@@ -256,8 +260,9 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 - **Joint × plane:** sagittal flexion, frontal (valgus / adduction), transverse (rotation). Expect a steep ordering (McGinley).
 - **Camera:** azimuth 0/30/45/60/90°, elevation (floor, hip or head height), and distance.
 - **Capture settings:** fps, exposure, readout time, resolution, codec bitrate.
-- **Backend:** MediaPipe, HMR2, SAM 3D Body, OpenCap Monocular; multi-view in Phase 5.
-- **Body:** a range of shapes (β) and clothing, in synthetic data only.
+- **Backend:** MediaPipe, HMR2, SAM 3D Body, OpenCap Monocular; multi-view in Stage 3.
+- **Clothing:** fitted (shorts or leggings), track pants, loose pants. Tested on real footage in §3.7.
+- **Body:** you and your teammate give two real bodies; synthetic data adds a wider range of shapes (β).
 
 **Don't run the full factorial.** Sweep one factor at a time around a nominal condition, then run a Latin-hypercube sample to probe interactions.
 
@@ -281,7 +286,7 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 |---|---|---|---|---|
 | **T1** | Synthetic renders: authored θ, textured SMPL, Blender | Exact | Causal effect of each mechanism in §3.2 | No |
 | **T2** | [OpenCap lab dataset](https://simtk.org/projects/opencap): ~10 participants; squat, sit-to-stand, drop jump, walking; 5 synchronized smartphone views plus markers and force plates. [Fit3D](https://fit3d.imar.ro/): ~47 exercises, 13 subjects, 4 RGB cameras plus Vicon, scored on an evaluation server | Marker mocap | Real-world validity; whether T1 predicts real error | No: public data (check the licences) |
-| **T3** | Self-capture, with a phone used as an inclinometer on the thigh or shank, and goniometer holds | Consumer-grade reference | Your own phones in your own rooms | No: you are the only participant, which is exempt |
+| **T3** | You and your teammate: held positions measured with a phone angle-meter, under different clothing and camera views (§3.7) | Consumer-grade reference | Clothing and view effects on real bodies, with your own phones in your own rooms | No: as the student researchers, you two are exempt |
 | **T4** | Other people using the capture app | **None** | Reliability (test–retest ICC, SEM, MDC95), robustness, failure rates, backend disagreement | **Yes: IRB approval before recruiting** |
 
 **Notes on the tiers:**
@@ -297,39 +302,91 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 - **Figure 2:** trust-map heatmap of exercise class × DOF × camera view. Each cell holds the predicted MAE; cells whose upper confidence bound exceeds 5° are hatched.
 - **Figure 3:** error predicted from synthetic data vs error measured on OpenCap footage. This is the sim-to-real check.
 - **Table:** MAE per backend and DOF on OpenCap squat and sit-to-stand trials, with Bland–Altman limits of agreement.
-- **Released artifact:** a JSON trust table, which the viewer and capture app consume (§4.3).
+- **Figure 4:** error vs clothing type, per camera view (§3.7).
+- **Released artifact:** a JSON trust table, which the Studio and capture app consume (§4.1).
+
+### 3.7 Experiment B: clothing and camera view
+
+On a multi-camera lab system (Theia3D) during walking, switching between sport and street clothing changed joint angles by only 2.6° on average ([Keller et al. 2022](https://www.researchgate.net/publication/361538327_Clothing_condition_does_not_affect_meaningful_clinical_interpretation_in_markerless_motion_capture)). That setting makes clothing least likely to matter: many cameras see through gaps in the fabric, and walking barely bends the hips and knees. Whether the result holds for **one phone during a deep squat**, where loose fabric bunches at the hip and knee, hasn't been tested. Either answer is a result.
+
+- **Subjects:** you and your teammate. As the student researchers you can be your own subjects, and two bodies beat one. Take turns: one holds the position while the other measures and records.
+- **Reference:** a phone angle-meter app (e.g. phyphox, which is free) measures the knee angle during each hold. Holds take speed out of the problem.
+- **Holds:** standing, quarter squat, half squat and a wall sit at about 90°, 5 s each. A wall sit is easy to repeat at the same depth.
+- **Conditions:** 3 clothing types (shorts, track pants, loose pants) × 2 camera views (side, 45°). Record following §4.4.
+- **Result:** error vs clothing type for each view. Headline the change in error from shorts to loose pants; that cancels the constant offset between a surface angle-meter and a skeleton angle (§3.4 rule 7).
+- **Limit:** holds capture what fabric hides when still. Fabric swinging during fast reps is a later, harder test.
 
 ---
 
-## 4. Live demo: record someone → 3D → analysis
+## 4. The Studio: drag-and-drop video → 3D model → analysis
 
-### 4.1 Two tiers
+The demo is a local app on your laptop. You drag in a video you recorded and get back a 3D body you can rotate and scrub, joint-angle graphs, a rep summary, and a trust badge on every angle. Nothing needs the internet.
 
-| | Tier A — instant | Tier B — record → 3D |
+### 4.1 How the pieces connect
+
+| Piece | What it is | Role in the Studio |
 |---|---|---|
-| **What** | Live skeleton and angles in the browser | 10–20 s clip → mesh + angle curves + trust badges |
-| **Backend** | MediaPipe `worldLandmarks` | HMR2 or SAM 3D Body on the local GPU |
-| **Latency** | Real-time | Target ≤ 90 s for a 15 s clip. Measure per-stage timing on the RTX 5060. Person detection runs on full frames and is often the bottleneck; the code supports RegNetY and the much slower ViTDet-H |
-| **Trust** | Badges from the MediaPipe rows of the trust table | Badges + a cross-backend disagreement flag |
+| **SMPL** | A standard 3D template of the human body (6,890 surface points, 24 joints), controlled by pose numbers (θ) and body-shape numbers (β) | The "3D model" everything is expressed in |
+| **HMR2 (4D-Humans)** | An AI model that looks at one frame and outputs SMPL θ and β | The main engine for single videos |
+| **MediaPipe** | A fast AI model that outputs 33 body points | The instant live view, and a second opinion for trust checks |
+| **SAM 3D Body** | A newer single-image model (it uses its own MHR body model, not SMPL) | An optional third opinion, later |
+| **EasyMocap** | Software that fits SMPL using **two or more cameras filming at the same time** | **Not needed for drag-and-drop.** Only for a future two-phone mode, where Pose2Sim or aniposelib may be simpler (M7) |
 
-### 4.2 Exhibit setup that works offline
+What happens to one dropped video:
+1. **Read** the file: rotation, per-frame timestamps, resolution.
+2. **Find the person** in every frame (person detector).
+3. **Estimate the body:** HMR2 gives SMPL θ and β per frame; MediaPipe gives 33 points per frame.
+4. **Build the mesh:** SMPL turns θ and β into the 3D body and its 24 joints.
+5. **Clean up** (M2–M5): one body shape for the whole clip; missed frames marked, never copied; a tested smoothing filter; "down" taken from gravity, not the camera.
+6. **Measure:** joint angles every frame, reps detected, a per-rep summary (depth, tempo, left/right difference).
+7. **Judge trust:** check speed, camera angle, the models' own confidence and HMR2-vs-MediaPipe disagreement against the trust table → *trusted*, *caution* or *not trusted* for each angle.
+8. **Save** to `runs/<id>/` with a manifest (M12): `result.json` (angles, reps, trust), the 3D animation and an overlay video.
+9. **Show:** the video and the 3D body on one scrubber, with angle graphs coloured by trust.
 
-- Use a GPU machine, a phone on a tripod and your own Wi-Fi hotspot, so nothing depends on venue internet.
-- **Camera-access gotcha:** phone browsers only allow `getUserMedia` on HTTPS or localhost, so a phone opening `http://192.168.x.x` gets no camera. Either serve HTTPS with a locally trusted certificate (mkcert), or record with the phone's **native camera app** (better quality, 60 fps) and upload the file through a plain file input, which works over HTTP. Use the native-app route for Tier B.
-- Keep pre-processed fallback clips for when the GPU run fails, and dry-run the whole setup three times.
-- **Demo mode keeps nothing.** Process visitor clips in memory and then delete them. Retaining them would turn them into human-participant data collected without approval.
-- **Until IRB approval, every pre-recorded demo clip is of you.**
+### 4.2 Architecture (all local)
 
-### 4.3 What the screen shows
+- **Page:** a `/studio` page in the existing Next.js app. It reuses `DualViewport`, `ThreeMeshCanvas`, `TimelineScrubber` and `KinematicWaveformChart`, wired to a real `result.json` instead of sample data.
+- **Server:** a small FastAPI server in the HMR2 Python environment. It accepts the upload, runs steps 1–8 as a background job and reports progress.
+- **One command** starts both (e.g. `./studio.sh`); then open `http://localhost:3000/studio`. Localhost counts as a secure origin, so the webcam and file drop both work without HTTPS.
+- **Animation format:** one binary file of per-frame vertex positions, loaded once and played by swapping positions, instead of hundreds of OBJ files.
+- **Speed target:** under 2 minutes for a 15 s clip on the laptop GPU. Measure it; don't assume it.
+- **No NVIDIA GPU available:** fall back to MediaPipe only, which gives a skeleton but no mesh.
 
-- **Synchronised views:** the video and the 3D mesh, both on one shared scrubber.
-- **Angle curves:** a shaded band showing the predicted error, coloured *trusted*, *caution* or *untrusted*.
-- **Per-rep summary:** depth, tempo and left/right difference, each with its ± error.
-- **Plain-language reasons for low trust**, for example "knee valgus isn't measurable from a side view; record from the front". This is the research answering "till what point can it be trusted" live, in front of a judge.
-- **Export:** CSV and OpenSim `.mot`, so biomechanists can use the output.
-- **No hardcoded frame counts.** Everything comes from the JSON.
+### 4.3 Instant view
 
-### 4.4 Mesh licensing
+The live page (`/test/squat`) stays as the instant tier: webcam in, skeleton and angles out in real time, once M1 is fixed. It keeps judges engaged while the Studio processes a clip.
+
+### 4.4 Recording protocol
+
+Use the same protocol for demo clips, experiments and the exhibition:
+
+- **Phone placement:** on a tripod at hip height, 3–4 m away, with the whole body in frame and space above the head and below the feet.
+- **View:**
+  - side-on for squat depth
+  - front-on for knees caving in
+  - 45° when testing camera angle
+- **Settings:**
+  - 1080p at 60 fps
+  - focus and exposure locked (tap and hold)
+  - stabilisation off
+  - bright light facing the person
+  - plain background, nobody else in frame
+- **Take structure:** stand still in an A-pose for 3 s → 5 reps → stand still for 2 s.
+- **File labels:** name every file by person, clothing, view, speed and lighting, e.g. `p1_shorts_side_normal_bright.mp4`. These labels become the trust-map factors.
+- **Transfer:** USB cable or Quick Share to the laptop, then drag the file into the Studio.
+
+### 4.5 Exhibit setup
+
+- **Hardware:** the laptop (the GPU machine) and a phone on a tripod. No venue internet needed.
+- **Flow:**
+  1. A judge squats in front of the phone.
+  2. You drag the clip into the Studio.
+  3. While it processes, the live page shows their skeleton.
+  4. The Studio then shows their 3D body with trust badges, next to your experiment graphs.
+- **Demo mode keeps nothing.** Delete visitor clips after the session.
+- **Backup:** keep pre-processed fallback clips in case anything fails, and dry-run the whole setup three times.
+
+### 4.6 Mesh licensing
 
 The SMPL model data (template, skinning weights) is licensed and may not be redistributed. A public web app that ships a skinned SMPL rig is therefore a licence risk; a local exhibit is not. For the public web, send per-frame vertex positions (compressed morph targets) or a skeleton-only view. Check the SMPL licence before publishing anything.
 
@@ -383,66 +440,86 @@ Treat every threshold above as a starting point, and tune it on your own pilot.
   - Under-18s need guardian permission plus their own assent.
   - Risk Assessment Form 3 may apply.
 - **The IRB is constituted at your school.** ISEF specifies its minimum composition: an educator, a school administrator, and a medical or mental-health professional. Confirm this against the current rules.
-- **Start the paperwork during Phase 2**, because approvals take weeks.
+- **Start the paperwork during Stage 2**, because approvals take weeks.
 - **Relocation:** in Japan in 2027, obtain local approval again before collecting anything; JSEC rules differ.
 
 ---
 
-## 7. Phased roadmap
+## 7. Roadmap
 
-This assumes about 12–15 focused hours a week alongside school; rescale if that's wrong. Each phase ends at a **gate**. The plumbing in Phase 3 (worker, upload, viewer wiring) can start during Phase 2 if you need a break from analysis; only the trust badges wait for Phase 2's trust table.
+This assumes about 12–15 focused hours a week. Stage 1 is sized for the CBSE regional round, which last year ran from late October to November.
 
-### Phase 1 — Make the numbers trustworthy (≈ 30 Sep – 25 Oct)
-- [ ] Email JSEC: is a foreign student enrolled at a Japanese school eligible? (§0)
-- [ ] M1: live angles from `worldLandmarks`, plus shared test vectors
-- [ ] M2 and M3: native frame rate, per-frame timestamps, `detected` mask, no imputation
-- [ ] M4: fixed β per clip; support the A-pose static trial
-- [ ] M5 and M6: angle module (§2.3) with a gravity input; fix `torso_lean` and the tilt wrap-around
-- [ ] M11: phone-realistic intrinsics
-- [ ] M12: per-run output directories with manifests; regenerate every demo asset through them
-- [ ] `PoseSequence` and `JointAngleSeries` schemas, with MediaPipe and HMR2 adapters
-- [ ] Package and CLI; move the loose scripts to `legacy/`
+### Stage 1 — Exhibition-ready (≈ 30 Sep – end Oct)
+
+**1A. Build the Studio and connect every piece (weeks 1–2)**
+- [ ] FastAPI server + `/studio` page: drag-and-drop → job → progress → results (§4.2)
+- [ ] Pipeline steps 1–8 (§4.1), with the measurement fixes built in:
+  - native fps and timestamps (M2)
+  - missed frames marked (M3)
+  - one body shape per clip (M4)
+  - gravity plus one angle module (M5, M6)
+  - a phone-realistic focal length (M11)
+  - per-run folders with manifests (M12)
+- [ ] Viewer wired to a real `result.json`, with no hardcoded frame counts
+- [ ] M1: live-page angles from `worldLandmarks`
+- [ ] M10: remove the unbacked claims from the site and the write-ups
+
+**Done when:** you drag in a squat video and get a 3D body, angle graphs and a rep summary in under 2 minutes, and a standing knee reads about 170–180°.
+
+**1B. Record (week 2, one weekend)**
+- [ ] Demo clips of you and your teammate, following §4.4
+- [ ] Experiment B sessions (§3.7)
+
+**1C. Experiment A: speed and blur (weeks 2–3)**
+- [ ] Turn the scripted-squat generator into ground truth: save θ, β and the true joint angles for every frame
+- [ ] Render in Blender, slow and fast, each with and without blur (blur = 8 sub-frames averaged)
+- [ ] Run the renders through HMR2 and MediaPipe; produce one graph of error vs speed and blur
+- [ ] Recommended: finish the OSF draft (§3.4) and register it before this first number
+
+**1D. Measure Experiment B (week 4)**
+- [ ] Run the hold clips through the Studio, compare with the angle-meter readings, and produce one graph of error vs clothing and view
+
+**1E. Trust badges (week 4)**
+- [ ] Turn Experiments A and B into a first trust table (e.g. "fast + blur" or "loose pants + 45°" → caution)
+- [ ] Show the badges in the Studio and on the live page
+
+**1F. Exhibit (final week)**
+- [ ] Set up the exhibit as in §4.5
+- [ ] Make sure the write-up and poster claim only what the Studio shows
+- [ ] Practise a 2-minute explanation
+
+**If the regional date is early:** drop the 45° view from Experiment B. Never cut 1A or 1E.
+
+### Stage 2 — Make it more accurate (≈ Nov – Feb)
+
+Judge every idea the same way: re-run Experiments A and B and compare the error before and after.
+
+- [ ] **Body calibration:** measure body shape once in fitted clothes (the A-pose), then reuse it in any clothing. This targets the clothing error directly.
+- [ ] **Physics rules:** planted feet, fixed bone lengths, gravity from the phone
+- [ ] **Error predictor:** a small model that predicts each angle's error from blur, view, confidence, speed and model disagreement. It powers better badges.
+- [ ] **Targeted retraining:** fine-tune part of HMR2 on blurred or clothed renders. On an 8 GB GPU, freeze most of the model or use free cloud GPUs. BEDLAM (clothed synthetic humans with ground truth) is an option; check its access and licence.
+- [ ] **Real-footage check:** the OpenCap dataset (phone video recorded alongside lab motion capture). Does the trust table hold on real people?
+- [ ] More exercise classes from §3.3 (lunge, push-up), if time
+- [ ] Start the ethics paperwork for Stage 3
+
+**Done when:** at least one improvement lowers the measured error in Experiment A or B, shown as a before/after graph.
+
+### Stage 3 — 2027
+
+- The recording app for other people (§5), only after ethics approval
+- Fit3D exercises → the full trust map
+- Two-phone mode (Pose2Sim or aniposelib, or EasyMocap done properly)
+- Treadmill running
+- JSEC, if eligible (§0)
+
+### Backlog (whenever convenient)
+
+- [ ] Email JSEC about eligibility (§0)
+- [ ] Package + CLI; move the loose scripts to `legacy/`
 - [ ] Delete or relabel `running_kinematics.json` and its generator; remove the `batch_process` mock; archive the LLM and coaching files
-- [ ] M10: remove the UI claims and extend the CI claims check to `src/`
-- [ ] Tests that need SMPL skip when the model file is absent; add a golden-file test on a synthetic skeleton; activate CI (a token with `workflow` scope, or the web UI)
+- [ ] Tests that need SMPL skip when the file is absent; add a golden-file test; activate CI
 - [ ] Point `.gitmodules` at your forks
-- [ ] Update `critical_analysis.md` (running data, finding 18, the M-items)
-
-**Gate:** ground-truth joints → kinematics module → angles round-trips to within 0.1°; processing the same video twice gives byte-identical JSON; CI is green.
-
-### Phase 2 — Ground truth and the first trust map (≈ 26 Oct – 22 Nov)
-- [ ] Harness: start from the posing code in `synthesize_scripted_squat_smpl()`, saving θ, β and ground-truth joints for every frame; author squat and sit-to-stand first, with several reps per clip (the rep is the bootstrap unit); time-warp 0.5–4×; textured SMPL; Blender camera rig covering the views
-- [ ] Degradation stack: blur from 8× subframes (average 4 of every 8 for a 180° shutter; take every 8th for blur-off, so one render pass gives both); rolling shutter via per-row time offsets; frame rate; codec
-- [ ] OSF: add §3.4 to the draft and **register before the first error number**
-- [ ] Adapters for SAM 3D Body and OpenCap Monocular (check both licences)
-- [ ] OpenCap lab-dataset loader (video, IK `.mot`, sync) → evaluation in OpenSim coordinates
-- [ ] Evaluation: MAE, bias and limits of agreement per condition; bootstrap by rep, sequence or subject; every figure regenerated from CSV by a single script
-- [ ] Start the IRB paperwork
-
-**Gate:** one command produces Figure 1 for the squat with two or more backends; corrupting the input increases the error; a synthetic-vs-OpenCap comparison exists. If synthetic and real disagree, that is a finding, not a failure.
-
-### Phase 3 — Live demo (≈ 23 Nov – 20 Dec)
-- [ ] FastAPI worker and job queue on the GPU machine: upload → process → poll
-- [ ] Viewer wired to real JSON: trust bands, per-rep summaries, CSV and `.mot` export, no hardcoded counts
-- [ ] Trust table v1 → badges, plus the cross-backend disagreement flag
-- [ ] Offline exhibit kit: hotspot, mkcert, fallback clips, a 5-minute setup checklist; three dry runs
-- [ ] Measure end-to-end latency and publish the number
-
-**Gate:** someone who has never seen the system records a clip and gets a 3D model, angles and badges in ≤ 2 minutes, without you touching the keyboard.
-
-### Phase 4 — Capture app and pilot (≈ Dec – Feb; recruiting only after IRB approval)
-- [ ] Mobile web app per §5: setup checks, consent and assent flows, resumable upload, storage and retention
-- [ ] Pilot on yourself across at least 3 phones and 3 rooms (exempt) → tune the setup-check thresholds
-- [ ] After approval: 5–10 adults, 2 sessions each → test–retest ICC, SEM and MDC95
-- [ ] Calibration check of the trust indicator: do the predicted 90% intervals cover about 90% of real errors on held-out OpenCap subjects?
-
-**Gate:** at least 80% of first-time users complete a valid recording without help.
-
-### Phase 5 — 2027 onward
-- Fit3D exercises → the full exercise-class trust map, including prone and supine classes
-- Multi-view done properly: replace EasyMocap with Pose2Sim or aniposelib (ChArUco calibration from many images, DLT triangulation, correct keypoint mapping). As a side effect this removes EasyMocap's non-commercial terms from your own code; SMPL's licence still covers the model files.
-- Treadmill running on the same harness and pipeline
-- Scale up crowd collection in Japan after local approval; JSEC
+- [ ] Update `critical_analysis.md`
 
 ---
 
@@ -459,7 +536,7 @@ This assumes about 12–15 focused hours a week alongside school; rescale if tha
 
 ## 9. How this fails
 
-- **Collecting other people's data before the fixes in Phase 1.** Every clip then has to be reprocessed, which is why raw video retention matters.
+- **Collecting other people's data before the Stage 1A fixes.** Every clip then has to be reprocessed, which is why raw video retention matters.
 - **Collecting from anyone but yourself before IRB approval.** That data is unusable for ISEF-affiliated fairs.
 - **Presenting crowd data as accuracy evidence.** It measures reliability.
 - **Letting the demo show an angle the study never evaluated.**
@@ -468,12 +545,13 @@ This assumes about 12–15 focused hours a week alongside school; rescale if tha
 
 ## 10. Decisions only you can make
 
-1. **Next venue:** JSEC (depends on the eligibility answer), a school exhibition, or no fair. This decides whether any phase has a deadline. *(IRIS 2026–27: skipped, decided 2026-09-29.)*
+1. **Laptop:** the Studio plan assumes the RTX 5060 is in the laptop you'll demo on, and that it runs Linux. If not, the MediaPipe-only fallback (§4.2) still works.
 2. **`run_easymocap_videos2.py`:** my recommendation is that step 3 becomes the ground-truth generator now, and real multi-view comes later via Pose2Sim or aniposelib, not EasyMocap. This settles the open question from July.
-3. **Pilot participants:** adults only (simpler consent), or peers under 18 (guardian forms)?
+3. **Stage 3 participants:** adults only (simpler consent), or peers under 18 (guardian forms)?
 4. **Canonical body model:** SMPL (existing code, restrictive licence) or MHR / SAM 3D Body (newer; check its licence)?
-5. **Hardware and budget:** is the exhibit machine the RTX 5060 desktop or a laptop? Do you need paid storage?
-6. **Hours per week.** Phases 1–4 are sized at 12–15.
+5. **Hours per week.** Stages 1–2 are sized at 12–15.
+
+*Decided so far: CBSE 2026–27 under Emerging technologies (team of two plus a mentor teacher; the school is expected to pay the fee); IRIS 2026–27 skipped.*
 
 ## Sources
 
@@ -486,6 +564,7 @@ This assumes about 12–15 focused hours a week alongside school; rescale if tha
 - Turner et al., [Markerless pose estimation for resistance training technique assessment](https://arxiv.org/abs/2608.24384), 2026
 - [SAM 3D Body](https://arxiv.org/abs/2602.15989), 2026 · [weights](https://huggingface.co/facebook/sam-3d-body-dinov3)
 - McGinley et al., [The reliability of three-dimensional kinematic gait measurements](https://doi.org/10.1016/j.gaitpost.2008.09.003), Gait Posture 2009
+- Keller et al., [Clothing condition does not affect meaningful clinical interpretation in markerless motion capture](https://www.researchgate.net/publication/361538327_Clothing_condition_does_not_affect_meaningful_clinical_interpretation_in_markerless_motion_capture), J Biomech 2022 · [Theia3D reliability in tight vs loose clothing](https://peerj.com/articles/18613/), PeerJ
 - Milanese et al., [Knee angle: smartphone app vs universal goniometer](https://www.sciencedirect.com/science/article/abs/pii/S1356689X14001118), Man Ther 2014
 - [ISEF Human Participants rules](https://www.societyforscience.org/isef/international-rules/human-participants/) · [ISEF Rules for All Projects](https://www.societyforscience.org/isef/international-rules/rules-for-all-projects/) (research window, continuation projects)
 - [Video-based markerless mocap for clinical and rehabilitation biomechanics: scoping review](https://arxiv.org/pdf/2609.18667), 2026
