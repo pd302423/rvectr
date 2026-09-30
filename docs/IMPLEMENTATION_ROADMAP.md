@@ -377,7 +377,7 @@ Everything the Studio hides, stage by stage, for any session:
 - **Trust:** a badge timeline with the reason for each badge.
 - **Performance:** time per stage and GPU memory.
 - **Provenance:** the run manifest (pipeline version, parameters, input hashes).
-- **Export:** JSON, CSV, OpenSim `.mot`, and BVH, the skeleton-animation format that film and game studios import into Blender, Unity and Unreal.
+- **Export:** JSON, CSV, OpenSim `.mot`, and BVH, the standard skeleton-animation format for motion capture. Blender opens BVH directly; for Unity or Unreal, convert it to FBX (e.g. through Blender).
 - **Dataset page:** every session in one table, filterable by person, clothing, view, speed and mode, next to the experiment graphs. This is where the trust map lives.
 
 ### 4.5 Under the hood
