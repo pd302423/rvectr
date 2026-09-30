@@ -313,8 +313,8 @@ A per-frame model can only perceive speed through the image, so "velocity" decom
 On a multi-camera lab system (Theia3D) during walking, switching between sport and street clothing changed joint angles by only 2.6° on average ([Keller et al. 2022](https://www.researchgate.net/publication/361538327_Clothing_condition_does_not_affect_meaningful_clinical_interpretation_in_markerless_motion_capture)). That setting makes clothing least likely to matter: many cameras see through gaps in the fabric, and walking barely bends the hips and knees. Whether the result holds for **one phone during a deep squat**, where loose fabric bunches at the hip and knee, hasn't been tested. Either answer is a result.
 
 - **Subjects:** you and your teammate. As the student researchers you can be your own subjects, and two bodies beat one. Take turns: one holds the position while the other measures and records.
-- **Reference:** a phone angle-meter app (e.g. phyphox, which is free) measures the knee angle during each hold. Holds take speed out of the problem.
-- **Holds:** standing, quarter squat, half squat and a wall sit at about 90°, 5 s each. A wall sit is easy to repeat at the same depth.
+- **Reference:** a phone angle-meter app (e.g. phyphox, which is free) measures the knee angle during each hold. Holds take speed out of the problem. The measurer takes the reading, then steps out of frame before the 5 s recording, so they never block the camera.
+- **Holds:** standing, then wall sits at three depths (shallow, medium, about 90°), 5 s each. Tape the foot positions for each depth on the floor, so every clothing condition repeats the same angles. Wall sits hold far steadier than free half-squats.
 - **Conditions:** 3 clothing types (shorts, track pants, loose pants) × 2 camera views (side, 45°), with both phones recording at once and synced by a clap. Record following §4.7. The same clips also test fusion: side alone, 45° alone, and fused.
 - **Result:** error vs clothing type for each view. Headline the change in error from shorts to loose pants; that cancels the constant offset between a surface angle-meter and a skeleton angle (§3.4 rule 7).
 - **Limit:** holds capture what fabric hides when still. Fabric swinging during fast reps is a later, harder test.
@@ -413,6 +413,7 @@ Use the same protocol for demo clips, experiments and the exhibition:
   - plain background, nobody else in frame
 - **Multiple phones:** start every recording, then give one sharp clap that all phones can hear.
 - **Mode 3 only:** hold the printed checkerboard where every phone can see it for 5 s at the start.
+- **Equipment:** 2–3 phones, 2 tripods (stands improvised from books or boxes are fine), masking tape, a clear wall, 3 clothing types, and phyphox on a spare phone.
 - **Take structure:** stand still in an A-pose for 3 s → 5 reps → stand still for 2 s.
 - **File labels:** name each file by person, clothing, speed and view, e.g. `p1_shorts_normal_side.mp4` and `p1_shorts_normal_45.mp4`. These labels become the trust-map factors.
 
@@ -494,27 +495,61 @@ This assumes about 12–15 focused hours a week. Stage 1 is sized for the CBSE r
 
 **Build the pipeline and the Lab first, and polish the Studio last.** The Lab is how you find bugs and how the science gets done; a beautiful Studio on top of wrong numbers is exactly the failure the July roadmap warned about.
 
-**Week 1 — One-video pipeline + Lab v1**
-- [ ] Build the pipeline as stages that save their outputs (§4.5): ingest → detect → MediaPipe → HMR2 → clean-up → angles → reps
-- [ ] Build in the measurement fixes:
-  - M2: native fps and timestamps
-  - M3: missed frames marked
-  - M4: one body shape per clip
-  - M5/M6: gravity plus one angle module
-  - M11: a phone-realistic focal length
-  - M12: run folders with manifests
-- [ ] Lab v1: a session list, plus every stage's output for one video
+**Weeks 1–2 at a glance.** "Claude" means code written in a session and pushed to your branch; start one by saying "start Week 1". "You" means you on your laptop, and "Teammate" your partner. These weeks assume about 2 hours on school days and 4 on weekend days.
+
+**Week 1 (Thu 1 – Wed 7 Oct) — One video → 3D → Lab**
+
+*Claude builds:*
+- [ ] The `backend/rvectr/` package: a session → view → run → stage data model (SQLite). Each stage saves to `runs/<id>/<stage>/`, with a manifest (M12).
+- [ ] Stages for one video:
+  - ingest: rotation, per-frame timestamps, fps
+  - MediaPipe: world landmarks, confidence, a detected mask
+  - HMR2: every frame, with SMPL parameters saved; missed frames marked, never copied
+  - clean-up: one body shape per clip, gravity from the floor, a tested filter
+  - angles: one module with shared test vectors
+  - reps
+
+  Together these cover M2–M6 and M11.
+- [ ] The FastAPI server, the `./studio.sh` launcher, and a README with the exact commands
+- [ ] Lab v1: a session list, plus each stage's output (video overlays, angle curves, missed frames, timings, manifest)
 - [ ] M1: live-page angles from `worldLandmarks`
 
-**Done when:** a squat video goes through, the Lab shows every stage, and a straight standing knee reads about 170–180°.
+*You:*
+- [ ] Thu 1: confirm the laptop (NVIDIA GPU, Linux, ≥ 30 GB free), which phones can record at 60 fps, and tripods (stands improvised from books or boxes at hip height are fine)
+- [ ] Thu 1: check the old HMR2 setup still runs by processing one July video with `process_video_3d.py`, and note where `SMPL_NEUTRAL.pkl` is
+- [ ] Sat 3 – Sun 4: with your teammate, record 5 single-phone test clips following §4.7 (side and front, slow and fast, both of you)
+- [ ] Mon 5 – Wed 7: pull the branch, run the clips through the Lab, and send back screenshots, error messages and timings
+- [ ] Mon 5 – Wed 7: check the live page. A straight standing knee should read 170–180°, in both portrait and landscape.
 
-**Week 2 — Multiple videos (mode 2)**
-- [ ] A position label for each video; clap sync (fix the sign bug first); each view processed separately
-- [ ] Angle fusion: combine the per-view angles with trust weights. Use equal weights until Week 3's trust table exists.
-- [ ] The Lab shows the sync, per-view vs fused curves, and where the views disagree
-- [ ] Record Experiment B with two phones at once, side and 45° (§3.7). One session tests clothing, view and fusion together.
+*Teammate:*
+- [ ] Fri 2 (holiday): draft the new write-up and title for the school registration, claiming only what the platform will show (M10). Claude can draft a first version.
+- [ ] Gather the Experiment B clothing (shorts, track pants, loose pants) and masking tape
 
-**Done when:** two synced videos of one squat produce one fused result, and the Lab shows how each view contributed.
+**Done when:** a squat video goes through, the Lab shows every stage, a straight standing knee reads about 170–180°, and the processing time for a 15 s clip is written down.
+
+**Week 2 (Thu 8 – Wed 14 Oct) — Multiple videos, and Experiment B recorded**
+
+*Claude builds:*
+- [ ] Multi-view sessions, with a position label for each video
+- [ ] Clap sync: audio cross-correlation with the sign bug fixed and tested on synthetic audio; views aligned on timestamps
+- [ ] Angle fusion: equal weights until Week 3's trust table exists
+- [ ] Lab panels: sync waveforms and offsets, per-view vs fused curves, and where the views disagree
+- [ ] Holds analysis: find the still periods in a clip, average the angles over each, a small form to enter the angle-meter readings, and a comparison table
+
+*You and your teammate:*
+- [ ] Thu 8: a two-phone sync test (side and 45°, one clap, 5 squats). Check by eye that the Lab's offset matches the clap.
+- [ ] Fri 9: set up Experiment B (§3.7):
+  - install phyphox and practise measuring a wall-sit knee angle
+  - tape the two tripod spots and the three wall-sit foot positions on the floor
+  - write the shot list and file names
+- [ ] Sat 10 – Sun 11: record Experiment B (about 2 hours):
+  - 2 people × 3 clothing types, with both phones recording at once and a clap per take
+  - each take is standing plus wall sits at the three taped depths
+  - for each hold: take the angle-meter reading, step out of frame, then record 5 s
+  - write every reading down
+- [ ] Mon 12 – Wed 14: load the takes into the Lab, enter the readings, and review the first table with Claude
+
+**Done when:** two synced videos produce one fused result, the Lab shows how each view contributed, and there's a first rough table of error by clothing type, by view, and fused vs single.
 
 **Week 3 — Measure**
 - [ ] Experiment A: ground-truth squat renders (slow/fast × blur on/off), from several virtual camera positions, so fusion is also tested against exact truth
