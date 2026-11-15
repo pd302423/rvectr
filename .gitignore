@@ -80,6 +80,11 @@ backend/EasyMocap/data/
 *.avi
 *.webm
 *.m4v
+*.wav
+*.mp3
+*.aac
+*.m4a
+*.flac
 videos/
 videos2/
 
@@ -112,3 +117,29 @@ backend/haarcascade_frontalface_default.xml
 # GitHub token lacks `workflow` scope and rejects pushes touching this path.
 # Once the token has that scope: git rm --cached nothing, just `git add -f`.
 .github/workflows/ci.yml
+
+# Linux-first runtime and private assets (2026-10-27)
+**/.venv*/
+**/venv/
+**/__pycache__/
+**/.pytest_cache/
+**/*.egg-info/
+outputs/*
+!outputs/README.md
+models/**
+!models/README.md
+calibration/
+.local-state/
+.publish/
+exports/
+*.safetensors
+*.fbx
+*.ply
+*.stl
+*.7z
+*.zip
+*.tar
+*.tar.gz
+*.tar.zst
+# A portable, placeholder-only environment example is intentionally public.
+!.env.example

@@ -16,6 +16,8 @@ MESH_DIR = os.path.join(backend_dir, "squat_demo_out")
 
 @pytest.fixture(scope="session")
 def j_regressor():
+    if not os.path.exists(SMPL_MODEL_PATH):
+        pytest.skip(f"SMPL model not found at {SMPL_MODEL_PATH}")
     return load_j_regressor(SMPL_MODEL_PATH)
 
 @pytest.fixture(scope="session")

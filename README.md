@@ -1,3 +1,12 @@
+> **Current runtime: Linux first (WSL 2 or native Linux), 27 October 2026.**
+> Start with [docs/LINUX_FIRST.md](docs/LINUX_FIRST.md). Python dependencies are
+> declared in `pyproject.toml` and `uv.lock`; use `bash tools/bootstrap-linux.sh --pose --web`.
+> `uv run --no-sync rvectr doctor --require-cuda` verifies the environment.
+> The CLI provides versioned diagnostics and a two-camera squat-depth pipeline
+> ([docs/TWO_CAMERA_PIPELINE.md](docs/TWO_CAMERA_PIPELINE.md)), checked on synthetic data only so far. Historical
+> capability descriptions below are not evidence of current measurement accuracy.
+> Official SMPL data, raw recordings and run outputs are local, separately supplied
+> assets. Review Git history before publication; `.gitignore` cannot erase old assets.
 # rvectr 🧬
 
 > **Markerless 3D Human Mesh Recovery & Real-Time Kinematic Telemetry Engine**

@@ -57,3 +57,33 @@ graph TD
 - **Role**: End-to-End Quality & Integration Overseer
 - **Responsibilities**: Verifies full-stack contract alignment (Frontend props <-> Backend endpoints), verifies build integrity, checks user goal satisfaction, and resolves conflicts between subagent branches.
 
+
+# Current runtime and working-copy guidance (27 October 2026)
+
+Linux is primary: WSL 2 now and native Linux later. Continue work in the Linux
+checkout at ~/projects/rvectr; the original Windows tree is preserved as a
+reference and native Windows is secondary. Read docs/LINUX_FIRST.md first.
+
+Use the declared Python 3.11 project and uv.lock. The shared bootstrap is
+`bash tools/bootstrap-linux.sh --pose --web`; normal runs use `uv run --no-sync`.
+Do not activate or copy Windows virtual environments inside Linux.
+
+Private data and model locations are supplied through .env.local. Capture JSON
+contains relative recording/calibration names, not machine-specific drive paths.
+Keep official model parameters, raw recordings, calibration records and generated
+body assets outside published source. Inspect original Git history as well as
+current tracked files before publication; source-only exports omit old history.
+
+The new pipeline currently provides versioned diagnostics. Model fitting and
+reconstruction modules still need end-to-end integration and independent
+validation. An environment check or a plausible SMPL mesh is not an accuracy
+result. Preserve missing observations, original time and failed/blocked run IDs.
+## Luna delegation policy (user preference)
+
+- The parent agent owns architecture, task decomposition, acceptance criteria, integration, and final review.
+- Delegate bounded implementation, research, or testing tasks to model `gpt-6-luna` explicitly. Give each worker a fresh context and concise, self-contained brief; request a short evidence summary.
+- Normally use one worker, with at most two independent workers concurrently.
+- Use medium reasoning by default and low for simple scans; increase reasoning only when justified by the task.
+- Do not use Astra or any other non-Luna worker unless the user explicitly authorizes it.
+- Do not spawn agents just to fill roles. Avoid duplicate investigations and concurrent edits to the same file.
+- This user preference supersedes the earlier generic six-agent roster above.
