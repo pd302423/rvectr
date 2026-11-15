@@ -2,8 +2,8 @@
 > Start with [docs/LINUX_FIRST.md](docs/LINUX_FIRST.md). Python dependencies are
 > declared in `pyproject.toml` and `uv.lock`; use `bash tools/bootstrap-linux.sh --pose --web`.
 > `uv run --no-sync rvectr doctor --require-cuda` verifies the environment.
-> The new CLI currently performs versioned diagnostics, with metric reconstruction
-> blocked until capture calibration and stage integration are complete. Historical
+> The CLI provides versioned diagnostics and a two-camera squat-depth pipeline
+> ([docs/TWO_CAMERA_PIPELINE.md](docs/TWO_CAMERA_PIPELINE.md)), checked on synthetic data only so far. Historical
 > capability descriptions below are not evidence of current measurement accuracy.
 > Official SMPL data, raw recordings and run outputs are local, separately supplied
 > assets. Review Git history before publication; `.gitignore` cannot erase old assets.

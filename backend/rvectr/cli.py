@@ -20,7 +20,13 @@ from rvectr.sync import estimate_audio_offset
 from rvectr.media import decode_audio
 
 
+COMMANDS = ('calibrate-intrinsics', 'calibrate-extrinsics', 'sync', 'run', 'check-points', 'frames')
+
+
 def main():
+    if len(sys.argv)>1 and sys.argv[1] in COMMANDS:
+        from rvectr.commands import dispatch
+        return dispatch(sys.argv[1], sys.argv[2:])
     if len(sys.argv)>1 and sys.argv[1]=='doctor':
         from rvectr.doctor import inspect_environment
         doctor_parser=argparse.ArgumentParser(description='Check the runtime; camera accuracy is evaluated separately')
@@ -31,7 +37,10 @@ def main():
         if doctor_args.report:write_json(doctor_args.report,result)
         print(json.dumps(result,indent=2))
         return 0 if result['passed'] else 1
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     epilog='Two-camera squat pipeline commands (see docs/TWO_CAMERA_PIPELINE.md):\n  '
+                                            + '\n  '.join(f'rvectr {c} --help' for c in COMMANDS)
+                                            + '\n  rvectr doctor')
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--diagnose-only', action='store_true',
                         help='Required until the reconstruction stages are integrated and tested')

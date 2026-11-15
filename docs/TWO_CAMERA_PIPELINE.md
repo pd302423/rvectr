@@ -1,0 +1,184 @@
+# Two-camera squat pipeline
+
+This pipeline measures **squat depth** as the drop of the pelvis (the midpoint of
+the two hip keypoints) along the true vertical, using two calibrated,
+synchronized phones. It implements the procedure in the CBSE report
+("R Vector 3D Motion Capture for Comparing Squat Repetitions").
+
+```
+board videos ──► calibrate-intrinsics (per phone) ──► calibrate-extrinsics (per phone, same board)
+                                                                 │
+exercise videos ──► sync (light pulse) ──► 2D keypoints (RTMPose) ──► triangulate ──► pelvis height
+                                                                                         │
+                                       reps, depth, reference comparison, jitter ◄───────┘
+```
+
+Everything is written to a numbered run folder, `outputs/V1.1.N`.
+**The software never declares itself accurate.** You get accuracy only from
+the checks in steps 5 and 7 below.
+
+## 0. One-time setup
+
+```bash
+uv sync --frozen --extra pose          # RTMPose via RTMLib (CPU works)
+uv sync --frozen --extra cuda --extra pose   # optional: ~3 GB, lets pose detection use the GPU
+cp .env.example .env.local             # then set RVECTR_DATA_ROOT to your recordings folder
+```
+
+Put recordings under `RVECTR_DATA_ROOT` and calibration files under
+`RVECTR_DATA_ROOT/calibration` (or set `RVECTR_CALIBRATION_DIR`).
+
+## 1. Measure the board
+
+Your board has **8 × 11 printed squares** (7 × 10 inner corners). Measure four
+squares in a row with a ruler, divide by four, and do this along both
+directions. That number in millimetres is `--square-mm`. It sets the scale of
+every result, so do not guess it from the paper size.
+
+## 2. Phone settings (same for calibration and exercise)
+
+- Rear main camera, 1×, 1080p at 60 fps if possible, the same orientation for every video.
+- Turn off stabilisation, auto lens switching and auto framing. Lock focus and exposure if the phone allows it.
+- Whole body, from standing to the bottom of the squat, stays inside the frame
+  with space around it. Keypoints on the frame edge are thrown away.
+
+## 3. Lens calibration: once per phone and setting
+
+Record about 60 seconds per phone: hold the board in the centre, edges and
+corners of the picture, tilted left/right/up/down, near and far. Pause briefly
+at each place so the corners are sharp.
+
+```bash
+uv run --no-sync rvectr calibrate-intrinsics --camera-id cam1 \
+  --video ~/Videos/rvectr/2026-11-16/cam1_lens.mp4 --square-mm 70.7 \
+  --out ~/Videos/rvectr/calibration/2026-11-16/cam1_intrinsics.json
+```
+
+It picks up to 30 varied sharp views, keeps 20 % aside to test the result, and
+prints `PASSED` or `FAILED` with the reason. The held-out error should be well
+under 1 px. Repeat for `cam2`.
+
+## 4. Camera position: every time the phones are placed
+
+Mount both phones in their final positions. Start recording on both. Stand the
+board **upright and level** (use a spirit level) in the middle of the squat
+area, facing both cameras, and hold it still for 3–5 seconds. Both phones must
+see the whole board at the same time.
+
+```bash
+uv run --no-sync rvectr calibrate-extrinsics \
+  --intrinsics ~/Videos/rvectr/calibration/2026-11-16/cam1_intrinsics.json \
+  --video ~/Videos/rvectr/2026-11-16/board_cam1.mp4 --start 2 --end 5 \
+  --board-frame-id 2026-11-16_setupA --square-mm 70.7 --same-recording-mode \
+  --out ~/Videos/rvectr/calibration/2026-11-16/cam1_camera.json
+```
+
+`--start/--end` are seconds into **that phone's** video where the board is
+still. Use the same `--board-frame-id` for both phones. Pass
+`--same-recording-mode` only after checking that the exercise videos use
+exactly the same settings; runs refuse calibrations without it. The board must
+stay level and must not be rotated about 45° in the picture, because the corner
+numbering depends on that.
+
+**After this, do not touch the phones.** If one moves, redo step 4.
+
+## 5. Check the geometry with a known length (before recording people)
+
+Put a rigid stick with two marks a known distance apart (for example 50 cm) in
+the squat area. Record it in both phones. Save a frame from each:
+
+```bash
+uv run --no-sync rvectr frames --config configs/session.json --time 4.0 --out frames/
+```
+
+Open the PNGs in any image viewer that shows pixel coordinates. Note the pixel
+position of each mark in both images and write `points.json`:
+
+```json
+{"points": {"A": {"cam1": [812, 1404], "cam2": [655, 1390]},
+            "B": {"cam1": [1290, 1410], "cam2": [1102, 1377]}},
+ "distances": [{"from": "A", "to": "B", "known_m": 0.5}]}
+```
+
+```bash
+uv run --no-sync rvectr check-points --config configs/session.json --points points.json
+```
+
+Repeat with the stick in several places and orientations. Record the errors.
+This is the independent check of scale and camera geometry.
+
+## 6. Record a take
+
+1. Start both phones.
+2. Flash a light visible to both cameras: a phone torch switched on for about half a second.
+3. Stand still for 3 seconds. This is the jitter measurement.
+4. Do the reps. Rep 1 is the participant's chosen reference depth.
+5. Stand still, then flash the light again.
+6. Stop both phones.
+
+Check the sync on its own first:
+
+```bash
+uv run --no-sync rvectr sync --config configs/session.json --out sync_check/
+```
+
+Look at `sync_check/brightness.png`: the dashed lines must sit on the two
+flashes in both cameras. If other light changes confuse it, set a `roi`
+`[x, y, w, h]` around the torch for each camera in the config.
+
+## 7. Label the footage BEFORE looking at the software results
+
+For each rep, decide from the video (marked footage, or the pelvis marker)
+whether it **matches** the reference depth, is **shallow**, or is **unclear**.
+Save it as a CSV like `configs/labels.example.csv` and point `"labels"` in the
+session config at it. Making labels after seeing the software output would bias
+the comparison.
+
+## 8. Run
+
+```bash
+uv run --no-sync rvectr run --config configs/session.json
+# change only squat/triangulation settings? reuse the slow 2D step:
+uv run --no-sync rvectr run --config configs/session.json --keypoints-from outputs/V1.1.12
+```
+
+The run folder contains:
+
+| File | What it is |
+|---|---|
+| `report.json` | everything: sync, coverage, jitter, reps, outcomes, comparison with labels |
+| `depth_trace.png` | pelvis height over time, reps shaded green (reached), red (shallower), grey (unclear) |
+| `reps_raw.csv`, `reps_filtered.csv` | one row per rep: depth, descent time, coverage, outcome |
+| `pelvis_trace.csv` | height per frame, raw and filtered, with hip reprojection error |
+| `points3d.npz` | all 17 triangulated joints per frame |
+| `sync/` | pulse detection plot and offsets |
+| `keypoints2d/` | 2D detections per camera (reusable) |
+
+### How the numbers are defined
+
+- **Depth** = standing pelvis height just before the rep − lowest pelvis height in the rep.
+- **Reached reference** = depth ≥ reference depth − `tolerance_m` (default 3 cm).
+  Set the tolerance from a pilot clip, then keep it fixed.
+- **Borderline** = within `borderline_m` of that line.
+- **Unclear** = fewer than `min_coverage` (85 %) of the rep's frames had both
+  hips reconstructed, or the bottom was not seen. Missing data is never filled in.
+- **Jitter** = spread of the pelvis around its median while standing still
+  (`standing_window_s`), for raw and filtered traces.
+- **Filter effect** = filtered depth − raw depth per rep. A large change on the
+  faster reps means the filter is hiding real depth.
+- **False pass** = software said reached, footage said shallow.
+  **False flag** = software said shallower, footage said match.
+
+## What this does not tell you
+
+- The hip keypoint is the detector's estimate of the hip joint, inside the body.
+  A marker on clothing moves differently. Compare the two by marking the
+  pelvis marker at the standing and bottom frames with `frames` +
+  `check-points`, and report the difference. Do not treat either one as the truth.
+- Low reprojection error means the two cameras agree. It does not prove the
+  point is anatomically right.
+- The light-pulse sync is good to roughly a quarter to a half frame. Fast
+  movement makes a residual timing error matter more. The tests show that a
+  two-frame error clearly inflates reprojection error, so watch that number.
+- Every check in `backend/tests/test_two_camera_pipeline.py` uses synthetic data.
+  It proves the software recovers known answers, not that phones are accurate.

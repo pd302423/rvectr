@@ -1,5 +1,15 @@
 # Linux-first runtime: WSL 2 now, native Linux later
 
+> **Update, 15 November 2026.** Development has since continued on native Linux
+> in a copy of the original repository, with its Git history and GitHub remote.
+> A two-camera squat-depth pipeline was added and pushed on the branch
+> `feat/two-camera-pipeline`; see [TWO_CAMERA_PIPELINE.md](TWO_CAMERA_PIPELINE.md).
+> It has been checked on synthetic data only. The rest of this page is the
+> 27 October record of the WSL setup: where it says that pose inference and
+> reconstruction are not integrated, or that nothing has been pushed, it
+> describes that date. The old history noted under "GitHub publication" has
+> not been rewritten.
+
 Updated 27 October 2026. WSL Ubuntu 26.04 is the primary current development
 environment. Native Windows is secondary. The same Python project, lockfile,
 setup script and capture JSON are used on native Linux; local data locations
