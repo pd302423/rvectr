@@ -1,0 +1,13 @@
+{
+  "dataset": "October 15 existing two-camera footage",
+  "movement": "unspecified; diagnostic runner has no exercise assumptions",
+  "cameras": [
+    {"id": "cam1", "video": "v1/20261015_093838.mp4", "calibration": null},
+    {"id": "cam2", "video": "v1/VID_20261015_093949.mp4", "calibration": null}
+  ],
+  "calibration_reuse": "Not authorized: main-folder 4K recording has unverified correspondence to v1 recording settings",
+  "calibration_candidate": "20261014_094430.mp4",
+  "existing_wav_files": ["v1/audio1.wav", "v1/audio2.wav"],
+  "audio_choice": "Use embedded audio and its presentation start timestamps; preserve WAV files as original data",
+  "accuracy_claim": "unvalidated"
+}

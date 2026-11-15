@@ -1,3 +1,7 @@
+> **Linux-first runtime:** use the root `pyproject.toml`, `uv.lock`, and
+> `docs/LINUX_FIRST.md`. The `rvectr` package and `backend/run_capture.py` are
+> the new portable entry points. The script tables below are historical and
+> do not establish current measurement accuracy or Linux compatibility.
 # rvectr backend
 
 Python 3D vision and kinematics pipeline. **Read this before running anything** —
