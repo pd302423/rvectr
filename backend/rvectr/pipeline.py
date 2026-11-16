@@ -334,7 +334,7 @@ def _write_tables(run, sequence, result):
                              sequence["reprojection_px"][i, 11], sequence["reprojection_px"][i, 12])])
     columns = ["rep", "outcome", "borderline", "is_reference", "depth_m", "difference_from_reference_m",
                "descent_s", "coverage", "start_s", "bottom_s", "end_s", "standing_m", "bottom_m",
-               "depth_se_m", "difference_se_m", "bottom_samples", "estimator"]
+               "depth_se_m", "difference_se_m", "bottom_samples", "estimator", "bottom_model"]
     for name, entry in result["reps"].items():
         with (run / f"reps_{name}.csv").open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=columns, extrasaction="ignore")

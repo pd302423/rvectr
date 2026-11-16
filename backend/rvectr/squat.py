@@ -58,11 +58,24 @@ def jitter(times, points, window_s, up=None):
         return {"status": "insufficient_data", "window_s": list(window_s), "samples": int(observed.sum())}
     sample = points[observed]
     distance = np.linalg.norm(sample - np.median(sample, axis=0), axis=1)
+    vertical_sd = fast_sd = slow_sd = None
+    if up is not None:
+        vertical_sd = float(np.std(height(sample, up)))
+        # Fast noise: how much the height changes from one frame to the next (consecutive observed
+        # frames only). Two independent errors differ by sqrt(2) times their size, hence the division.
+        # Slow drift changes little from frame to frame, so it hardly shows up here.
+        h = height(np.nan_to_num(points), up)
+        both = observed[:-1] & observed[1:]
+        steps = np.diff(h)[both]
+        if len(steps) >= 2:
+            fast_sd = float(np.std(steps) / np.sqrt(2))
+            # What is left of the total spread once the fast part is taken away is slow drift.
+            slow_sd = float(np.sqrt(max(vertical_sd ** 2 - fast_sd ** 2, 0.0)))
     return {"status": "measured", "window_s": list(window_s), "samples": int(observed.sum()),
             "coverage": float(observed.sum() / max(inside.sum(), 1)),
             "rms_m": float(np.sqrt(np.mean(distance ** 2))), "p95_m": float(np.percentile(distance, 95)),
             "max_m": float(distance.max()),
-            "vertical_sd_m": None if up is None else float(np.std(height(sample, up)))}
+            "vertical_sd_m": vertical_sd, "vertical_fast_sd_m": fast_sd, "vertical_slow_sd_m": slow_sd}
 
 
 def segment_reps(times, h, standing=None, min_depth_m=0.06, enter_fraction=0.5, edge_fraction=0.1, *,
@@ -134,6 +147,7 @@ def segment_reps(times, h, standing=None, min_depth_m=0.06, enter_fraction=0.5, 
                      "bottom_s": bottom["time"], "end_s": float(t[end]), "standing_m": local["height"],
                      "bottom_m": bottom["height"], "depth_m": float(depth), "descent_s": float(bottom["time"] - t[start]),
                      "coverage": float(finite[span].mean()), "bottom_observed": bottom["observed"],
+                     "bottom_model": bottom["model"], "bottom_window_stops": list(bottom["stops"]),
                      "standing_source": local["source"], "standing_samples": local["samples"],
                      "standing_se_m": local["se"], "bottom_samples": bottom["samples"],
                      "bottom_max_gap_s": bottom["max_gap_s"], "bottom_se_m": bottom["se"],
@@ -168,15 +182,18 @@ def _carry_forward(values):
 def _standing_height(t, h, finite, previous_end, dip_start_s, session_standing, window_s, guard_s):
     """Standing height before one rep: the median of the observed samples while the person stood still.
 
-    First choice: the window_s seconds that end guard_s before the dip starts (but never
-    reaching back into the previous rep). If that holds fewer than 10 samples, take every
+    First choice: the window_s seconds that end guard_s before the dip starts, but starting no
+    earlier than guard_s after the previous rep ended (the person is still rising then and the
+    median would be pulled down). If that holds fewer than 10 samples, take every
     observed sample from the end of the previous rep up to the guard. If there are still fewer
     than 5, fall back to the session standing level (and say so).
     """
     guard_s = max(guard_s, 0.2)
     stop = dip_start_s - guard_s
     earliest = t[previous_end] if previous_end > 0 else -np.inf
-    inside = finite & (t >= max(stop - window_s, earliest)) & (t <= stop)
+    # Right after the previous rep the person is still rising, so wait guard_s there as well.
+    first_choice_start = max(stop - window_s, earliest + guard_s)
+    inside = finite & (t >= first_choice_start) & (t <= stop)
     if inside.sum() < 10:
         inside = finite & (t >= earliest) & (t <= stop)
     if inside.sum() < 5:
@@ -190,40 +207,67 @@ def _standing_height(t, h, finite, previous_end, dip_start_s, session_standing, 
 
 
 def _bottom_height(t, h, finite, smooth_h, segment, real, cap_m, max_gap_s, min_samples):
-    """Height and time of the lowest point of a dip, from a parabola fitted to the raw samples near it.
+    """Height and time of the bottom of a dip, from the raw samples near the lowest point.
 
-    Why a parabola: near the lowest point the pelvis has roughly constant acceleration, so
-    height against time is a parabola, like a thrown ball at the top of its flight. Its vertex
-    is the bottom. Fitting many samples averages out the noise, whereas the single lowest
-    sample is the luckiest noise value and sits too low.
+    Two shapes are possible at the bottom, and "bottom_model" says which one was used:
+
+    "parabola": the pelvis turns round at the bottom. Near the lowest point it has roughly
+    constant acceleration, so height against time is a parabola, like a thrown ball at the top
+    of its flight. Its vertex is the bottom. Fitting many samples averages out the noise,
+    whereas the single lowest sample is the luckiest noise value and sits too low.
+
+    "plateau": the person rests at the bottom (for example on a stool). Height against time is
+    flat there, not a parabola, so the fit may open downwards or put its vertex outside the
+    samples. Then the bottom is the median of the raw samples that lie on the flat part.
 
     The samples used are the observed ones next to the smoothed minimum whose smoothed height
-    is within cap_m of it (at most 0.5 s either side). The bottom counts as observed only if
-    enough samples were used, the parabola opens upwards, its vertex lies inside the used
-    samples with at least 2 on each side, and no gap between used samples exceeds max_gap_s.
-    Otherwise the bottom is reported as the lowest observed sample for plotting, with no error bar.
+    is within cap_m of it (at most 0.5 s either side). The parabola is accepted only if enough
+    samples were used, it opens upwards, its vertex lies inside the used samples with at least
+    2 on each side, and no gap between used samples exceeds max_gap_s. A parabola rejected for
+    its shape becomes a plateau if there are enough samples, no long gap, and the window did not
+    end because of missing data or at the edge of the dip (then we cannot tell what happened
+    there). Otherwise the bottom is "none": reported as the lowest observed sample for plotting,
+    not observed, with no error bar.
+
+    "stops" says why the window stopped growing on each side: "cap" (the smoothed height rose
+    above the cap), "limit" (0.5 s reached), "edge" (the edge of the dip) or "missing" (the
+    smoothed height is missing there).
     """
     lowest_real = int(real[np.argmin(h[real])])
     fallback = {"index": lowest_real, "time": float(t[lowest_real]), "height": float(h[lowest_real]),
-                "observed": False, "samples": 0, "max_gap_s": np.nan, "se": np.nan}
+                "observed": False, "samples": 0, "max_gap_s": np.nan, "se": np.nan, "model": "none",
+                "stops": (None, None)}
     usable = segment[np.isfinite(smooth_h[segment])]
     if len(usable) == 0:
         return fallback
     k = int(usable[np.argmin(smooth_h[usable])])
+
+    def widen(step, cap):
+        """Walk from k in one direction while the smoothed height stays low; return the last index and why we stopped."""
+        i = k
+        while True:
+            if (i == segment[0] and step < 0) or (i == segment[-1] and step > 0):
+                return i, "edge"
+            if not np.isfinite(smooth_h[i + step]):
+                return i, "missing"
+            if abs(t[i + step] - t[k]) > 0.5:
+                return i, "limit"
+            if smooth_h[i + step] > smooth_h[k] + cap:
+                return i, "cap"
+            i += step
+
     used = np.array([], int)
+    stops = (None, None)
     for cap in (cap_m, 2 * cap_m):   # widen the cap once if too few samples
-        lo = hi = k
-        while lo > segment[0] and np.isfinite(smooth_h[lo - 1]) and t[k] - t[lo - 1] <= 0.5 \
-                and smooth_h[lo - 1] <= smooth_h[k] + cap:
-            lo -= 1
-        while hi < segment[-1] and np.isfinite(smooth_h[hi + 1]) and t[hi + 1] - t[k] <= 0.5 \
-                and smooth_h[hi + 1] <= smooth_h[k] + cap:
-            hi += 1
+        lo, why_lo = widen(-1, cap)
+        hi, why_hi = widen(+1, cap)
+        stops = (why_lo, why_hi)
         used = np.arange(lo, hi + 1)
         used = used[finite[used]]
         if len(used) >= min_samples:
             break
     fallback["samples"] = int(len(used))
+    fallback["stops"] = stops
     if len(used) < max(min_samples, 4):
         return fallback
     x = t[used] - t[k]                      # time measured from the lowest point
@@ -232,12 +276,13 @@ def _bottom_height(t, h, finite, smooth_h, segment, real, cap_m, max_gap_s, min_
     c0, c1, c2 = coef
     gaps = np.diff(t[used])
     fallback["max_gap_s"] = float(gaps.max()) if len(gaps) else np.nan
-    if c2 <= 0:                              # opens downwards: not a bottom
+    if gaps.max() > max_gap_s + 1e-6:        # 1e-6 s: rounding of frame times
         return fallback
-    vertex_x = -c1 / (2 * c2)
+    vertex_x = -c1 / (2 * c2) if c2 > 0 else np.nan
+    vertex_inside = c2 > 0 and (x < vertex_x).sum() >= 2 and (x > vertex_x).sum() >= 2
+    if not vertex_inside:                    # opens downwards or vertex outside: not a turning point
+        return _plateau(t, h, smooth_h, used, k, real, cap_m, max_gap_s, min_samples, stops, fallback)
     vertex_h = c0 - c1 ** 2 / (4 * c2)
-    if not ((x < vertex_x).sum() >= 2 and (x > vertex_x).sum() >= 2) or gaps.max() > max_gap_s + 1e-6:   # 1e-6 s: rounding of frame times
-        return fallback
     # Error bar: scatter of the samples around the fit gives the coefficient covariance;
     # the delta method turns it into an error on the vertex height.
     residual = h[used] - design @ coef
@@ -248,7 +293,30 @@ def _bottom_height(t, h, finite, smooth_h, segment, real, cap_m, max_gap_s, min_
     vertex_s = float(t[k] + vertex_x)
     nearest = int(real[np.argmin(np.abs(t[real] - vertex_s))])
     return {"index": nearest, "time": vertex_s, "height": float(vertex_h), "observed": True,
-            "samples": int(len(used)), "max_gap_s": fallback["max_gap_s"], "se": se}
+            "samples": int(len(used)), "max_gap_s": fallback["max_gap_s"], "se": se, "model": "parabola",
+            "stops": stops}
+
+
+def _plateau(t, h, smooth_h, used, k, real, cap_m, max_gap_s, min_samples, stops, fallback):
+    """Bottom of a person resting at the bottom: the median of the flat part, or "none" if it cannot be trusted."""
+    # A hole next to the bottom, or a window that ran into the edge of the dip (the recording started
+    # or stopped while the person was down): we cannot tell what happened there, so do not guess.
+    if "missing" in stops or "edge" in stops:
+        return fallback
+    flat = used[smooth_h[used] <= smooth_h[k] + cap_m / 3]   # samples within a third of the cap of the lowest level
+    if len(flat) < min_samples:
+        return fallback
+    if len(flat) > 1 and np.diff(t[flat]).max() > max_gap_s + 1e-6:
+        return fallback
+    values = h[flat]
+    centre = float(np.median(values))
+    sigma = 1.4826 * float(np.median(np.abs(values - centre)))   # robust spread (median absolute deviation)
+    bottom_s = float(np.median(t[flat]))
+    nearest = int(real[np.argmin(np.abs(t[real] - bottom_s))])
+    # 1.2533 = sqrt(pi/2): the median of n noisy samples is that much less precise than their mean.
+    return {"index": nearest, "time": bottom_s, "height": centre, "observed": True, "samples": int(len(flat)),
+            "max_gap_s": float(np.diff(t[flat]).max()) if len(flat) > 1 else np.nan,
+            "se": 1.2533 * sigma / np.sqrt(len(flat)), "model": "plateau", "stops": stops}
 
 
 def _segment_extreme(times, h, standing, min_depth_m, enter_fraction, edge_fraction):
@@ -301,7 +369,7 @@ def _segment_extreme(times, h, standing, min_depth_m, enter_fraction, edge_fract
         while end < len(h) - 1 and not (finite[end] and h[end] >= edge):
             end += 1
         span = np.arange(start, end + 1)
-        reps.append({"rep": len(reps) + 1, "estimator": "extreme", "estimator": "extreme", "start_index": int(start), "bottom_index": bottom,
+        reps.append({"rep": len(reps) + 1, "estimator": "extreme", "bottom_model": "extreme", "start_index": int(start), "bottom_index": bottom,
                      "end_index": int(end), "start_s": float(t[start]), "bottom_s": float(t[bottom]),
                      "end_s": float(t[end]), "standing_m": local_standing, "bottom_m": float(h[bottom]),
                      "depth_m": float(depth), "descent_s": float(t[bottom] - t[start]),

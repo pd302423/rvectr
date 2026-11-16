@@ -114,7 +114,8 @@ This is the independent check of scale and camera geometry.
 3. Stand still for 3 seconds. This is the jitter measurement.
 4. Do the reps. Rep 1 is the participant's chosen reference depth.
    Stand still for two seconds between reps: the software reads the standing
-   height from that pause.
+   height from that pause. When squatting to a target (a stool, a bar), touch
+   it lightly and come straight back up.
 5. Stand still, then flash the light again.
 6. Stop both phones.
 
@@ -169,7 +170,14 @@ The run folder contains:
   pelvis moves like a ball at the top of its flight, so its height against time
   is a parabola, and using many frames averages out the noise. The single
   lowest frame is not used: it is the frame with the luckiest noise, so it
-  reads too deep.
+  reads too deep. If the person rests at the bottom, the height is flat there.
+  In simulation most such reps are still read with the parabola and come out
+  about 1 mm too deep; when the parabola does not fit at all, the bottom is the
+  median level of the resting frames. `bottom_model` in `reps_*.csv` says which
+  was used: `parabola`, `plateau` (rested), or `none` (the bottom was not seen
+  well enough, so the rep is unclear). A recording that stops while the person
+  is still at the lowest point gives `none`, because the bottom may not have
+  been reached yet.
 - **Depth** = standing height − bottom height.
 - **Plus-or-minus** (`depth_se_m` in `reps_*.csv`) = the typical error of the
   depth, worked out from the scatter of the frames used. `difference_se_m` is
@@ -187,7 +195,15 @@ The run folder contains:
   or frames missing on one side so that the lowest point is not inside them.
   Missing data is never filled in.
 - **Jitter** = spread of the pelvis around its median while standing still
-  (`standing_window_s`), for raw and filtered traces.
+  (`standing_window_s`), for raw and filtered traces. The vertical spread is
+  split in two:
+  `vertical_fast_sd_m` is the noise that changes from one frame to the next
+  (worked out from the differences between neighbouring frames), and
+  `vertical_slow_sd_m` is what is left, slow drift of the detected pose that
+  stays almost the same for a second or so. They matter because fast noise
+  averages out when many frames are used for the standing height and the
+  bottom, but slow drift does not: it shifts the whole standing level or bottom
+  together, so it sets how small a depth difference can be detected.
 - **Filter effect** = filtered depth − raw depth per rep. A large change on the
   faster reps means the filter is hiding real depth.
 - **False pass** = software said reached, footage said shallow.

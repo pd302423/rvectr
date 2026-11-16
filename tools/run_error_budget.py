@@ -34,6 +34,7 @@ NOISE_LEVELS = (0.5, 1.0)                    # white noise in "model pixels" (8.
 DETECTION_CM = (0, 1, 2, 3, 4, 6, 8)         # true differences reported in the detection tables
 MODE_LABELS = {"side_1cam": "1 camera (side)", "oblique_1cam": "1 camera (oblique)",
                "two_cam": "2 cameras", "three_cam": "3 cameras"}
+DWELLS_S = (0.0, 0.3, 1.0)                   # time resting at the bottom in the "pause at the bottom" table
 BASE = eb.Setup()                            # reference: 2 cameras at 90 and 45 degrees, 60 fps, 0.5 model px white noise
 
 
@@ -106,6 +107,10 @@ def main():
     parser.add_argument("--quick", action="store_true", help="few sessions and coarse grids (under a minute)")
     parser.add_argument("--sessions", type=int, help="sessions per condition (default 300, or 20 with --quick)")
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--pelvis-fast-mm", type=float, help="measured fast (frame-to-frame) noise of the two-camera pelvis "
+                        "height, as squat.jitter reports it (vertical_fast_sd_m); adds the measured-noise scenario table")
+    parser.add_argument("--pelvis-slow-mm", type=float, help="measured slow drift of the two-camera pelvis height "
+                        "(vertical_slow_sd_m); adds the measured-noise scenario table")
     parser.add_argument("--workers", type=int, default=min(16, os.cpu_count() or 1))
     parser.add_argument("--out-root", default=str(ROOT / "outputs" / "sim"))
     args = parser.parse_args()
@@ -154,6 +159,14 @@ def main():
                    for noise in NOISE_LEVELS for pace in eb.PACES}
     for setup in list(dropout_setups.values()) + list(noisy_setups.values()) + list(slow_setups.values()):
         need(setup, (0,))
+    # ---- pause at the bottom: two cameras, 0.5 model px, both paces, dwell 0 / 0.3 / 1.0 s
+    dwell_setups = {(pace, dwell): BASE.with_(pace=pace, dwell_s=dwell) for pace in eb.PACES for dwell in DWELLS_S}
+    for setup in dwell_setups.values():
+        need(setup, ref_grid)
+    # ---- measured-noise scenario: only if the user gave measured jitter
+    measured_setups = measured_noise_setups(args.pelvis_fast_mm, args.pelvis_slow_mm)
+    for setup in measured_setups.values():
+        need(setup, ref_grid)
     jobs = [("run", s, d / 100, n, seed) for s, grid in wanted.items() for d in grid]
     check_setups = {(noise, pace): BASE.with_(white_px=model(noise), pace=pace)
                     for noise in NOISE_LEVELS for pace in eb.PACES}
@@ -229,6 +242,24 @@ def main():
                       "standing_pelvis_height_sd_mm": standing * 1000,
                       "analytic_pelvis_height_sd_mm": analytic / 2})
 
+    pause = []
+    for (pace, dwell), setup in dwell_setups.items():
+        run0 = done[("run", setup, 0.0)]
+        mdd, _ = mdd_mm(done, setup, ref_grid)
+        pause.append({"pace": pace, "dwell_s": dwell, "mean_depth_error_mm": float(np.nanmean(run0["depth_error_m"])) * 1000,
+                      "sd_depth_error_mm": eb.depth_error_sd_m(run0) * 1000,
+                      "bottom_model_share": eb.bottom_model_shares(run0), "unclear_rate": eb.unclear_rate(run0),
+                      "minimum_detectable_difference_mm": mdd})
+    measured = None
+    if measured_setups:
+        measured = {"pelvis_fast_mm": args.pelvis_fast_mm or 0.0, "pelvis_slow_mm": args.pelvis_slow_mm or 0.0,
+                    "per_camera_per_hip_white_mm": 2 * (args.pelvis_fast_mm or 0.0),
+                    "per_camera_per_hip_slow_mm": 2 * (args.pelvis_slow_mm or 0.0), "rows": []}
+        for (mode, pace), setup in measured_setups.items():
+            mdd, _ = mdd_mm(done, setup, ref_grid)
+            measured["rows"].append({"mode": mode, "pace": pace, "minimum_detectable_difference_mm": mdd,
+                                     "unclear_rate": eb.unclear_rate(done[("run", setup, 0.0)])})
+
     comparison = estimator_comparison(done, ref_grid, comparison_setups, dropout_setups, noisy_setups, slow_setups)
     assumptions = assumption_list(n, seed, cfg)
     result = {"title": "Squat-depth error budget: simulation, not a measurement",
@@ -237,11 +268,28 @@ def main():
               "assumptions": assumptions, "reference_table": table, "reference_filtered_trace": filtered,
               "detection_curves_default_rule": detection, "sweeps": sweeps, "ranking": ranking,
               "analytic_cross_check": check, "estimator_comparison": comparison,
+              "pause_at_bottom": pause, "measured_noise_scenario": measured,
               "runtime_s": time.time() - started}
     (out / "summary.json").write_text(json.dumps(clean(result), indent=2, default=float, allow_nan=False), encoding="utf-8")
     figures(out, table, detection, sweeps, ranking, ref_grid)
     (out / "summary.md").write_text(markdown(result, ref_grid, sweep_grid), encoding="utf-8")
     print(f"wrote {out} in {time.time() - started:.0f} s")
+
+
+def measured_noise_setups(fast_mm, slow_mm):
+    """Set-ups for the measured-noise scenario (empty if no measured jitter was given).
+
+    The measured numbers describe the two-camera pelvis height. That height averages two cameras and
+    two hips, so its noise is the per-camera, per-hip noise divided by 2 (the same factor the analytic
+    cross-check in section 5 uses). The per-camera, per-hip noise is therefore 2 x the measured value.
+    The same per-camera noise is then used for one, two and three cameras.
+    """
+    if fast_mm is None and slow_mm is None:
+        return {}
+    white_px = 2 * (fast_mm or 0.0) / eb.MM_PER_IMAGE_PX
+    slow_px = 2 * (slow_mm or 0.0) / eb.MM_PER_IMAGE_PX
+    return {(mode, pace): BASE.with_(mode=mode, pace=pace, white_px=white_px, slow_px=slow_px)
+            for mode in eb.MODES for pace in eb.PACES}
 
 
 def estimator_comparison(done, ref_grid, comparison_setups, dropout_setups, noisy_setups, slow_setups):
@@ -293,7 +341,7 @@ def assumption_list(n, seed, cfg):
         "THIS IS A SIMULATION, NOT A MEASUREMENT. No two-phone footage exists yet; every number below is a prediction to be compared with experiment later.",
         f"Person: two hip points {s.HIP_SPACING_M} m apart; pelvis = midpoint; standing pelvis height {s.STANDING_M} m; reference repetition depth {s.REFERENCE_DEPTH_M} m.",
         f"Session: {s.STAND_S:.0f} s standing, the reference repetition, then 3 test repetitions, each shallower than the reference by the true difference; {s.PAUSE_S:.0f} s standing pause after every repetition.",
-        "Motion: raised cosine (depth x sin^2) down and up, equal descent and ascent time; no pause at the bottom. Descent time 2.0 s (controlled) or 0.8 s (fast). The pelvis also moves backwards by 0.5 x the current descent.",
+        "Motion: raised cosine (depth x sin^2) down and up, equal descent and ascent time; no pause at the bottom (except in section 7, where the pelvis rests at the bottom for dwell_s). Descent time 2.0 s (controlled) or 0.8 s (fast). The pelvis also moves backwards by 0.5 x the current descent.",
         f"Cameras: pinhole, {s.IMAGE_W}x{s.IMAGE_H} portrait, focal length {s.FOCAL_PX:.0f} px, {s.DISTANCE_M} m from the person, lens height {s.LENS_HEIGHT_M} m, level, no lens distortion. Camera A side-on (90 deg from the facing direction), camera B front-oblique (45 deg); optional camera C at the mirrored oblique position (-45 deg). 60 fps (30 fps in the frame-rate sweep); frame phase random.",
         f"White noise is set in 'model pixels' (1 model pixel = 1.70 m x 1.25 / 256 = {s.MM_PER_MODEL_PX:.2f} mm at the person) and converted at {s.MM_PER_IMAGE_PX:.2f} mm per image pixel: 0.5 model px = {s.model_px_to_image_px(0.5):.2f} image px, 1.0 model px = {s.model_px_to_image_px(1.0):.2f} image px, per frame, per camera, per hip, per image axis, 1 sigma, independent.",
         "Slow noise: AR(1) per camera, hip and image axis, correlation time 0.2 s, given as stationary sigma. Posture bias: the detected hip is displaced upward in 3D by beta x current descent (same displacement seen by every camera). Dropouts: each hip in each camera is missing in a frame with probability p, independently. Missing data is never filled in.",
@@ -401,6 +449,9 @@ def markdown(r, ref_grid, sweep_grid):
     else:
         out += ["", "The full simulation agrees with the analytic value to within 15%."]
     out += estimator_markdown(r["estimator_comparison"], ref_grid)
+    out += pause_markdown(r["pause_at_bottom"], ref_grid)
+    if r["measured_noise_scenario"]:
+        out += measured_markdown(r["measured_noise_scenario"], ref_grid)
     out.append("")
     return "\n".join(out)
 
@@ -438,6 +489,38 @@ def estimator_markdown(c, ref_grid):
              "n/a" if x["ratio_reported_to_empirical"] is None else f"{x['ratio_reported_to_empirical']:.2f}"] for x in c["calibration"]]
     out.append(table_md(["slow noise, model px", "white noise, model px", "pace", "mean reported depth_se", "actual sd of depth error",
                          "ratio reported / actual"], rows))
+    return out
+
+
+def pause_markdown(rows_in, ref_grid):
+    """Section 7: resting at the bottom for a while (for example touching a stool)."""
+    out = ["", "## 7. Pause at the bottom (two cameras, 0.5 model px white noise)", "",
+           "The pelvis goes down, stays at the bottom for the dwell time, then comes up. With a rest, height against time is flat at the bottom, "
+           "not a parabola. 'parabola', 'plateau', 'none' = share of all repetitions whose bottom was read with that model "
+           "('none' = the bottom was not seen well enough, so the repetition is unclear; 'missing' = the repetition was not found at all). "
+           "Mean and sd of the depth error in mm; MDD = minimum detectable difference in mm.", ""]
+    rows = []
+    for e in rows_in:
+        share = e["bottom_model_share"]
+        rows.append([e["pace"], e["dwell_s"], f"{e['mean_depth_error_mm']:+.2f}", f"{e['sd_depth_error_mm']:.2f}",
+                     f"{100 * share['parabola']:.0f}%", f"{100 * share['plateau']:.0f}%",
+                     f"{100 * (share['none'] + share['missing']):.0f}%", f"{100 * e['unclear_rate']:.0f}%",
+                     text_mm(e["minimum_detectable_difference_mm"], ref_grid)])
+    out.append(table_md(["pace", "dwell, s", "mean depth error", "sd depth error", "parabola", "plateau", "none", "unclear", "MDD"], rows))
+    return out
+
+
+def measured_markdown(m, ref_grid):
+    """Section 8: the design's minimum detectable difference if the noise is what was measured."""
+    out = ["", "## 8. Measured-noise scenario", "",
+           f"Measured jitter of the two-camera pelvis height: fast noise {m['pelvis_fast_mm']} mm, slow drift {m['pelvis_slow_mm']} mm "
+           "(what squat.jitter reports as vertical_fast_sd_m and vertical_slow_sd_m). ASSUMPTION: pelvis-height noise = per-camera, per-hip noise / 2 "
+           "for two cameras, because two cameras and two hips are averaged. So the simulation uses "
+           f"{m['per_camera_per_hip_white_mm']} mm white noise and {m['per_camera_per_hip_slow_mm']} mm slow noise (correlation time 0.2 s) "
+           "per camera, per hip, per image axis, for every mode; one- and three-camera pelvis noise then differs from the measured value. Millimetres.", ""]
+    rows = [[MODE_LABELS[x["mode"]], x["pace"], text_mm(x["minimum_detectable_difference_mm"], ref_grid), f"{100 * x['unclear_rate']:.0f}%"]
+            for x in m["rows"]]
+    out.append(table_md(["mode", "pace", "MDD", "unclear"], rows))
     return out
 
 

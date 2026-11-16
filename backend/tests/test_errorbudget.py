@@ -107,3 +107,15 @@ def test_noise_unit_conversion():
     assert eb.MM_PER_MODEL_PX == pytest.approx(8.30, abs=0.01)
     assert eb.MM_PER_IMAGE_PX == pytest.approx(2.11, abs=0.01)
     assert eb.model_px_to_image_px(1.0) == pytest.approx(3.94, abs=0.01)
+
+
+def test_dwell_keeps_the_pelvis_at_the_bottom_and_is_still_measured():
+    times = np.arange(0, 10, 0.01)
+    d = eb.descent_profile(times, [1.0], [0.3], 2.0, dwell_s=1.0)
+    assert np.allclose(d[(times >= 3.0) & (times < 4.0)], 0.3)       # rests for 1 s after the 2 s descent
+    assert d[times > 5.0 + 2.0].max() == 0 and d[times < 1.0].max() == 0
+    run = eb.run_config(eb.Setup(pace="fast", white_px=0.0, dwell_s=1.0), 0.0, 2, seed=3)
+    assert np.isfinite(run["depth_error_m"]).all()                   # nothing unclear
+    assert np.abs(run["depth_error_m"]).max() < 3e-3
+    shares = eb.bottom_model_shares(run)
+    assert abs(sum(shares.values()) - 1) < 1e-12 and shares["missing"] == 0
