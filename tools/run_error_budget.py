@@ -28,6 +28,8 @@ sys.path.insert(0, str(ROOT / "backend"))
 from rvectr import errorbudget as eb  # noqa: E402
 
 # ----------------------------------------------------------------------------- what to run
+ESTIMATORS = ("parabola", "extreme")        # the new estimator and the old one, compared in section 6
+SLOW_CALIBRATION_PX = 0.5                    # slow noise added in the second calibration table (model px)
 NOISE_LEVELS = (0.5, 1.0)                    # white noise in "model pixels" (8.3 mm each at the person)
 DETECTION_CM = (0, 1, 2, 3, 4, 6, 8)         # true differences reported in the detection tables
 MODE_LABELS = {"side_1cam": "1 camera (side)", "oblique_1cam": "1 camera (oblique)",
@@ -138,6 +140,20 @@ def main():
                 BASE.with_(pace=pace, mode="three_cam"), level)
     for setup in sweep_setups.values():
         need(setup, sweep_grid)
+    # ---- estimator comparison: the same two-camera set-ups with the old "extreme" estimator,
+    # the dropout sweep and the 2.0 px noise case with it, and the slow-noise runs for the calibration table
+    comparison_setups = {(est, noise, pace): BASE.with_(white_px=model(noise), pace=pace, estimator=est)
+                         for est in ESTIMATORS for noise in NOISE_LEVELS for pace in eb.PACES}
+    for setup in comparison_setups.values():
+        need(setup, ref_grid)
+    dropout_setups = {(est, pace, level): BASE.with_(pace=pace, dropout=level, estimator=est)
+                      for est in ESTIMATORS for pace in eb.PACES for level in SWEEPS["dropouts"][0]}
+    noisy_setups = {(est, pace): BASE.with_(pace=pace, white_px=model(2.0), estimator=est)
+                    for est in ESTIMATORS for pace in eb.PACES}
+    slow_setups = {(noise, pace): BASE.with_(white_px=model(noise), slow_px=model(SLOW_CALIBRATION_PX), pace=pace)
+                   for noise in NOISE_LEVELS for pace in eb.PACES}
+    for setup in list(dropout_setups.values()) + list(noisy_setups.values()) + list(slow_setups.values()):
+        need(setup, (0,))
     jobs = [("run", s, d / 100, n, seed) for s, grid in wanted.items() for d in grid]
     check_setups = {(noise, pace): BASE.with_(white_px=model(noise), pace=pace)
                     for noise in NOISE_LEVELS for pace in eb.PACES}
@@ -213,18 +229,50 @@ def main():
                       "standing_pelvis_height_sd_mm": standing * 1000,
                       "analytic_pelvis_height_sd_mm": analytic / 2})
 
+    comparison = estimator_comparison(done, ref_grid, comparison_setups, dropout_setups, noisy_setups, slow_setups)
     assumptions = assumption_list(n, seed, cfg)
     result = {"title": "Squat-depth error budget: simulation, not a measurement",
               "created_utc": stamp, "quick": args.quick, "sessions_per_condition": n, "seed": seed,
               "settings": {"reference_grid_cm": list(ref_grid), "sweep_grid_cm": list(sweep_grid)},
               "assumptions": assumptions, "reference_table": table, "reference_filtered_trace": filtered,
               "detection_curves_default_rule": detection, "sweeps": sweeps, "ranking": ranking,
-              "analytic_cross_check": check,
+              "analytic_cross_check": check, "estimator_comparison": comparison,
               "runtime_s": time.time() - started}
     (out / "summary.json").write_text(json.dumps(clean(result), indent=2, default=float, allow_nan=False), encoding="utf-8")
     figures(out, table, detection, sweeps, ranking, ref_grid)
     (out / "summary.md").write_text(markdown(result, ref_grid, sweep_grid), encoding="utf-8")
     print(f"wrote {out} in {time.time() - started:.0f} s")
+
+
+def estimator_comparison(done, ref_grid, comparison_setups, dropout_setups, noisy_setups, slow_setups):
+    """Old ("extreme") against new ("parabola") estimator, two cameras, plus the calibration of depth_se_m."""
+    rows = []
+    for (est, noise, pace), setup in comparison_setups.items():
+        run0 = done[("run", setup, 0.0)]
+        mdd, _ = mdd_mm(done, setup, ref_grid)
+        rows.append({"estimator": est, "white_noise_model_px": noise, "pace": pace,
+                     "mean_depth_error_mm": float(np.nanmean(run0["depth_error_m"])) * 1000,
+                     "sd_depth_error_mm": eb.depth_error_sd_m(run0) * 1000,
+                     "sd_difference_two_reps_mm": eb.difference_sd_m(run0) * 1000,
+                     "minimum_detectable_difference_mm": mdd, "unclear_rate": eb.unclear_rate(run0)})
+    dropouts = [{"estimator": est, "pace": pace, "dropout": level,
+                 "unclear_rate": eb.unclear_rate(done[("run", setup, 0.0)])}
+                for (est, pace, level), setup in dropout_setups.items()]
+    extra = [{"estimator": est, "pace": pace, "white_noise_model_px": 2.0,
+              "extra_detected_reps_per_session": eb.extra_reps(done[("run", setup, 0.0)])}
+             for (est, pace), setup in noisy_setups.items()]
+    calibration = []
+    for slow, table in ((0.0, {k: v for k, v in comparison_setups.items() if k[0] == "parabola"}),
+                        (SLOW_CALIBRATION_PX, {("parabola",) + k: v for k, v in slow_setups.items()})):
+        for (_, noise, pace), setup in table.items():
+            run0 = done[("run", setup, 0.0)]
+            reported = run0["depth_se_m"][np.isfinite(run0["depth_se_m"])]
+            actual = eb.depth_error_sd_m(run0)
+            calibration.append({"slow_noise_model_px": slow, "white_noise_model_px": noise, "pace": pace,
+                                "mean_reported_depth_se_mm": float(reported.mean()) * 1000 if len(reported) else None,
+                                "empirical_sd_depth_error_mm": actual * 1000,
+                                "ratio_reported_to_empirical": float(reported.mean() / actual) if len(reported) else None})
+    return {"rows": rows, "dropouts": dropouts, "extra_reps_2px": extra, "calibration": calibration}
 
 
 def clean(value):
@@ -252,6 +300,7 @@ def assumption_list(n, seed, cfg):
         "Sync error: camera B samples the motion at t + d frames and is then treated as simultaneous (cameras A and C are exact). Only the two-camera and three-camera modes have it.",
         "Calibration errors: scale error multiplies every reconstructed length by (1 + s); tilt leans the calibrated up-axis by e degrees towards the direction of horizontal travel (backwards). Tilt does not apply to the one-camera modes (they have no horizontal position).",
         "Two or more cameras: hips are triangulated by a vectorised linear (DLT) method (checked against rvectr.geometry.triangulate_points), then the pipeline's own steps are used: squat.pelvis_track, squat.segment_reps, squat.classify, pipeline defaults (tolerance 3 cm, min depth 6 cm, min coverage 0.85, reference rep 1, raw trace; standing level from the 0.5-2.5 s window). Not simulated: the pipeline's confidence, reprojection-error and ray-angle rejection, the robust refinement step, left/right hip swaps, lens distortion, and correlation between the two hips' errors.",
+        "Depth estimator (sections 1 to 5): the pipeline default 'parabola' (standing height = median of the standing samples; bottom = vertex of a parabola fitted to the samples near the lowest point; the lowest point needs at least 5 usable samples, an upward-opening fit, the vertex inside the samples with 2 on each side, and no gap above 0.1 s). The original 'extreme' estimator (highest standing sample minus lowest bottom sample) is compared in section 6.",
         "One camera: height = lens height - (image row - centre) x 3.0 m / focal length, i.e. the scale that is correct at the standing position. Moving towards or away from the camera therefore causes a perspective error (the side camera has none because the pelvis moves across its view).",
         "Detected repetitions are matched to the true ones by bottom time. A repetition the software does not find, or finds with too little coverage, is 'unclear'. If the reference repetition itself is unusable (classify refuses it), every test repetition of that session is 'unclear'.",
         "Minimum detectable difference (MDD): the smallest true difference for which SOME decision threshold flags at least 95% of shallow repetitions and at most 5% of matching repetitions. 'Flagged' means measured reference depth minus measured test depth is above the threshold. Unclear repetitions are never counted as flagged, so an unclear rate above 5% makes the MDD unreachable. The threshold is chosen with knowledge of the simulated noise, so it is a best case; the pipeline's fixed 3 cm tolerance is evaluated separately.",
@@ -330,8 +379,9 @@ def markdown(r, ref_grid, sweep_grid):
             "but move the 3 cm decision line (last column). "
             "(c) Large white noise does more than add jitter: once the pelvis-height noise is a sizeable fraction of the 3 cm entry level of squat.segment_reps, "
             "the rule splits or invents repetitions ('extra reps' column) and the MDD grows faster than the noise. "
-            "(d) Dropouts act through the coverage rule (at least 85% of the repetition) and the rule that the bottom frame and its two neighbours must all be observed; "
-            "with two cameras every hip needs both cameras, so even 0.5% missing detections per hip per camera make about 6% of repetitions unclear.", "",
+            "(d) Dropouts act through the coverage rule (at least 85% of the repetition) and the bottom rule (enough observed samples around the lowest point, without a long gap; "
+            "the old estimator instead needed the bottom frame and both its neighbours, which made about 6% of repetitions unclear at only 0.5% missing detections per hip per camera, see section 6). "
+            "With two cameras every hip needs both cameras, so the pelvis is missing in a frame about four times as often as one detection.", "",
             "![ranking](ranking.png)", "![detection](detection_curves.png)", "![sweeps](sweeps.png)", "",
             "## 5. Cross-check against the analytic value (white noise only, two cameras)", "",
             "Simple argument: the height of one hip from two cameras has spread sigma/sqrt(2); the pelvis (two hips) sigma/2; "
@@ -343,15 +393,52 @@ def markdown(r, ref_grid, sweep_grid):
     out.append(table_md(["noise, model px", "pace", "analytic, mm", "simulated sd diff, mm", "ratio", "two-frame estimator, mm", "ratio", "pelvis sd standing, mm"], rows))
     if any(c["differs_more_than_15_percent"] for c in r["analytic_cross_check"]):
         out += ["", "The full simulation differs from the analytic value by more than 15%. Why: the analytic formula assumes each depth is read from "
-                "one standing frame and one bottom frame. The real rule takes the MAXIMUM height over about a second of standing frames and the MINIMUM "
-                "over the frames near the bottom, where the pelvis hardly moves. The extreme of many noisy values varies much less than one value "
-                "(and sits slightly high/low, which cancels in a difference), so the real spread is smaller. The 'two-frame estimator' columns "
+                "one standing frame and one bottom frame. The pipeline's estimator uses the MEDIAN of about a second of standing frames and a PARABOLA fitted to "
+                "the frames near the bottom, so it averages many noisy values and the real spread is smaller (the old 'extreme' estimator, see section 6, "
+                "used the maximum and the minimum, which are also less spread but biased). The 'two-frame estimator' columns "
                 "check this: reading depth from two single frames reproduces the analytic value, and the standing pelvis spread confirms sigma/2. "
                 "The fast pace is closer to the analytic value because fewer frames lie near the bottom. The raw trace is not smoothed; smoothing would reduce the spread further."]
     else:
         out += ["", "The full simulation agrees with the analytic value to within 15%."]
+    out += estimator_markdown(r["estimator_comparison"], ref_grid)
     out.append("")
     return "\n".join(out)
+
+
+def estimator_markdown(c, ref_grid):
+    """Section 6: the old and the new depth estimator side by side."""
+    out = ["", "## 6. Estimator comparison: old 'extreme' against new 'parabola' (two cameras)", "",
+           "'extreme' = highest standing sample minus lowest bottom sample (the original rule). 'parabola' = median of the standing samples "
+           "minus the vertex of a parabola fitted around the lowest point (the new default, used in sections 1 to 5). "
+           "Mean depth error is the bias (a positive value means depths read too deep). Millimetres.", ""]
+    rows = [[e["estimator"], e["white_noise_model_px"], e["pace"], f"{e['mean_depth_error_mm']:+.1f}", f"{e['sd_depth_error_mm']:.1f}",
+             f"{e['sd_difference_two_reps_mm']:.1f}", text_mm(e["minimum_detectable_difference_mm"], ref_grid),
+             f"{100 * e['unclear_rate']:.0f}%"] for e in c["rows"]]
+    out.append(table_md(["estimator", "white noise, model px", "pace", "mean depth error (bias)", "sd depth error", "sd diff",
+                         "minimum detectable difference", "unclear"], rows))
+    out += ["", "Unclear share of test repetitions with dropouts (each hip in each camera missing in a frame with this probability), no other noise than the reference 0.5 model px:", ""]
+    levels = sorted({d["dropout"] for d in c["dropouts"]})
+    rows = []
+    for level in levels:
+        cells = [level]
+        for pace in eb.PACES:
+            for est in ESTIMATORS:
+                x = next(d for d in c["dropouts"] if d["dropout"] == level and d["pace"] == pace and d["estimator"] == est)
+                cells.append(f"{100 * x['unclear_rate']:.0f}%")
+        rows.append(cells)
+    out.append(table_md(["dropout probability"] + [f"{p}, {e}" for p in eb.PACES for e in ESTIMATORS], rows))
+    out += ["", "Extra repetitions found per session (beyond the 4 real ones) at 2.0 model px white noise:", ""]
+    out.append(table_md(["estimator", "pace", "extra reps per session"],
+                        [[x["estimator"], x["pace"], f"{x['extra_detected_reps_per_session']:+.2f}"] for x in c["extra_reps_2px"]]))
+    out += ["", "Calibration of the reported error bar (parabola): mean reported depth_se_m against the actual spread (standard deviation) of the depth error. "
+            "The reported value assumes errors from frame to frame are independent, so with slow noise it should be too small. Millimetres.", ""]
+    rows = [[x["slow_noise_model_px"], x["white_noise_model_px"], x["pace"],
+             "n/a" if x["mean_reported_depth_se_mm"] is None else f"{x['mean_reported_depth_se_mm']:.2f}",
+             f"{x['empirical_sd_depth_error_mm']:.2f}",
+             "n/a" if x["ratio_reported_to_empirical"] is None else f"{x['ratio_reported_to_empirical']:.2f}"] for x in c["calibration"]]
+    out.append(table_md(["slow noise, model px", "white noise, model px", "pace", "mean reported depth_se", "actual sd of depth error",
+                         "ratio reported / actual"], rows))
+    return out
 
 
 def eb_detection_cm(grid):

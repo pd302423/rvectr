@@ -82,7 +82,7 @@ def test_a_missing_bottom_frame_makes_a_repetition_unclear_through_classify():
     times, h, depths, starts = eb.simulate_trace(setup, 0.0, np.random.default_rng(1))
     bottoms = starts + setup.descent_s
     h[np.abs(times - bottoms[2]) < 0.1] = np.nan             # no data around the bottom of repetition 2
-    measured, outcomes, _ = eb.measure(setup, times, h, bottoms)
+    measured, outcomes, _, _ = eb.measure(setup, times, h, bottoms)
     assert outcomes[2] == eb.UNCLEAR and np.isnan(measured[2])
     assert outcomes[1] == eb.REACHED and outcomes[3] == eb.REACHED
 

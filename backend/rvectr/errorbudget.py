@@ -87,6 +87,7 @@ class Setup:
     trace: str = "raw"             # "raw" or "filtered" (5-frame moving average, as in the pipeline)
     n_test_reps: int = 3
     tolerance_m: float = RULES["tolerance_m"]
+    estimator: str = RULES["estimator"]   # "parabola" (new) or "extreme" (old), see squat.segment_reps
 
     def __post_init__(self):
         if self.mode not in MODES:
@@ -95,6 +96,8 @@ class Setup:
             raise ValueError(f"pace must be one of {tuple(PACES)}")
         if self.trace not in ("raw", "filtered"):
             raise ValueError("trace must be 'raw' or 'filtered'")
+        if self.estimator not in ("parabola", "extreme"):
+            raise ValueError("estimator must be 'parabola' or 'extreme'")
 
     @property
     def descent_s(self):
@@ -287,29 +290,31 @@ def pelvis_height(setup, xyz, valid, up):
 def measure(setup, times, h, true_bottoms_s):
     """Run the project's segment/classify rules on a height trace and match results to the true repetitions.
 
-    Returns depths [R], outcomes [R] for the true repetitions in order (reference first) and the
-    number of repetitions the software detected (more than R means noise created false repetitions).
+    Returns depths [R], outcomes [R] for the true repetitions in order (reference first), the number
+    of repetitions the software detected (more than R means noise created false repetitions) and the
+    standard error the software reports for each depth [R] (NaN if unclear, or with the old estimator).
     A repetition the software did not find is "unclear".
     """
     n = len(true_bottoms_s)
-    depths, outcomes = np.full(n, np.nan), np.full(n, UNCLEAR)
+    depths, outcomes, depth_se = np.full(n, np.nan), np.full(n, UNCLEAR), np.full(n, np.nan)
     inside = (times >= STANDING_WINDOW_S[0]) & (times <= STANDING_WINDOW_S[1]) & np.isfinite(h)
     standing = float(np.median(h[inside])) if inside.sum() >= 10 else None
-    reps, _ = squat.segment_reps(times, h, standing=standing, min_depth_m=RULES["min_rep_depth_m"])
+    reps, _ = squat.segment_reps(times, h, standing=standing, min_depth_m=RULES["min_rep_depth_m"],
+                                 estimator=setup.estimator)
     if not reps:
-        return depths, outcomes, 0
+        return depths, outcomes, 0, depth_se
     # Which detected repetition is which? Match by bottom time to the known truth.
     matched = []
     for bottom in true_bottoms_s:
         gaps = np.array([abs(r["bottom_s"] - bottom) for r in reps])
         matched.append(int(np.argmin(gaps)) if gaps.min() <= setup.descent_s else None)
     if matched[0] is None:
-        return depths, outcomes, len(reps)                        # reference not found: nothing can be compared
+        return depths, outcomes, len(reps), depth_se              # reference not found: nothing can be compared
     try:
         classified, _ = squat.classify(reps, reps[matched[0]]["rep"], setup.tolerance_m,
                                        RULES["min_coverage"], RULES["borderline_m"])
     except ValueError:                                            # reference not observed well enough
-        return depths, outcomes, len(reps)
+        return depths, outcomes, len(reps), depth_se
     names = {"reached_reference": REACHED, "shallower": SHALLOWER, "unclear": UNCLEAR}
     for i, k in enumerate(matched):
         if k is None:
@@ -317,7 +322,8 @@ def measure(setup, times, h, true_bottoms_s):
         outcomes[i] = names[classified[k]["outcome"]]
         if outcomes[i] != UNCLEAR:
             depths[i] = classified[k]["depth_m"]
-    return depths, outcomes, len(reps)
+            depth_se[i] = classified[k].get("depth_se_m", np.nan)
+    return depths, outcomes, len(reps), depth_se
 
 
 def simulate_trace(setup, delta_m, rng):
@@ -331,8 +337,8 @@ def simulate_trace(setup, delta_m, rng):
 def run_session(setup, delta_m, rng):
     """One recording: reference repetition then test repetitions shallower by delta_m."""
     times, h, depths, starts = simulate_trace(setup, delta_m, rng)
-    measured, outcomes, detected = measure(setup, times, h, starts + setup.descent_s)
-    return measured, outcomes, depths, detected
+    measured, outcomes, detected, depth_se = measure(setup, times, h, starts + setup.descent_s)
+    return measured, outcomes, depths, detected, depth_se
 
 
 def run_config(setup, delta_m, n_sessions, seed=0):
@@ -341,16 +347,18 @@ def run_config(setup, delta_m, n_sessions, seed=0):
     Session i always uses random stream (seed, i), so results do not depend on
     how many sessions are run and are identical for the same seed.
     Returns dict of arrays: depth_error_m [n, 1+K] (NaN where unclear),
-    outcome [n, 1+K] (0 reached, 1 shallower, 2 unclear), extra_reps [n] (detected minus true repetitions).
+    outcome [n, 1+K] (0 reached, 1 shallower, 2 unclear), extra_reps [n] (detected minus true repetitions),
+    depth_se_m [n, 1+K] (the standard error the software reported for each depth).
     """
-    err, out, detected = [], [], []
+    err, out, detected, reported_se = [], [], [], []
     for i in range(n_sessions):
-        measured, outcomes, truth, n_found = run_session(setup, delta_m, np.random.default_rng([seed, i]))
+        measured, outcomes, truth, n_found, depth_se = run_session(setup, delta_m, np.random.default_rng([seed, i]))
+        reported_se.append(depth_se)
         err.append(measured - truth)
         out.append(outcomes)
         detected.append(n_found - len(truth))
     return {"delta_m": float(delta_m), "depth_error_m": np.array(err), "outcome": np.array(out),
-            "extra_reps": np.array(detected)}
+            "extra_reps": np.array(detected), "depth_se_m": np.array(reported_se)}
 
 
 def config_seed(*parts):

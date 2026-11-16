@@ -113,6 +113,8 @@ This is the independent check of scale and camera geometry.
 2. Flash a light visible to both cameras: a phone torch switched on for about half a second.
 3. Stand still for 3 seconds. This is the jitter measurement.
 4. Do the reps. Rep 1 is the participant's chosen reference depth.
+   Stand still for two seconds between reps: the software reads the standing
+   height from that pause.
 5. Stand still, then flash the light again.
 6. Stop both phones.
 
@@ -156,12 +158,34 @@ The run folder contains:
 
 ### How the numbers are defined
 
-- **Depth** = standing pelvis height just before the rep − lowest pelvis height in the rep.
+- **Standing height** = the median pelvis height over the second of standing
+  still that ends half a second before the rep begins (never reaching back into
+  the previous rep). The median ignores the odd wild value. If that stretch has
+  too few observed frames, the whole pause before the rep is used; if even that
+  is too short, the standing level of the whole recording is used and the rep
+  is marked `standing_source` = `session` (it then has no plus-or-minus).
+- **Bottom** = the lowest point of a smooth curve (a parabola) fitted to the
+  real frames around the lowest part of the rep. Near the lowest point the
+  pelvis moves like a ball at the top of its flight, so its height against time
+  is a parabola, and using many frames averages out the noise. The single
+  lowest frame is not used: it is the frame with the luckiest noise, so it
+  reads too deep.
+- **Depth** = standing height − bottom height.
+- **Plus-or-minus** (`depth_se_m` in `reps_*.csv`) = the typical error of the
+  depth, worked out from the scatter of the frames used. `difference_se_m` is
+  the same for the difference from the reference rep. It assumes the error of
+  each frame is independent of the next. If errors drift slowly (a slowly
+  wandering pose detection), the real error is bigger, so the plus-or-minus is
+  a lower bound.
 - **Reached reference** = depth ≥ reference depth − `tolerance_m` (default 3 cm).
   Set the tolerance from a pilot clip, then keep it fixed.
-- **Borderline** = within `borderline_m` of that line.
+- **Borderline** = within `borderline_m` of that line, or within twice the
+  plus-or-minus of the difference from the reference rep, whichever is larger.
 - **Unclear** = fewer than `min_coverage` (85 %) of the rep's frames had both
-  hips reconstructed, or the bottom was not seen. Missing data is never filled in.
+  hips reconstructed, or the bottom was not seen well enough: fewer than 5
+  real frames around the lowest point, a gap of more than 0.1 s between them,
+  or frames missing on one side so that the lowest point is not inside them.
+  Missing data is never filled in.
 - **Jitter** = spread of the pelvis around its median while standing still
   (`standing_window_s`), for raw and filtered traces.
 - **Filter effect** = filtered depth − raw depth per rep. A large change on the
