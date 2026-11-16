@@ -295,8 +295,8 @@ def test_rigid_target_length_from_marked_pixels():
 
 
 # ----------------------------------------------------------------------------- whole run from files
-@needs_ffmpeg
-def test_full_run_from_videos_and_saved_keypoints(tmp_path, monkeypatch):
+def prepare_full_run(tmp_path, monkeypatch):
+    """Synthetic videos, calibrations, saved keypoints and session config; returns what run_session needs."""
     width, height, offset = 640, 360, 0.45
     cameras = two_cameras(width, height)
     data, calibration, outputs = tmp_path / "data", tmp_path / "calibration", tmp_path / "outputs"
@@ -332,6 +332,12 @@ def test_full_run_from_videos_and_saved_keypoints(tmp_path, monkeypatch):
     monkeypatch.setenv("RVECTR_DATA_ROOT", str(data))
     monkeypatch.setenv("RVECTR_CALIBRATION_DIR", str(calibration))
     paths = RuntimePaths.discover(load_local=False)
+    return paths, outputs, previous, offset
+
+
+@needs_ffmpeg
+def test_full_run_from_videos_and_saved_keypoints(tmp_path, monkeypatch):
+    paths, outputs, previous, offset = prepare_full_run(tmp_path, monkeypatch)
     run, report = run_session(tmp_path / "session.json", paths, outputs, keypoints_from=previous, progress=lambda *_: None)
     assert run.name == "V1.1.2"
     assert report["status"] == "measured"

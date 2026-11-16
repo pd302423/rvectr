@@ -109,6 +109,11 @@ This is the independent check of scale and camera geometry.
 
 ## 6. Record a take
 
+Before the first take, mark the standing spot with a tape cross on the floor.
+Stand on it at the start of every take and face the same way in every take.
+The one-camera comparison (see "Comparing numbers of views") needs to know where
+the person stands and which way the hips point.
+
 1. Start both phones.
 2. Flash a light visible to both cameras: a phone torch switched on for about half a second.
 3. Stand still for 3 seconds. This is the jitter measurement.
@@ -208,6 +213,87 @@ The run folder contains:
   faster reps means the filter is hiding real depth.
 - **False pass** = software said reached, footage said shallow.
   **False flag** = software said shallower, footage said match.
+
+## Comparing numbers of views
+
+The research question is how the accuracy of the depth changes with the number
+of camera views. So after the normal measurement the software measures the
+**same recording again** with fewer cameras. It does not detect the body again:
+it reuses the 2D keypoints already found, and it uses the same squat settings
+and the same reference rep. Each way of measuring is called a **condition**:
+
+- **all views**: every camera together. This is the main result above.
+- **two views** (only when there are three or more cameras): every pair of cameras, triangulated on their own.
+- **one view, fixed distance** and **one view, movement plane**: each camera alone, in two versions (below).
+
+With two cameras that makes five conditions (two per camera, plus all views);
+with three cameras it makes ten (six one-view, three pairs, all views).
+
+### What one camera can and cannot do
+
+One camera sees a direction, not a distance: each pixel is a straight line
+(a ray) running out from the camera. Two cameras give two rays that cross at
+the point. One camera needs an extra assumption: *the pelvis moves in a flat,
+vertical plane*. The point is then where the ray meets that plane. If the
+person does not really stay in that plane, the depth is wrong. Both versions
+use a vertical plane through the standing spot:
+
+- **Fixed distance** uses the plane that faces the camera. It assumes the person
+  never moves towards or away from the camera, which is what a simple
+  one-camera measurement assumes. If the hips move backwards while the camera
+  looks at them from the side-front, the depth is read too short; if they move
+  towards the camera, too long. A camera exactly side-on to the movement is not affected.
+- **Movement plane** uses the plane the person moves in: forwards, backwards, up
+  and down. Its direction comes from the hip line (from the left hip to the
+  right hip). It assumes no sideways movement. It copes with moving backwards,
+  but a wrongly measured hip line causes an error, and it cannot be used by a
+  camera that looks straight along the movement (the ray then runs along the
+  plane and the point is marked missing).
+
+### Where the plane comes from, and fairness
+
+The plane needs the standing spot and the hip line, in the calibration frame.
+
+- **`plane_source = "multiview_standing"`** (default): both are taken from the
+  all-cameras result while the person stands still (median pelvis position, and
+  median left-hip-to-right-hip direction). **This is not a fair test of one
+  camera alone**, because the one-camera conditions borrow set-up information
+  from the other cameras. It tells you the best a single camera could do with
+  perfect knowledge of where the person stands.
+- **`plane_source = "measured"`**: give both in the session config, measured
+  independently of the cameras (for example the tape cross on the floor and the
+  direction the person faces, converted to the calibration frame):
+
+```json
+"views": {"compare": true, "standing_point_m": [0.30, -0.95, 0.50], "hip_line": [1, 0, 0]}
+```
+
+  Then the one-camera conditions use no information from the other cameras. Give
+  both values or neither. `"compare": false` switches the comparison off.
+
+The standing spot is the pelvis position (so it is at hip height, not on the floor).
+
+### The files
+
+| File | What it is |
+|---|---|
+| `views_comparison.csv` | one row per rep per condition |
+| `views_summary.json` | one entry per condition: reps found, unclear, standing jitter (total, fast, slow), the averages below, `plane_source` and one sentence saying what the condition assumes |
+| `views_depth.png` | depth of every rep for every condition, with plus-or-minus bars |
+
+Reading `views_comparison.csv`: `condition` and `cameras` say what was used and
+`model` how (`triangulation`, `fixed_distance` or `movement_plane`). `rep` is
+numbered as in the all-views result: a rep of another condition is the same rep
+if its bottom is within 0.5 s of that rep's bottom. A rep that a condition did
+not find has `outcome` = `not_found` and empty numbers; reps found that match no
+all-views rep are only counted in the summary. The other columns are as in
+`reps_raw.csv`, with one addition: **`depth_minus_all_views_m`** is this
+condition's depth minus the all-views depth for the same rep. A value near zero
+means that fewer views did as well. The summary gives its mean (a steady bias)
+and standard deviation (scatter), and the same for the difference from the
+reference rep (rep 1, which is zero by definition, is left out of that one).
+A condition that agrees with all views is not necessarily right: all views is
+the comparison, not the truth.
 
 ## What this does not tell you
 
