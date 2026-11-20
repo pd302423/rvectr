@@ -22,39 +22,19 @@ function getMeshMaterial(style: string) {
   if (materialCache[style]) return materialCache[style];
 
   let mat: THREE.MeshStandardMaterial;
-  switch (style) {
-    case "wireframe":
-      mat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.75,
-      });
-      break;
-    case "matte":
-      mat = new THREE.MeshStandardMaterial({
-        color: 0xe2e8f0,
-        roughness: 0.35,
-        metalness: 0.05,
-      });
-      break;
-    case "glass":
-      mat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.25,
-      });
-      break;
-    case "chrome":
-    default:
-      mat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        roughness: 0.1,
-        metalness: 0.9,
-        envMapIntensity: 1.5,
-      });
-      break;
+  if (style === "wireframe") {
+    mat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.85,
+    });
+  } else {
+    mat = new THREE.MeshStandardMaterial({
+      color: 0xe2e8f0,
+      roughness: 0.45,
+      metalness: 0.1,
+    });
   }
   materialCache[style] = mat;
   return mat;
@@ -68,7 +48,7 @@ export function ThreeMeshCanvas({
   const mountRef = useRef<HTMLDivElement>(null);
   const { activeFrame } = useBiomechanicsStore();
 
-  const [meshStyle, setMeshStyle] = useState<"chrome" | "matte" | "wireframe" | "glass">("wireframe");
+  const [meshStyle, setMeshStyle] = useState<"solid" | "wireframe">("solid");
   const [sourceType, setSourceType] = useState<"obj" | "glb">(defaultSource);
   const [isLoadingMesh, setIsLoadingMesh] = useState(false);
 
@@ -330,17 +310,15 @@ export function ThreeMeshCanvas({
             </button>
           </div>
 
-          {/* Viewport Material Controls */}
-          <div className="flex items-center gap-1 bg-[#000000] border border-[#262626] p-1">
+          {/* Viewport Display Mode */}
+          <div className="flex items-center gap-1 bg-[#000000] border border-[#262626] p-1 font-mono text-[11px]">
             {[
-              { id: "wireframe", label: "Wireframe" },
-              { id: "chrome", label: "Chrome" },
-              { id: "matte", label: "Matte" },
-              { id: "glass", label: "Translucent" },
+              { id: "solid", label: "Anatomical Mesh" },
+              { id: "wireframe", label: "3D Wireframe" },
             ].map((m) => (
               <button
                 key={m.id}
-                onClick={() => setMeshStyle(m.id as any)}
+                onClick={() => setMeshStyle(m.id as "solid" | "wireframe")}
                 className={`px-2.5 py-0.5 transition-all uppercase ${
                   meshStyle === m.id
                     ? "bg-[#ffffff] text-[#000000] font-bold"
@@ -358,13 +336,12 @@ export function ThreeMeshCanvas({
       <div ref={mountRef} style={{ height }} className="w-full cursor-grab active:cursor-grabbing relative" />
 
       {/* Footer Info */}
-      <div className="p-2.5 border-t border-[#262626] bg-[#0a0a0a] text-[10px] text-[#a3a3a3] flex justify-between items-center px-4">
+      <div className="p-2.5 border-t border-[#262626] bg-[#0a0a0a] text-[10px] text-[#a3a3a3] flex justify-between items-center px-4 font-mono">
         <span>
-          {sourceType === "glb" ? "squat_multiview_animated.glb (.blend export)" : `Frame ${activeFrame + 1} / 291`}{" "}
-          • Sub-centimeter SMPL Surface Mesh
+          {sourceType === "glb" ? "SMPL 6,890-Vertex Mesh (.glb)" : `Frame ${activeFrame + 1} / 291 (.obj)`}
         </span>
         <span className="flex items-center gap-1 text-[#ffffff]">
-          <Eye className="h-3 w-3 text-[#ffffff]" /> Drag mouse to rotate 360°
+          <Eye className="h-3 w-3 text-[#38bdf8]" /> Left-click to rotate 360° · Scroll to zoom
         </span>
       </div>
     </div>

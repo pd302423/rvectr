@@ -1,212 +1,251 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { Navbar } from "@/components/layout/Navbar";
-import { useBiomechanicsStore, AnalysisResultData } from "@/lib/store";
-import { FileVideo, AlertCircle, Loader2, ArrowRight } from "lucide-react";
+import { useRef, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, CheckCircle2, Grid3x3, Camera, UploadCloud } from "lucide-react";
+import { Container } from "@/components/site/Container";
+import { Notice } from "@/components/site/Notice";
+import { PageHeader } from "@/components/site/PageHeader";
+import { SectionHeading } from "@/components/site/SectionHeading";
+import { GITHUB_URL } from "@/lib/site";
+
+type SlotId = "calib" | "cam1" | "cam2";
+type SetupMode = "multiview" | "monocular";
+
+interface VideoSlot {
+  id: SlotId;
+  title: string;
+  role: string;
+  description: string;
+  icon: typeof Camera;
+  file: File | null;
+  required: boolean;
+}
+
+const KIT_LIST = [
+  "Two phones (a third helps) on tripods or something very stable",
+  "The printed checkerboard, stuck flat on a stiff board",
+  "A torch from a different phone, for the flash that lines up the clocks",
+  "A stick of known length, to check the software gets lengths right",
+  "A stool and a few flat boards or books, to raise the stool by measured amounts",
+  "Tape for a cross on the floor, and a notebook and pen",
+] as const;
+
+const NEXT_STEPS = [
+  "The software reads the checkerboard video to learn each phone's lens and where each phone stands.",
+  "A pose model finds the hips in every frame of every video. Frames are lined up using the torch flash.",
+  "The hip positions are combined into 3D, and each squat is labelled “reached reference”, “shallower” or “unclear”.",
+] as const;
 
 export default function UploadPage() {
-  const router = useRouter();
-  const setAnalysis = useBiomechanicsStore((state) => state.setAnalysis);
+  const [mode, setMode] = useState<SetupMode>("multiview");
 
-  const [file, setFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [analysisType, setAnalysisType] = useState("full");
-  const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [calibFile, setCalibFile] = useState<File | null>(null);
+  const [cam1File, setCam1File] = useState<File | null>(null);
+  const [cam2File, setCam2File] = useState<File | null>(null);
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  }, []);
+  const calibInputRef = useRef<HTMLInputElement>(null);
+  const cam1InputRef = useRef<HTMLInputElement>(null);
+  const cam2InputRef = useRef<HTMLInputElement>(null);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-      setError(null);
-    }
-  }, []);
+  const slots: VideoSlot[] = [
+    {
+      id: "calib",
+      title: "1. Checkerboard video",
+      role: "Lens and phone positions",
+      description:
+        "A video of the printed checkerboard, seen by both phones. The software uses it to learn each phone's lens and where each phone stands.",
+      icon: Grid3x3,
+      file: calibFile,
+      required: mode === "multiview",
+    },
+    {
+      id: "cam1",
+      title: "2. Phone 1 squat video",
+      role: "First view",
+      description: "The squats, filmed from phone 1.",
+      icon: Camera,
+      file: cam1File,
+      required: true,
+    },
+    {
+      id: "cam2",
+      title: "3. Phone 2 squat video",
+      role: "Second view",
+      description: "The same squats at the same time, filmed from phone 2. A torch flash both phones see lines up the clocks.",
+      icon: Camera,
+      file: cam2File,
+      required: mode === "multiview",
+    },
+  ];
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setError(null);
-    }
+  const inputRefs = { calib: calibInputRef, cam1: cam1InputRef, cam2: cam2InputRef };
+  const setters = { calib: setCalibFile, cam1: setCam1File, cam2: setCam2File };
+
+  const handleFileSelect = (slotId: SlotId, e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (selected) setters[slotId](selected);
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
-
-    setUploading(true);
-    setProgress(10);
-    setError(null);
-
-    const formData = new FormData();
-    formData.append("video", file);
-
-    try {
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 15;
-        });
-      }, 300);
-
-      const response = await fetch(
-        `/api/v1/analyze?analysis_type=${analysisType}`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      clearInterval(progressInterval);
-      setProgress(100);
-
-      if (!response.ok) {
-        // NO MOCK FALLBACK. This previously substituted fabricated joint angles
-        // and a posture grade whenever the backend was unreachable, then routed
-        // the user to /analysis as though a real analysis had completed. Failing
-        // loudly is the only honest behaviour.
-        throw new Error(
-          `Analysis backend unavailable (HTTP ${response.status}). ` +
-            `No analysis was performed. The server-side analysis endpoint has ` +
-            `been removed — run the Python pipeline in backend/ directly.`
-        );
-      }
-
-      const data: AnalysisResultData = await response.json();
-      setAnalysis(data);
-      router.push("/analysis");
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An error occurred during video upload"
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
+  const visibleSlots = slots.filter((s) => mode === "multiview" || s.id === "cam1");
+  const chosen = visibleSlots.filter((s) => s.file);
+  const totalMb = chosen.reduce((sum, s) => sum + (s.file ? s.file.size : 0), 0) / (1024 * 1024);
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      <Navbar />
+    <Container className="grid gap-10 py-10 sm:py-14">
+      <PageHeader eyebrow="Recording kit" title="What to record for the two-phone squat test">
+        <p>
+          A short guide to what you need and what to film, with a place to line up your video files before you take
+          them to the laptop.
+        </p>
+      </PageHeader>
 
-      <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-10">
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground font-sans">
-            Upload Video Analysis
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground font-sans">
-            Select an assessment type and upload a movement recording for 3D landmark recovery and telemetry generation.
-          </p>
+      <Notice tone="info" title="Nothing is uploaded or processed online.">
+        <p>
+          Files you choose here stay in your browser. They are not sent anywhere. Processing runs on a laptop with the
+          Python <code className="font-mono text-foreground">rvectr</code> software. The step-by-step filming list is
+          in <code className="font-mono text-foreground">docs/PILOT_RECORDING_CHECKLIST.md</code> in the{" "}
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground underline underline-offset-4"
+          >
+            GitHub repository
+          </a>
+          .
+        </p>
+      </Notice>
+
+      <section aria-labelledby="kit-title" className="grid gap-5">
+        <SectionHeading id="kit-title" eyebrow="Before you film">
+          What you need
+        </SectionHeading>
+        <ul className="grid max-w-[65ch] list-disc gap-2 pl-5 leading-relaxed text-muted-foreground marker:text-data">
+          {KIT_LIST.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+        <p className="max-w-[65ch] text-sm leading-relaxed text-muted-foreground">
+          Film only yourself for now. Warm up first, and stop if anything hurts.
+        </p>
+      </section>
+
+      <section aria-labelledby="files-title" className="grid gap-5">
+        <SectionHeading id="files-title" eyebrow="Your files">
+          Line up your videos
+        </SectionHeading>
+
+        <div role="group" aria-label="How many phones" className="flex flex-wrap gap-2">
+          {(
+            [
+              { id: "multiview", label: "Two phones (checkerboard + 2 videos)" },
+              { id: "monocular", label: "One phone (1 video)" },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={mode === option.id}
+              onClick={() => setMode(option.id)}
+              className="min-h-10 rounded-full border border-border px-4 text-sm transition-colors hover:bg-muted aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background"
+            >
+              {option.label}
+            </button>
+          ))}
         </div>
 
-        {/* Analysis Type Selector */}
-        <div className="mb-8 p-5 rounded-xl border border-border bg-card shadow-xs">
-          <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-3">
-            Select Assessment Type
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { id: "full", label: "Full Analysis" },
-              { id: "posture", label: "Posture" },
-              { id: "gait", label: "Gait Cycle" },
-              { id: "range_of_motion", label: "Range of Motion" },
-            ].map((type) => (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => setAnalysisType(type.id)}
-                className={`py-2.5 px-3 rounded-lg border text-xs font-semibold transition-all ${
-                  analysisType === type.id
-                    ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                    : "bg-secondary/60 text-secondary-foreground border-border hover:bg-secondary"
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {visibleSlots.map((slot) => {
+            const Icon = slot.icon;
+            const inputRef = inputRefs[slot.id];
+            return (
+              <div
+                key={slot.id}
+                className={`flex min-w-0 flex-col justify-between rounded-lg border p-5 transition-colors ${
+                  slot.file ? "border-data/50 bg-data/5" : "border-border bg-card"
                 }`}
               >
-                {type.label}
-              </button>
-            ))}
-          </div>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".mp4,.avi,.mov,.mkv,.webm"
+                  onChange={(e) => handleFileSelect(slot.id, e)}
+                  className="hidden"
+                  tabIndex={-1}
+                />
+
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="rounded-md border border-border bg-background p-2 text-foreground">
+                      <Icon aria-hidden="true" className="h-5 w-5" />
+                    </div>
+                    {slot.file ? (
+                      <span className="flex items-center gap-1 font-mono text-[11px] text-data">
+                        <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> Chosen
+                      </span>
+                    ) : (
+                      <span className="font-mono text-[10px] uppercase text-muted-foreground">
+                        {slot.required ? "Required" : "Optional"}
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="mb-1 text-sm font-semibold">{slot.title}</h3>
+                  <p className="mb-3 font-mono text-[11px] text-muted-foreground">{slot.role}</p>
+                  <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{slot.description}</p>
+                </div>
+
+                <div>
+                  {slot.file ? (
+                    <div className="mb-3 rounded-sm border border-border bg-background/80 p-2.5 font-mono text-xs">
+                      <p className="truncate font-semibold text-foreground">{slot.file.name}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground">
+                        {(slot.file.size / (1024 * 1024)).toFixed(2)} MB &middot; {slot.file.type || "video"}
+                      </p>
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    className="flex min-h-10 w-full items-center justify-center gap-2 border border-border px-3 text-xs uppercase tracking-wider transition-colors hover:bg-foreground hover:text-background"
+                  >
+                    <UploadCloud aria-hidden="true" className="h-3.5 w-3.5" />
+                    <span>{slot.file ? "Replace file" : "Choose video"}</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Drop Zone */}
-        <div
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`p-10 rounded-xl border-2 border-dashed text-center cursor-pointer transition-all ${
-            dragActive
-              ? "border-primary bg-primary/5"
-              : "border-border bg-card hover:border-border/80"
-          }`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".mp4,.avi,.mov,.mkv,.webm"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          <div className="p-4 rounded-full bg-secondary text-primary w-fit mx-auto mb-4">
-            <FileVideo className="h-8 w-8" />
-          </div>
-          <p className="text-sm font-semibold text-foreground">
-            {file ? file.name : "Drop video file here or click to browse"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1 font-mono">
-            {file
-              ? `${(file.size / (1024 * 1024)).toFixed(2)} MB`
-              : "Supports MP4, AVI, MOV, MKV, WebM • Max 100MB"}
-          </p>
-        </div>
+        <p aria-live="polite" className="font-mono text-sm text-muted-foreground">
+          {chosen.length === 0
+            ? "No files chosen yet."
+            : `${chosen.length} of ${visibleSlots.length} chosen (${totalMb.toFixed(1)} MB). Kept in this browser only.`}
+        </p>
+      </section>
 
-        {/* Action Button */}
-        {file && (
-          <button
-            onClick={handleUpload}
-            disabled={uploading}
-            className="mt-6 w-full py-3.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+      <section aria-labelledby="next-title" className="grid gap-5 rounded-lg border border-border bg-card p-5 sm:p-6">
+        <SectionHeading id="next-title" eyebrow="Then, on a laptop">
+          What the software does with them
+        </SectionHeading>
+        <ol className="grid max-w-[65ch] list-decimal gap-2 pl-5 leading-relaxed text-muted-foreground marker:font-mono marker:text-data">
+          {NEXT_STEPS.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+        <p>
+          <Link
+            href="/analysis"
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-data underline-offset-4 hover:underline"
           >
-            {uploading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Processing Frame Telemetry... ({progress}%)</span>
-              </>
-            ) : (
-              <>
-                <span>Start Biomechanical Analysis</span>
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-        )}
-
-        {/* Error Alert */}
-        {error && (
-          <div className="mt-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400 text-xs font-mono flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-      </main>
-    </div>
+            See a mock-up of a result page (sample data)
+            <ArrowRight aria-hidden="true" className="size-4" />
+          </Link>
+        </p>
+      </section>
+    </Container>
   );
 }

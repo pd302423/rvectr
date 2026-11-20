@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import Link from "next/link";
+import type { PoseLandmarker } from "@mediapipe/tasks-vision";
+import { Container } from "@/components/site/Container";
+import { Notice } from "@/components/site/Notice";
+import { PageHeader } from "@/components/site/PageHeader";
 import {
   getElbowAngle,
   getHipAngle,
@@ -48,15 +51,15 @@ const POSE_CONNECTIONS = [
 
 // ---------- helpers ----------
 function scoreColor(score: number): string {
-  if (score >= 80) return "text-emerald-700";
-  if (score >= 60) return "text-amber-700";
-  return "text-red-700";
+  if (score >= 80) return "text-emerald-400";
+  if (score >= 60) return "text-amber-400";
+  return "text-red-400";
 }
 
 function scoreBg(score: number): string {
-  if (score >= 80) return "bg-emerald-50 border-emerald-200";
-  if (score >= 60) return "bg-amber-50 border-amber-200";
-  return "bg-red-50 border-red-200";
+  if (score >= 80) return "bg-emerald-500/10 border-emerald-500/30";
+  if (score >= 60) return "bg-amber-500/10 border-amber-500/30";
+  return "bg-red-500/10 border-red-500/30";
 }
 
 function phaseLabel(phase: RepPhase): string {
@@ -70,10 +73,10 @@ function phaseLabel(phase: RepPhase): string {
 
 function phaseColor(phase: RepPhase): string {
   switch (phase) {
-    case "standing": return "text-emerald-700";
-    case "descending": return "text-amber-700";
-    case "bottom": return "text-red-700";
-    case "ascending": return "text-amber-700";
+    case "standing": return "text-emerald-400";
+    case "descending": return "text-amber-400";
+    case "bottom": return "text-red-400";
+    case "ascending": return "text-amber-400";
   }
 }
 
@@ -92,7 +95,7 @@ export default function SquatTestPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const poseLandmarkerRef = useRef<any>(null);
+  const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
 
   // States
   const [modelState, setModelState] = useState<"loading" | "ready" | "error">("loading");
@@ -154,7 +157,7 @@ export default function SquatTestPage() {
 
         poseLandmarkerRef.current = poseLandmarker;
         setModelState("ready");
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to load MediaPipe Pose model:", err);
         if (active) {
           setModelState("error");
@@ -215,13 +218,15 @@ export default function SquatTestPage() {
           startProcessingLoop();
         };
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Camera access error:", err);
       setCameraState("error");
+      const name = err instanceof Error ? err.name : "";
+      const message = err instanceof Error ? err.message : String(err);
       setErrorMsg(
-        err.name === "NotAllowedError"
+        name === "NotAllowedError"
           ? "Camera permission denied. Please enable camera access in your browser settings."
-          : `Failed to open camera: ${err.message}`
+          : `Failed to open camera: ${message}`
       );
     }
   }
@@ -269,8 +274,9 @@ export default function SquatTestPage() {
       }
 
       const timestamp = performance.now();
-      
-      // Calculate FPS
+
+      // Calculate FPS (the clock starts on the first frame)
+      if (lastFpsUpdateRef.current === 0) lastFpsUpdateRef.current = timestamp;
       frameCountRef.current++;
       if (timestamp - lastFpsUpdateRef.current >= 1000) {
         setFps(Math.round((frameCountRef.current * 1000) / (timestamp - lastFpsUpdateRef.current)));
@@ -359,7 +365,7 @@ export default function SquatTestPage() {
       animationFrameRef.current = requestAnimationFrame(processFrame);
     }
 
-    lastFpsUpdateRef.current = performance.now();
+    lastFpsUpdateRef.current = 0;
     frameCountRef.current = 0;
     animationFrameRef.current = requestAnimationFrame(processFrame);
   }
@@ -450,39 +456,26 @@ export default function SquatTestPage() {
     : null;
 
   return (
-    <main className="min-h-screen bg-background px-6 py-10">
-      <div className="mx-auto max-w-6xl">
-        
-        {/* Header */}
-        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-6">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-              § Biomechanical visualizer
-            </p>
-            <h1
-              style={{ fontFamily: "var(--font-serif)" }}
-              className="mt-3 text-4xl leading-tight tracking-tight"
-            >
-              Squat Analysis
-            </h1>
-            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-              Real-time squat form grading with rep counting, depth analysis, and bilateral symmetry tracking.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 border border-border rounded"
-            >
-              ← Home
-            </Link>
-          </div>
-        </header>
+    <Container size="wide" className="grid gap-6 py-10 sm:py-14">
+      <PageHeader eyebrow="Live demo" title="Squat demo for the exhibition stall">
+        <p>
+          Stand in front of a webcam. A pose model draws a skeleton on you, counts squats and scores each one.
+        </p>
+      </PageHeader>
 
+      <Notice tone="info" title="A webcam demo, separate from the two-phone measurement software.">
+        <p>
+          This page uses MediaPipe, a pose model that runs in your browser, with one camera. Your video stays in the
+          browser. The scores here are a demonstration, not a measurement of squat depth. The Rvectr research uses two
+          or three phones, a calibration board and a different pose model.
+        </p>
+      </Notice>
+
+      <div>
         {/* Error Notice */}
         {errorMsg && (
-          <div className="mb-6 rounded border border-red-200 bg-red-50 p-4">
-            <p className="font-mono text-xs text-red-700">{errorMsg}</p>
+          <div className="mb-6 rounded border border-red-500/30 bg-red-500/10 p-4">
+            <p className="font-mono text-xs text-red-400">{errorMsg}</p>
           </div>
         )}
 
@@ -595,7 +588,7 @@ export default function SquatTestPage() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={stopCamera}
-                    className="rounded border border-border px-3 py-1.5 font-mono text-[10px] hover:bg-muted transition-colors text-red-700 border-red-200 bg-red-50"
+                    className="rounded border border-border px-3 py-1.5 font-mono text-[10px] hover:bg-muted transition-colors text-red-400 border-red-500/30 bg-red-500/10"
                   >
                     Stop Feed
                   </button>
@@ -668,9 +661,9 @@ export default function SquatTestPage() {
                           <td className="py-2 px-3 text-right text-foreground">{score.torsoScore}/25</td>
                           <td className="py-2 px-3 text-right text-foreground">{score.symmetryScore}/25</td>
                           <td className="py-2 px-3 text-right text-foreground">{Math.round(score.minKneeAngle)}°</td>
-                          <td className="py-2 pl-3 text-left text-red-700">
+                          <td className="py-2 pl-3 text-left text-red-400">
                             {score.faults.length === 0
-                              ? <span className="text-emerald-700">—</span>
+                              ? <span className="text-emerald-400">—</span>
                               : score.faults.map(f => faultLabel(f)).join(", ")}
                           </td>
                         </tr>
@@ -694,13 +687,13 @@ export default function SquatTestPage() {
               <div className="space-y-3 font-mono text-[11px]">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Detection Engine:</span>
-                  <span className={modelState === "ready" ? "text-emerald-700" : modelState === "loading" ? "text-amber-700" : "text-red-700"}>
+                  <span className={modelState === "ready" ? "text-emerald-400" : modelState === "loading" ? "text-amber-400" : "text-red-400"}>
                     {modelState === "ready" ? "ACTIVE" : modelState === "loading" ? "INITIALIZING" : "ERROR"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Device Camera:</span>
-                  <span className={cameraState === "active" ? "text-emerald-700" : "text-muted-foreground"}>
+                  <span className={cameraState === "active" ? "text-emerald-400" : "text-muted-foreground"}>
                     {cameraState === "active" ? "CAPTURING" : cameraState.toUpperCase()}
                   </span>
                 </div>
@@ -716,7 +709,7 @@ export default function SquatTestPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">GPU Acceleration:</span>
-                  <span className="text-emerald-700">ENABLED</span>
+                  <span className="text-emerald-400">ENABLED</span>
                 </div>
               </div>
             </div>
@@ -790,10 +783,10 @@ export default function SquatTestPage() {
                       <p className="font-mono text-[9px] uppercase text-muted-foreground">Angle</p>
                       <p className={`font-mono text-base font-semibold mt-1 tabular-nums ${
                         torsoLean >= 15 && torsoLean <= 45
-                          ? "text-emerald-700"
+                          ? "text-emerald-400"
                           : torsoLean > 50
-                          ? "text-red-700"
-                          : "text-amber-700"
+                          ? "text-red-400"
+                          : "text-amber-400"
                       }`}>
                         {torsoLean}°
                       </p>
@@ -813,10 +806,10 @@ export default function SquatTestPage() {
                       <p className="font-mono text-[9px] uppercase text-muted-foreground">Knee Difference</p>
                       <p className={`font-mono text-base font-semibold mt-1 tabular-nums ${
                         Math.abs(angles.leftKnee - angles.rightKnee) < 5
-                          ? "text-emerald-700"
+                          ? "text-emerald-400"
                           : Math.abs(angles.leftKnee - angles.rightKnee) < 10
-                          ? "text-amber-700"
-                          : "text-red-700"
+                          ? "text-amber-400"
+                          : "text-red-400"
                       }`}>
                         {Math.abs(angles.leftKnee - angles.rightKnee)}°
                       </p>
@@ -851,6 +844,6 @@ export default function SquatTestPage() {
         </div>
 
       </div>
-    </main>
+    </Container>
   );
 }
