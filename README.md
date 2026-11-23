@@ -1,155 +1,201 @@
-> **Current runtime: Linux first (WSL 2 or native Linux), 27 October 2026.**
-> Start with [docs/LINUX_FIRST.md](docs/LINUX_FIRST.md). Python dependencies are
-> declared in `pyproject.toml` and `uv.lock`; use `bash tools/bootstrap-linux.sh --pose --web`.
-> `uv run --no-sync rvectr doctor --require-cuda` verifies the environment.
-> The CLI provides versioned diagnostics and a two-camera squat-depth pipeline
-> ([docs/TWO_CAMERA_PIPELINE.md](docs/TWO_CAMERA_PIPELINE.md)), checked on synthetic data only so far. Historical
-> capability descriptions below are not evidence of current measurement accuracy.
-> Official SMPL data, raw recordings and run outputs are local, separately supplied
-> assets. Review Git history before publication; `.gitignore` cannot erase old assets.
-# rvectr 🧬
+# Rvectr
 
-> **Markerless 3D Human Mesh Recovery & Real-Time Kinematic Telemetry Engine**
-
-`rvectr` reconstructs full 3D human body surface meshes (6,890 SMPL vertices) from consumer-camera video, extracts frame-by-frame joint kinematics, and visualizes real-time joint angular velocity and kinetic curves in an interactive 3D WebGL viewport.
+Rvectr is a school research project about measuring human movement in 3D with
+ordinary phone cameras. It tests one movement, the squat, and one number, the
+depth of the squat (how far the hips drop). It is an entry for the CBSE Science
+Exhibition 2026-27, sub-theme "AI for Better Life".
 
 > [!IMPORTANT]
-> **Project status (July 2026):** rvectr has pivoted from a SaaS coaching product to an open research program studying **velocity-dependent error in markerless 3D human pose estimation** — benchmarking EasyMocap, 4D-Humans/HMR2, and MediaPipe against synthetic SMPL ground truth. See [`docs/RESEARCH_ROADMAP.md`](docs/RESEARCH_ROADMAP.md) for the research question, methodology, and timeline. The earlier SaaS launch plan is archived in [`docs/archive/`](docs/archive/).
+> **Status: tested on simulated data only.**
+> Everything checked so far uses synthetic data. That means data made by a
+> computer program, where the right answer is known in advance. These checks show
+> that the software can recover a known answer. They do not show that phone
+> cameras are accurate. No real recordings have been analysed yet. The next step
+> is a pilot recording with real phones. This page makes no accuracy claim.
 
----
+## The research question
 
-## ✨ Core Features
+How does the accuracy of 3D movement estimates from ordinary phone cameras
+change with the number of camera views and with movement speed?
 
-* **Monocular 3D Human Mesh Recovery (HMR2 / 4D-Humans)**: Reconstructs high-density 3D SMPL parametric body meshes directly from single-camera videos.
-* **Multi-View 3D Spatial Triangulation (EasyMocap)**: Synchronizes multi-camera recordings to solve single-camera self-occlusions and perform 3D joint triangulation.
-* **Real-Time In-Browser Telemetry (MediaPipe + Three.js)**: Runs zero-latency pose estimation and interactive 360° 3D skeleton rendering directly inside web browsers.
-* **Kinematics Engine**: Calculates frame-by-frame joint angles (hip depth, knee flexion, spinal alignment), movement phase transitions (eccentric/concentric), and bilateral asymmetries.
-* **Dual Viewport & Synchronized Scrubbing**: Synchronizes raw video playback with 3D mesh motion and live waveform telemetric charts.
+A "view" is one camera's picture of the person. In plain words: does a second
+phone help? Does a third? Is a fast squat measured worse than a slow one?
 
----
+Squat depth is the test because it is a single number that is easy to compare.
+Depth is how far the hips drop between standing and the bottom of the squat.
 
-## 🏗️ Architecture Pipeline
+## How it works
 
-```mermaid
-graph TD
-    A[Video Input: Single-Cam or Multi-Cam] --> B1[EasyMocap Multi-View Triangulation]
-    A --> B2[4D-Humans HMR2 Monocular Mesh]
-    A --> B3[MediaPipe Pose Browser Client]
+The software is a Python package called `rvectr`. A measurement session needs at
+least two phones. It goes through these steps:
 
-    B1 --> C[SMPL 72-Parameter Body Mesh]
-    B2 --> C
+1. **Calibrate each phone.** Calibration means measuring the phone, so that
+   points in its picture can be turned into real directions in space. We film a
+   printed checkerboard. The software finds the lens properties of each phone
+   (called intrinsics) and where each phone stands (called extrinsics).
+2. **Line up the videos in time.** Phones do not start recording at exactly the
+   same moment. A phone torch is flashed in view of all cameras at the start and
+   end of each take. The software finds the flash in each video and uses it to
+   match the timing.
+3. **Find the hips in each video.** A pose-estimation model called RTMPose, run
+   through the RTMLib package, marks keypoints (points such as the hips) on
+   every frame. Rvectr uses the two hip keypoints.
+4. **Triangulate into 3D.** Each camera sees a hip along a straight line. Where
+   the lines from two or more cameras cross is the position of the hip in 3D.
+   The method used is DLT (direct linear transform).
+5. **Follow the pelvis height.** The pelvis is taken as the midpoint of the two
+   hips. The software tracks its height over time. Frames where the hips could
+   not be found stay missing. Missing data is never filled in.
+6. **Measure the depth of each squat.** The standing height is the median pelvis
+   height while the person stands still (the median is the middle value, so odd
+   wild values are ignored). The bottom is the lowest point of a parabola (a
+   smooth U-shaped curve) fitted to the frames near the bottom. Depth is the
+   standing height minus the bottom.
+7. **Compare with a reference squat.** One squat is the reference (by default the
+   first). Each squat is then labelled "reached reference", "shallower" or
+   "unclear". "Unclear" means too little of the squat was seen to decide.
 
-    C --> D[Kinematic Extraction Engine]
-    C --> E[Blender Auto-Rig & Temporal Smoothing]
+Measuring with one camera, or with pairs of cameras, exists only to compare
+against the full set of cameras on the same take. It is not a way to run a
+session. The full method, with every setting explained, is in
+[docs/TWO_CAMERA_PIPELINE.md](docs/TWO_CAMERA_PIPELINE.md).
 
-    D --> F[Kinematics Telemetry JSON]
-    E --> G[GLB / OBJ 3D Model Output]
+### Error budget (a simulation)
 
-    F --> H[Next.js 16 Web Dashboard & Three.js Canvas]
-    G --> H
+Before any real recording, a Monte Carlo simulation predicts the smallest change
+in squat depth that each camera setup could catch. Monte Carlo means running a
+random experiment many times to see how much the results spread. The simulation
+adds typical errors (noise in the keypoints, timing errors, calibration errors,
+missing frames) to a computer-made squat.
+
+Every number from it is a prediction from a computer model. It is not a
+measurement. The model is in `backend/rvectr/errorbudget.py` and the runner is
+`tools/run_error_budget.py`. The script `tools/make_poster_charts.py` draws
+charts from a finished simulation run, which is stored locally and not in this
+repository.
+
+## Repository layout
+
+```
+backend/
+  rvectr/          the Python package: calibration, sync, pose, 3D, squat depth, error budget
+  tests/           automatic tests (they use synthetic data only)
+  pipeline/        older gait and running code
+  *.py             older scripts (see the caution below)
+configs/           example session, calibration and label files
+docs/              method notes, checklists and write-ups
+src/               the website (Next.js)
+public/            static files for the website
+tools/             setup script, publish check, simulation runner, chart maker
+models/            holds only a README; private model files are kept outside Git
+outputs/           holds only a README; run results are written here and not committed
 ```
 
----
-
-## 📁 Repository Structure
-
-```
-rvectr/
-├── src/                          # Next.js 16 viewer (/, /analysis, /demo, /test/squat, /upload)
-│   ├── components/biomechanics/  # ThreeMeshCanvas, KinematicWaveformChart, DualViewport
-│   └── lib/cv/                   # Kinematic angle calculations & grading logic
-├── backend/                      # Python 3D Vision & Kinematics Pipeline
-│   ├── README.md                 # ⚠️ READ FIRST — which script to run, and which not to
-│   ├── 4D-Humans/                # Monocular 3D Mesh Recovery Submodule (MIT)
-│   ├── EasyMocap/                # Multi-view 3D Triangulation Submodule (Non-Commercial)
-│   ├── pipeline/                 # Gait events, stride metrics, pelvic analysis
-│   ├── tests/                    # 31 tests — run with `pytest tests/`
-│   ├── rvectr_paths.py           # Path resolution (env-overridable, no hardcoded paths)
-│   ├── extract_kinematics.py     # Frame-by-frame 3D joint telemetry calculation
-│   └── run_4d_humans_videos2.py  # Local GPU inference runner
-├── docs/
-│   ├── RESEARCH_ROADMAP.md       # Current research program & 12-week plan
-│   ├── WORKSPACE_SUMMARY.md      # Architecture & CV stack reference
-│   ├── osf_preregistration_draft.md
-│   ├── log/                      # Dated engineering log
-│   ├── writeups/                 # Science exhibition writeups
-│   └── archive/                  # Retired SaaS-era planning docs
-├── critical_analysis.md          # Standing audit of known defects & their status
-└── LICENSE                       # Research / non-commercial (NOT MIT — see below)
-```
+The two folders `backend/4D-Humans` and `backend/EasyMocap` are Git submodules
+(links to other projects). Only the older scripts use them. A normal clone is
+enough for the main pipeline.
 
 > [!CAUTION]
-> **Not everything in `backend/` measures what its name suggests.**
-> `run_easymocap_videos2.py` calibrates cameras and extracts 2D keypoints, then
-> **discards them** and emits a hand-authored animation. Its outputs are not
-> capture results. Read [`backend/README.md`](backend/README.md) before running
-> or citing anything, and [`critical_analysis.md`](critical_analysis.md) for the
-> full list of known defects.
+> **Not every older script in `backend/` measures what its name suggests.** For
+> example, `run_easymocap_videos2.py` writes a hand-made animation, not a
+> measurement. Read [backend/README.md](backend/README.md) and
+> [critical_analysis.md](critical_analysis.md) before running or citing any of
+> them.
 
----
+## Quick start
 
-## 🚀 Quickstart Guide
+Linux is the main platform. On Windows, use WSL 2 (Linux inside Windows). More
+detail is in [docs/LINUX_FIRST.md](docs/LINUX_FIRST.md).
 
-### 1. Clone the Repository (with Submodules)
+### Python
+
+You need Python 3.11 (installed for you by uv), the package manager
+[uv](https://docs.astral.sh/uv/) (version 0.13.6 or a later 0.13 release), and
+`ffmpeg` with `ffprobe`.
 
 ```bash
-git clone --recursive https://github.com/pd302423/rvectr.git
+git clone https://github.com/pd302423/rvectr.git
 cd rvectr
+bash tools/bootstrap-linux.sh --pose --web
 ```
 
-If you already cloned without submodules, initialize them:
+The script installs the locked Python packages, checks the environment, runs the
+tests and builds the website (`--pose` adds the pose-detection packages, `--web`
+adds the website). It needs an NVIDIA GPU with CUDA and stops if it cannot find
+one. Without a GPU, set up the code and run the tests like this instead:
+
 ```bash
-git submodule update --init --recursive
+uv sync --frozen
+uv run --no-sync pytest -q
 ```
 
-### 2. Run the Web Application
+Useful commands (always use `uv run --no-sync` so the locked versions are used):
 
 ```bash
-# Install frontend dependencies
+uv run --no-sync rvectr doctor          # check ffmpeg and the environment
+uv run --no-sync pytest -q              # run the tests
+uv run --no-sync rvectr run --help      # help for the measurement command
+```
+
+The measurement commands are `calibrate-intrinsics`, `calibrate-extrinsics`,
+`sync`, `run`, `check-points` and `frames`. Running them on real footage needs
+recordings that are not in this repository. You do not need any recordings to
+work on the code.
+
+### Website
+
+The website is built with Next.js 16, React 19 and Tailwind CSS 4. It explains the
+project, shows the simulated results and has a live webcam demo for the
+exhibition stall. Install a current Node.js LTS release, then:
+
+```bash
 npm install
-
-# Start development server
-npm run dev
+npm run dev      # then open http://localhost:3000
+npm run lint
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) for the viewer. Note that
-`/analysis` displays clearly-labelled **sample data** until a real analysis is
-loaded — nothing on that page is a measurement.
+> [!NOTE]
+> This version of Next.js differs from older versions. Before changing web code,
+> read the guides in `node_modules/next/dist/docs/` (they appear after
+> `npm install`). See [AGENTS.md](AGENTS.md).
 
-### 3. Setup Python Backend Pipeline
+## Private data stays out of this repository
 
-Three incompatible environments are required (4D-Humans needs Python 3.10,
-EasyMocap needs 3.11). Full detail in [`backend/README.md`](backend/README.md).
+These are never committed: official SMPL model files, raw recordings, calibration
+records, videos or photos of people, generated body meshes, and `.env.local`
+(which holds the private locations of data and models). `.env.example` shows the
+format. To check a change before publishing, run
+`uv run --no-sync python tools/check_publish.py`.
 
-```bash
-cd backend
+## How to contribute
 
-# Core environment — kinematics, mesh processing, tests. No GPU needed.
-python3.11 -m venv .venv-core && source .venv-core/bin/activate
-pip install -r requirements-core.txt
+Contributions are welcome through pull requests, from small fixes to new tests or
+documentation. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. It explains the
+setup, the branch and commit rules, the checks to run before a pull request, and
+how to use an AI coding assistant. If you use one, point it at
+[AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) too.
 
-pytest tests/    # 31 tests
-```
-
-For the deep-learning backends see `requirements-hmr2.txt` (Python 3.10) and
-`setup_env.sh` (EasyMocap).
-
----
-
-## 📄 License & Attributions
+## Licence
 
 > [!WARNING]
-> **Research and non-commercial use only. This project is NOT MIT-licensed.**
->
-> rvectr builds on **EasyMocap**, which permits educational, research, and non-profit use only, requires that modifications remain open-source, and prohibits commercial use. Those terms govern this entire repository. See [`LICENSE`](LICENSE) for the full text and the complete attribution list.
+> **Research, education and non-profit use only. This project is NOT MIT
+> licensed.** Rvectr builds on EasyMocap, whose terms allow only educational,
+> research and non-profit use, require that modifications stay open source, and
+> forbid commercial use. Those terms apply to the whole repository. Read
+> [LICENSE](LICENSE) for the full text and the attributions.
 
-| Component | Terms |
-|---|---|
-| **[EasyMocap](https://github.com/zju3dv/EasyMocap)** | Non-commercial, research/education only — **most restrictive; governs this project** |
-| **[4D-Humans / HMR2](https://github.com/shubham-goel/4D-Humans)** | MIT — © 2023 UC Regents, Shubham Goel |
-| **[SMPL / SMPL-X](https://smpl.is.tue.mpg.de)** | Separate MPI model license — **not redistributed here**; obtain and accept separately |
-| **[MediaPipe](https://github.com/google-ai-edge/mediapipe)** | Apache 2.0 — © Google LLC |
+| Component | Used for | Terms |
+|---|---|---|
+| [EasyMocap](https://github.com/zju3dv/EasyMocap) | older multi-camera scripts (submodule) | Non-commercial, research and education only. The most restrictive, so it governs this project. |
+| 4D-Humans / HMR2 | older single-camera scripts (submodule) | MIT. The link and copyright notice are in LICENSE. |
+| [SMPL](https://smpl.is.tue.mpg.de) | body model for fitting | Separate model licence. Not included here. Get it yourself and accept its terms. |
+| [MediaPipe](https://github.com/google-ai-edge/mediapipe) | live webcam demo on the website | Apache 2.0. |
+| RTMPose, through RTMLib | hip detection in the main pipeline | Its own licence applies. It is not yet listed in LICENSE. |
 
-## ⚠️ Not a medical device
+## Not a medical device
 
-This is a research prototype. It is **not** a medical or diagnostic device, and its accuracy has **not been validated against any reference standard**. No accuracy claim is made. Do not use it to inform medical, rehabilitative, or training decisions where inaccuracy could cause harm.
+Rvectr is a research prototype. It is not a medical or diagnostic device. Its
+accuracy has not been validated against any reference standard, and no accuracy
+claim is made. Do not use it to make medical, rehabilitation or training
+decisions where a wrong result could cause harm.
