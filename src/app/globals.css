@@ -11,6 +11,8 @@
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --font-display: var(--font-serif);
+  --color-data: var(--data);
+  --color-warm: var(--warm);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,9 +52,11 @@
 }
 
 /* ============================================================
-   rvector — Professional Monochromatic Dark Theme
-   Pure Black background, pure White accents, crisp dark borders.
-   Zero consumer color fluff (no blue, green, cyan).
+   Rvectr dark theme.
+   Black background, white text, thin grey borders (shadcn tokens).
+   Two accents only:
+     --data  teal    numbers, charts and "new rule" (good / measured)
+     --warm  orange  "old rule", risk, and the simulation warning
    ============================================================ */
 
 :root {
@@ -84,6 +88,9 @@
   --border: #262626;
   --input: #262626;
   --ring: #ffffff;
+
+  --data: #5cc3a8;
+  --warm: #e08b5c;
 
   --chart-1: #ffffff;
   --chart-2: #a3a3a3;
@@ -134,5 +141,31 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Keyboard focus, anchor offset under the sticky header, reduced motion. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--data);
+    outline-offset: 2px;
+  }
+  html {
+    scroll-padding-top: 5rem;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

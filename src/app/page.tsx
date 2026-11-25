@@ -1,498 +1,242 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { HeadlineStats } from "@/components/results/HeadlineStats";
+import { Container } from "@/components/site/Container";
+import { SectionHeading } from "@/components/site/SectionHeading";
+import { TriangulationDiagram } from "@/components/site/TriangulationDiagram";
+import { ANGLED_PHONE_BIAS_MM } from "@/lib/results/errorBudget";
+import { cn } from "@/lib/utils";
 
-export default async function Home() {
+export const metadata: Metadata = {
+  title: { absolute: "Rvectr · Squat depth from phone cameras" },
+  description:
+    "Do a second and a third phone make a 3D movement measurement more accurate? Rvectr is a student research project that tests this on one number: how deep a squat goes.",
+};
+
+const STATUS = [
+  { label: "Software built", detail: "123 automated tests pass", dot: "bg-data" },
+  { label: "Tested on simulated data", detail: "no real footage yet", dot: "bg-warm" },
+  { label: "Pilot recording next", detail: "", dot: "border border-muted-foreground" },
+] as const;
+
+const STEPS = [
+  {
+    title: "Film from two or three angles",
+    body: "Two (or three) ordinary phones stand on tripods and film the same squats at the same time.",
+  },
+  {
+    title: "Calibrate with a checkerboard",
+    body: "A printed checkerboard is shown to every phone. From it the software learns each phone's lens and where each phone stands.",
+  },
+  {
+    title: "Line up the clocks with a torch flash",
+    body: "A torch flash that every phone can see marks one moment in all the videos, so the frames match in time.",
+  },
+  {
+    title: "Find the hips and combine them",
+    body: "A pose model (RTMPose, a program that finds body joints in a picture) marks the hips in every frame. Triangulation then joins the views: it finds where the lines of sight from each phone cross, which gives one 3D position.",
+  },
+  {
+    title: "Measure depth and label each squat",
+    body: "Pelvis height over time gives each squat's depth. Each squat is compared with the first one, the reference squat, and labelled “reached reference”, “shallower” or “unclear”. Missing data is never filled in.",
+  },
+] as const;
+
+const LIMITS = [
+  {
+    lead: "No real footage yet.",
+    body: "No real two-phone video has been recorded. Every number on this site comes from a computer simulation. The pilot recording will test whether they hold.",
+  },
+  {
+    lead: "Slow drift is the biggest risk.",
+    body: "A slow wobble in where the pose model puts the hip adds the most error in the simulation, far more than phone timing or phone placement.",
+  },
+  {
+    lead: `A single angled phone reads about ${ANGLED_PHONE_BIAS_MM} mm shallow.`,
+    body: "In the simulation, one phone placed at an angle reads every squat too shallow. Comparing squats with each other still works. The absolute depth does not.",
+  },
+] as const;
+
+const TRY_IT = [
+  {
+    href: "/test/squat",
+    tag: "Webcam demo",
+    title: "Live demo",
+    body: "Stand in front of a webcam and see a pose model draw a skeleton on you and count squats. Made for the exhibition stall. It runs in the browser with MediaPipe and is separate from the two-phone measurement software.",
+  },
+  {
+    href: "/demo",
+    tag: "Sample model",
+    title: "3D viewer",
+    body: "Rotate and zoom a 3D body model. It is a sample model, not a measurement of anyone.",
+  },
+  {
+    href: "/analysis",
+    tag: "Synthetic data",
+    title: "Sample analysis",
+    body: "A mock-up of a result page. Every number on it is a placeholder, not output from the software.",
+  },
+] as const;
+
+const BUTTON =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-medium transition-colors";
+
+export default function Home() {
   return (
-    <main className="bg-background text-foreground min-h-screen">
-
-      {/* ──────── NAV ──────── */}
-      <nav className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span style={{ fontFamily: "var(--font-serif)" }} className="text-xl font-bold italic tracking-tight">
-              rvectr
-            </span>
-            <span className="font-mono text-[10px] uppercase border border-border px-2 py-0.5 text-muted-foreground">
-              v1.0-OSS
-            </span>
-          </div>
-
-          <div className="flex items-center gap-6 font-mono text-xs">
-            <Link href="/demo" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
-              3D Workspace
-            </Link>
-            <Link href="/analysis" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
-              Kinematics Lab
-            </Link>
-            <Link href="/test/squat" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
-              Live CV
-            </Link>
-            <a href="#documentation" className="hidden sm:block text-muted-foreground hover:text-foreground transition-colors">
-              Documentation
-            </a>
-            <a
-              href="https://github.com/pd302423/rvectr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 border border-foreground/30 px-3 py-1 text-foreground hover:bg-foreground hover:text-background transition-colors"
+    <>
+      {/* Hero */}
+      <section aria-labelledby="hero-title" className="border-b border-border">
+        <Container className="grid items-center gap-12 py-14 sm:py-20 lg:grid-cols-[1.25fr_1fr] lg:gap-16">
+          <div className="grid gap-7">
+            <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
+              CBSE Science Exhibition 2026&ndash;27 &middot; AI for Better Life
+            </p>
+            <h1
+              id="hero-title"
+              className="font-display text-balance text-5xl leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl"
             >
-              <span>GitHub</span>
-              <span className="text-[10px]">↗</span>
-            </a>
+              Can ordinary phones measure how deep a squat is?
+            </h1>
+            <div className="grid max-w-[65ch] gap-4 text-lg leading-relaxed text-muted-foreground">
+              <p>
+                Rvectr tests whether a second and a third phone make a 3D movement measurement more accurate, whether
+                a faster movement makes it worse, and whether the extra setup is worth the effort.
+              </p>
+              <p>The test is one number: how deep a squat goes.</p>
+            </div>
+
+            <ul
+              aria-label="Project status"
+              className="grid gap-x-6 gap-y-3 rounded-lg border border-border bg-card px-4 py-4 text-sm sm:flex sm:flex-wrap sm:px-5"
+            >
+              {STATUS.map((item) => (
+                <li key={item.label} className="flex items-center gap-2.5">
+                  <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", item.dot)} />
+                  <span>
+                    {item.label}
+                    {item.detail ? <span className="text-muted-foreground"> ({item.detail})</span> : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex flex-wrap gap-3">
+              <Link href="/results" className={cn(BUTTON, "bg-foreground text-background hover:bg-foreground/85")}>
+                See the simulated results
+                <ArrowRight aria-hidden="true" className="size-4" />
+              </Link>
+              <a href="#how-it-works" className={cn(BUTTON, "border border-border hover:bg-muted")}>
+                How it works
+              </a>
+            </div>
           </div>
-        </div>
-      </nav>
 
-      {/* ──────── HERO — Asymmetric 8/4 ──────── */}
-      <section className="border-b border-border pt-36 pb-24">
-        <div className="mx-auto max-w-7xl px-8">
-          <div className="grid grid-cols-1 gap-12 lg:grid-cols-12">
+          <figure className="m-0 grid gap-3 rounded-lg border border-border bg-card p-5">
+            <TriangulationDiagram />
+            <figcaption className="text-sm leading-relaxed text-muted-foreground">
+              Two phones see the same hip from different angles. Where their lines of sight cross is the hip&apos;s 3D
+              position. A drawing of the idea, not data.
+            </figcaption>
+          </figure>
+        </Container>
+      </section>
 
-            {/* Left: Editorial display */}
-            <div className="lg:col-span-8">
-              <div className="flex items-center gap-3 mb-8">
-                <span className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground">
-                  Clinical Biomechanics · 3D Mesh Telemetry · Calisthenics
+      {/* How it works */}
+      <section id="how-it-works" aria-labelledby="how-title" className="border-b border-border">
+        <Container className="grid gap-10 py-16 sm:py-20">
+          <SectionHeading id="how-title" eyebrow="How it works">
+            Five steps from phone video to squat depth
+          </SectionHeading>
+          <ol className="grid">
+            {STEPS.map((step, i) => (
+              <li
+                key={step.title}
+                className="grid gap-x-8 gap-y-2 border-t border-border py-6 sm:grid-cols-[4rem_minmax(0,16rem)_minmax(0,1fr)] lg:grid-cols-[4rem_minmax(0,20rem)_minmax(0,1fr)]"
+              >
+                <span aria-hidden="true" className="font-mono text-sm tabular-nums text-data">
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-              </div>
-              <h1
-                style={{ fontFamily: "var(--font-serif)" }}
-                className="text-[clamp(3rem,7.5vw,7rem)] leading-[0.95] tracking-tight font-normal"
-              >
-                A clinical
-                <br />
-                system that
-                <br />
-                <span className="italic text-muted-foreground">watches you</span>
-                <br />
-                train.
-              </h1>
-
-              <div className="mt-12 flex flex-wrap items-center gap-4">
-                <Link
-                  href="/demo"
-                  className="px-6 py-3 bg-foreground text-background font-mono text-xs font-bold uppercase tracking-wider hover:bg-foreground/90 transition-colors"
-                >
-                  Launch 3D Motion Command Workspace →
-                </Link>
-                <Link
-                  href="/test/squat"
-                  className="px-6 py-3 border border-border bg-card font-mono text-xs font-bold uppercase tracking-wider hover:bg-secondary transition-colors"
-                >
-                  Test Optical CV Telemetry
-                </Link>
-                <a
-                  href="https://github.com/pd302423/rvectr"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-6 py-3 border border-border text-muted-foreground font-mono text-xs font-bold uppercase tracking-wider hover:text-foreground transition-colors flex items-center gap-2"
-                >
-                  <span>pd302423/rvectr</span>
-                  <span>↗</span>
-                </a>
-              </div>
-            </div>
-
-            {/* Right: Dense info column */}
-            <div className="lg:col-span-4 lg:pt-20">
-              <div className="space-y-8 border-l border-border pl-8">
-                <div className="space-y-2">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Primary Moat</p>
-                  <p className="text-sm leading-relaxed text-foreground/90 font-mono">
-                    Monocular (4D-Humans / HMR2) & Multi-view (EasyMocap) 3D Body Surface Mesh Recovery (SMPL 6,890-vertex parameters).
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Telemetry Engine</p>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    rvectr measures every joint angle of every rep. When it detects struggle, joint angular velocity collapse, or form degradation, it diagnoses biomechanical failure in real time.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Sports Science Standards</p>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    Programming follows <em className="italic">Overcoming Gravity</em> (Low, 2016), NSCA periodisation standards, and peer-reviewed sports science literature.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+                <h3 className="text-lg font-medium leading-snug">
+                  {step.title}
+                </h3>
+                <p className="max-w-[65ch] leading-relaxed text-muted-foreground">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+        </Container>
       </section>
 
-      {/* ──────── DOCUMENTATION & ARCHITECTURE SECTION ──────── */}
-      <section id="documentation" className="border-b border-border py-24 bg-card/30">
-        <div className="mx-auto max-w-7xl px-8">
-          <div className="mb-12">
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
-              § 01 — Architectural Specs
-            </p>
-            <h2 style={{ fontFamily: "var(--font-serif)" }} className="text-4xl leading-tight tracking-tight">
-              System Architecture & Open-Source Engine
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground font-mono">
-              Complete technical specification for the rvectr motion capture & telemetry stack.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="border border-border p-6 bg-card space-y-4">
-              <div className="font-mono text-xs text-muted-foreground uppercase tracking-wider">01 / Monocular HMR2</div>
-              <h3 className="font-mono font-bold text-lg">4D-Humans SMPL Recovery</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Fits a 6,890-vertex SMPL body surface mesh directly from single-view consumer camera recordings using local PyTorch ViTDet models.
-              </p>
-              <div className="pt-2">
-                <a
-                  href="https://github.com/pd302423/rvectr/tree/main/backend/4D-Humans"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-[11px] underline text-muted-foreground hover:text-foreground"
-                >
-                  View 4D-Humans Submodule ↗
-                </a>
-              </div>
-            </div>
-
-            <div className="border border-border p-6 bg-card space-y-4">
-              <div className="font-mono text-xs text-muted-foreground uppercase tracking-wider">02 / Multi-View Triangulation</div>
-              <h3 className="font-mono font-bold text-lg">EasyMocap Triangulation</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Processes multi-camera synchronized recordings to perform 3D spatial keypoint triangulation, solving single-camera self-occlusion.
-              </p>
-              <div className="pt-2">
-                <a
-                  href="https://github.com/pd302423/rvectr/tree/main/backend/EasyMocap"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-[11px] underline text-muted-foreground hover:text-foreground"
-                >
-                  View EasyMocap Submodule ↗
-                </a>
-              </div>
-            </div>
-
-            <div className="border border-border p-6 bg-card space-y-4">
-              <div className="font-mono text-xs text-muted-foreground uppercase tracking-wider">03 / WebGL Telemetry Canvas</div>
-              <h3 className="font-mono font-bold text-lg">In-Browser Three.js Viewport</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Renders interactive 360° 3D mesh model sequences, real-time MediaPipe joint angle waveforms, and bilateral asymmetry matrices.
-              </p>
-              <div className="pt-2">
-                <Link
-                  href="/demo"
-                  className="font-mono text-[11px] underline text-muted-foreground hover:text-foreground"
-                >
-                  Launch Interactive Demo →
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ──────── SAMPLE SESSION REPORT — Single large diagnostic ──────── */}
-      <section className="border-b border-border py-24">
-        <div className="mx-auto max-w-7xl px-8">
-
-          {/* Meta header */}
-          <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
-                Sample Diagnostic Output
-              </p>
-              <h2
-                style={{ fontFamily: "var(--font-serif)" }}
-                className="text-4xl leading-tight tracking-tight"
-              >
-                Anatomy of a rvectr session.
-              </h2>
-            </div>
-            <p className="text-xs font-mono text-muted-foreground sm:text-right max-w-xs">
-              Continuous 30Hz joint telemetry stream & clinical diagnostic evaluation.
-            </p>
-          </div>
-
-          <SessionReport />
-
-        </div>
-      </section>
-
-      {/* ──────── WHAT IS MEASURED — Spec table ──────── */}
-      <section id="measurements" className="border-b border-border py-24">
-        <div className="mx-auto max-w-7xl px-8">
-
-          <div className="grid grid-cols-1 gap-16 lg:grid-cols-12">
-            <div className="lg:col-span-4">
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-6">
-                § 02 — Measurements
-              </p>
-              <h2
-                style={{ fontFamily: "var(--font-serif)" }}
-                className="text-4xl leading-tight tracking-tight"
-              >
-                Every metric rvectr observes.
-              </h2>
-              <p className="mt-6 text-sm leading-relaxed text-muted-foreground max-w-xs">
-                Continuous measurement across kinematic, performance, and periodisation domains.
-              </p>
-            </div>
-
-            <div className="lg:col-span-8">
-              <SpecTable />
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* ──────── FOOTER ──────── */}
-      <footer className="border-t border-border bg-card/20">
-        <div className="mx-auto max-w-7xl px-8 py-12">
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
-            <div>
-              <p style={{ fontFamily: "var(--font-serif)" }} className="text-xl italic font-bold">
-                rvectr
-              </p>
-              <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                v1.0.0 · Open Source Biomechanics Engine
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
-                Open Source
-              </p>
-              <ul className="space-y-1.5 text-xs font-mono text-muted-foreground">
-                <li>
-                  <a href="https://github.com/pd302423/rvectr" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
-                    GitHub Repository (pd302423/rvectr) ↗
-                  </a>
-                </li>
-                <li>
-                  <a href="https://github.com/pd302423/rvectr/blob/main/README.md" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
-                    Documentation & Quickstart ↗
-                  </a>
-                </li>
-                <li>
-                  <a href="https://github.com/pd302423/rvectr/blob/main/WORKSPACE_SUMMARY.md" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
-                    Architecture Specs ↗
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted-foreground mb-3">
-                Live Workspaces
-              </p>
-              <ul className="space-y-1.5 text-xs font-mono text-muted-foreground">
-                <li><Link href="/demo" className="hover:text-foreground">3D Motion Workspace</Link></li>
-                <li><Link href="/analysis" className="hover:text-foreground">Kinematics Diagnostic Lab</Link></li>
-                <li><Link href="/test/squat" className="hover:text-foreground">Live Optical CV Telemetry</Link></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </main>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Session report — diagnostic mockup component
-   ───────────────────────────────────────────── */
-
-function SessionReport() {
-  return (
-    <div className="border border-border bg-card font-mono text-xs">
-
-      {/* Document header */}
-      <header className="grid grid-cols-2 gap-x-8 gap-y-4 border-b border-border px-6 py-5 sm:grid-cols-4">
-        <Field label="athlete_id" value="ATH-0042" />
-        <Field label="session_id" value="SES-2026-07-25-T1845" />
-        <Field label="duration" value="00:42:17" />
-        <Field label="status" value="completed" tone="emerald" />
-      </header>
-
-      {/* Movement: Pull-up */}
-      <div className="border-b border-border">
-        <div className="flex items-baseline justify-between border-b border-border bg-secondary/30 px-6 py-3">
-          <p className="text-foreground"><span className="text-muted-foreground">movement_01</span> &nbsp; pull_up</p>
-          <p className="text-muted-foreground">sets: 4 / reps_counted: 26 / effective: 22.4</p>
-        </div>
-
-        <p className="border-b border-border bg-amber-500/10 px-6 py-2 text-[11px] text-amber-600 dark:text-amber-400">
-          Illustrative mock-up of the intended output format. These are not
-          measured values — no validated measurement exists yet.
-        </p>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-
-          {/* Rep-by-rep table */}
-          <div className="border-b border-border lg:border-b-0 lg:border-r">
-            <table className="w-full text-[11px]">
-              <thead>
-                <tr className="border-b border-border bg-secondary/20">
-                  <th className="text-left px-6 py-2 text-muted-foreground font-medium uppercase tracking-wider">set·rep</th>
-                  <th className="text-right px-6 py-2 text-muted-foreground font-medium uppercase tracking-wider">elbow_top</th>
-                  <th className="text-right px-6 py-2 text-muted-foreground font-medium uppercase tracking-wider">velocity</th>
-                  <th className="text-right px-6 py-2 text-muted-foreground font-medium uppercase tracking-wider">quality</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {([
-                  ["1·1", "176°", "1.00", "1.00", "emerald"],
-                  ["1·3", "175°", "0.94", "0.98", "emerald"],
-                  ["1·5", "173°", "0.82", "0.92", "emerald"],
-                  ["1·7", "168°", "0.61", "0.78", "amber"],
-                  ["1·8", "162°", "0.41", "0.54", "red"],
-                  ["2·1", "175°", "0.96", "0.99", "emerald"],
-                  ["2·5", "169°", "0.71", "0.84", "amber"],
-                  ["2·7", "159°", "0.38", "0.46", "red"],
-                ] as const).map(([id, angle, vel, qual, tone]) => {
-                  const toneClass =
-                    tone === "emerald" ? "text-emerald-500"
-                    : tone === "amber" ? "text-amber-500"
-                    : "text-red-500";
-                  return (
-                    <tr key={id}>
-                      <td className="px-6 py-1.5 text-muted-foreground">{id}</td>
-                      <td className={`px-6 py-1.5 text-right tabular-nums ${toneClass}`}>{angle}</td>
-                      <td className={`px-6 py-1.5 text-right tabular-nums ${toneClass}`}>{vel}</td>
-                      <td className={`px-6 py-1.5 text-right tabular-nums ${toneClass}`}>{qual}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Velocity curve SVG */}
-          <div className="px-6 py-5">
-            <p className="text-muted-foreground uppercase tracking-wider text-[10px] mb-4">velocity curve (set 1)</p>
-            <svg
-              viewBox="0 0 280 110"
-              className="w-full"
-              preserveAspectRatio="none"
-            >
-              <line x1="0" y1="80" x2="280" y2="80" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-              <line x1="0" y1="50" x2="280" y2="50" stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="2 4" />
-              <polyline
-                points="0,20 35,22 70,28 105,40 140,55 175,68 210,82 245,92"
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth="1.5"
-              />
-              <line x1="0" y1="70" x2="280" y2="70" stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeDasharray="3 3" />
-              <text
-                x="276"
-                y="68"
-                fill="#a3a3a3"
-                textAnchor="end"
-                fontSize="9"
-                fontFamily="var(--font-geist-mono), monospace"
-              >
-                failure_threshold
-              </text>
-            </svg>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-[10px]">
-              <div>
-                <p className="text-muted-foreground">v_drop</p>
-                <p className="text-foreground tabular-nums">−59%</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">fail_at_rep</p>
-                <p className="text-foreground tabular-nums">8 of 8</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">limit_factor</p>
-                <p className="text-foreground">scap. fatigue</p>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        <div className="border-t border-border bg-secondary/20 px-6 py-4">
-          <p className="text-muted-foreground uppercase tracking-wider text-[10px] mb-2">rvectr diagnosis</p>
-          <p className="text-foreground leading-relaxed font-sans text-xs">
-            Scapular depression strength is the limiting factor — not pulling strength.
-            Velocity collapse precedes form failure by ~1 rep, indicating central fatigue. Prescribed corrective: scapular pull-ups 3×8 prior to next pulling session.
+      {/* Headline numbers */}
+      <section aria-labelledby="numbers-title" className="border-b border-border">
+        <Container className="grid gap-8 py-16 sm:py-20">
+          <SectionHeading id="numbers-title" eyebrow="Simulated results">
+            How small a change can it catch?
+          </SectionHeading>
+          <p className="max-w-[65ch] text-lg leading-relaxed text-muted-foreground">
+            In a computer simulation, more phones catch smaller changes in squat depth. Each extra phone helps a little
+            less than the one before.
           </p>
-        </div>
-      </div>
-
-      {/* Session summary */}
-      <div className="grid grid-cols-2 gap-x-8 gap-y-4 px-6 py-5 sm:grid-cols-4">
-        <Field label="weekly_volume" value="68 sets" />
-        <Field label="weekly_load" value="nominal" tone="emerald" />
-        <Field label="next_session" value="+2 days" />
-        <Field label="next_focus" value="legs · core" />
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, value, tone = "fg" }: { label: string; value: string; tone?: "fg" | "emerald" | "amber" | "red" }) {
-  const colorMap = {
-    fg: "text-foreground",
-    emerald: "text-emerald-400",
-    amber: "text-amber-400",
-    red: "text-red-400",
-  };
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
-      <p className={`mt-1 tabular-nums ${colorMap[tone]}`}>{value}</p>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────
-   Spec table — what's measured
-   ───────────────────────────────────────────── */
-
-function SpecTable() {
-  const rows: { domain: string; metric: string; unit: string; rate: string }[] = [
-    { domain: "Kinematic", metric: "Joint angles (33 landmarks)", unit: "degrees", rate: "30 Hz" },
-    { domain: "Kinematic", metric: "Angular velocity", unit: "deg/s", rate: "30 Hz" },
-    { domain: "Kinematic", metric: "3D Body Surface Mesh (SMPL)", unit: "6,890 vertices", rate: "frame-by-frame" },
-    { domain: "Kinematic", metric: "Bilateral asymmetry matrix", unit: "percent", rate: "per rep" },
-    { domain: "Performance", metric: "Effective rep count", unit: "reps", rate: "per set" },
-    { domain: "Performance", metric: "Velocity loss across set", unit: "percent", rate: "per set" },
-    { domain: "Performance", metric: "Form degradation index", unit: "0–1", rate: "per rep" },
-    { domain: "Periodisation", metric: "Weekly volume (sets)", unit: "sets/week", rate: "rolling 7d" },
-    { domain: "Periodisation", metric: "Connective tissue exposure", unit: "weeks", rate: "per movement" },
-  ];
-
-  let lastDomain = "";
-  return (
-    <div className="border border-border font-mono text-xs">
-      <div className="border-b border-border bg-secondary/30 grid grid-cols-12 px-4 py-2.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-        <div className="col-span-3">Domain</div>
-        <div className="col-span-5">Metric</div>
-        <div className="col-span-2">Unit</div>
-        <div className="col-span-2 text-right">Sampling</div>
-      </div>
-      <div>
-        {rows.map((r, i) => {
-          const newDomain = r.domain !== lastDomain;
-          lastDomain = r.domain;
-          return (
-            <div
-              key={i}
-              className="grid grid-cols-12 px-4 py-2.5 items-baseline border-b border-border/60 last:border-b-0"
+          <HeadlineStats variant="home" />
+          <p>
+            <Link
+              href="/results"
+              className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-data underline-offset-4 hover:underline"
             >
-              <div className={`col-span-3 ${newDomain ? "text-foreground font-bold" : "text-muted-foreground/30"}`}>
-                {newDomain ? r.domain : "·"}
-              </div>
-              <div className="col-span-5 text-foreground">{r.metric}</div>
-              <div className="col-span-2 text-muted-foreground">{r.unit}</div>
-              <div className="col-span-2 text-muted-foreground text-right">{r.rate}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+              All results, charts and caveats
+              <ArrowRight aria-hidden="true" className="size-4" />
+            </Link>
+          </p>
+        </Container>
+      </section>
+
+      {/* What we can't claim */}
+      <section aria-labelledby="limits-title" className="border-b border-border">
+        <Container className="grid gap-8 py-16 sm:py-20">
+          <SectionHeading id="limits-title" eyebrow="Honest limits">
+            What we can&apos;t claim yet
+          </SectionHeading>
+          <ul className="grid gap-4 md:grid-cols-3">
+            {LIMITS.map((item) => (
+              <li key={item.lead} className="grid content-start gap-2 rounded-lg border border-warm/40 bg-warm/5 p-5">
+                <p className="font-medium text-warm">{item.lead}</p>
+                <p className="text-sm leading-relaxed text-foreground/85">{item.body}</p>
+              </li>
+            ))}
+          </ul>
+        </Container>
+      </section>
+
+      {/* Try it */}
+      <section aria-labelledby="try-title">
+        <Container className="grid gap-8 py-16 sm:py-20">
+          <SectionHeading id="try-title" eyebrow="Try it">
+            Three things to click on
+          </SectionHeading>
+          <ul className="grid gap-4 md:grid-cols-3">
+            {TRY_IT.map((card) => (
+              <li key={card.href} className="grid">
+                <Link
+                  href={card.href}
+                  className="group grid content-start gap-3 rounded-lg border border-border bg-card p-5 transition-colors hover:border-foreground/50"
+                >
+                  <span className="w-fit rounded-full border border-border px-2.5 py-0.5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+                    {card.tag}
+                  </span>
+                  <span className="flex items-center justify-between gap-3 text-xl font-medium">
+                    {card.title}
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+                    />
+                  </span>
+                  <span className="text-sm leading-relaxed text-muted-foreground">{card.body}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Container>
+      </section>
+    </>
   );
 }

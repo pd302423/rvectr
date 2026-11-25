@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "camera_id": "cam1",
+  "status": "unverified",
+  "recording_mode_verified": false,
+  "image_size": null,
+  "recording_mode": {
+    "device": null,
+    "lens": null,
+    "resolution": null,
+    "orientation": null,
+    "zoom_crop": null,
+    "focus": null,
+    "stabilization": null
+  },
+  "K": null,
+  "distortion": null,
+  "R": null,
+  "t": null,
+  "units": "m",
+  "board_frame_id": null,
+  "sources": [],
+  "quality": {},
+  "note": "Template only. Obtain measured intrinsics/distortion and shared-frame extrinsics. Do not fill with guessed values or declare mode compatibility without evidence."
+}

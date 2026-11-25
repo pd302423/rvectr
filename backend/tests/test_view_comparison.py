@@ -1,0 +1,277 @@
+"""Synthetic checks of the one-camera models and of the comparison between numbers of views.
+
+Everything is generated. Passing shows the software recovers known answers under the
+stated assumptions; it says nothing about how accurate real phones are.
+"""
+import json
+
+import cv2
+import numpy as np
+import pytest
+
+from rvectr import oneview
+from rvectr.pipeline import (DEFAULTS, compare_views, measure_squats, reconstruct_sequence, run_session)
+
+from .test_two_camera_pipeline import (DEPTHS, HIPS, STANDING_HIP_HEIGHT, hip_height, intrinsic, look_at,
+                                       needs_ffmpeg, observe, prepare_full_run, skeleton, two_cameras)
+
+UP = np.array([0.0, -1.0, 0.0])          # board frame: Y points down
+STANDING = np.array([0.3, -STANDING_HIP_HEIGHT, 0.5])   # pelvis while standing
+HIP_LINE = np.array([1.0, 0.0, 0.0])     # left hip -> right hip
+BACKWARDS = np.array([0.0, 0.0, 1.0])    # the way the hips move when squatting (flat, across the hip line)
+BACK_PER_DROP = 0.5                      # hips travel back by half of how far they go down
+
+
+def camera_at(direction, distance=3.2, distortion=None, size=(1920, 1080)):
+    """A camera `distance` m from the standing spot along a flat direction, looking at the person."""
+    direction = np.asarray(direction, float)
+    centre = STANDING + distance * direction / np.linalg.norm(direction)
+    centre[1] = -1.0
+    R, t = look_at(centre, STANDING + [0, 0.25, 0])
+    return {"K": intrinsic(*size, 1500), "R": R, "t": t,
+            "distortion": np.zeros(5) if distortion is None else np.asarray(distortion, float),
+            "units": "m", "board_frame_id": "setupA", "image_size": list(size)}
+
+
+def pixels_of(points, camera):
+    """Pixels of 3D points seen through the camera, including its lens distortion."""
+    return cv2.projectPoints(np.ascontiguousarray(points, dtype=float).reshape(-1, 3), cv2.Rodrigues(camera["R"])[0], camera["t"],
+                             camera["K"], camera["distortion"])[0].reshape(-1, 2)
+
+
+def squat_with_backwards_hips(times):
+    """Hips [F,2,3] (left, right): down by the squat depth and backwards by half of it."""
+    drop = STANDING_HIP_HEIGHT - hip_height(times)
+    pelvis = STANDING + drop[:, None] * UP * -1 + (BACK_PER_DROP * drop)[:, None] * BACKWARDS
+    return np.stack([pelvis - 0.1 * HIP_LINE, pelvis + 0.1 * HIP_LINE], axis=1)
+
+
+def one_view_depths(camera, kind, hip_line=HIP_LINE):
+    """Depth per rep measured from this one camera with the given plane model."""
+    times = np.arange(0, 22, 1 / 60)
+    hips = squat_with_backwards_hips(times)
+    pixels = np.full((len(times), 17, 2), np.nan)
+    pixels[:, 11], pixels[:, 12] = (pixels_of(hips[:, k], camera) for k in (0, 1))
+    point, normal = oneview.movement_plane(kind, STANDING, UP, oneview.camera_centre(camera), hip_line)
+    xyz, valid = oneview.reconstruct_one_view(pixels, np.full((len(times), 17), 0.9), camera, point, normal)
+    result = measure_squats(times, xyz, valid, UP, {"standing_window_s": [0.5, 2.5]})
+    return np.array([r["depth_m"] for r in result["reps"]["raw"]["reps"]])
+
+
+# ----------------------------------------------------------------------------- geometry
+def test_points_in_a_known_plane_are_recovered_through_lens_distortion():
+    camera = camera_at([1, 0, -1], distortion=[-0.28, 0.09, 0.0012, -0.0008, -0.015])
+    point, normal = oneview.movement_plane("movement_plane", STANDING, UP, hip_line=[1, 0, 0.2])
+    sideways = np.cross(normal, UP)
+    sideways /= np.linalg.norm(sideways)
+    # A grid of points lying in the plane (across the person and up and down).
+    grid = np.array([point + a * sideways + b * -UP for a in np.linspace(-0.8, 0.8, 9)
+                     for b in np.linspace(-0.6, 0.6, 7)])
+    pixels = pixels_of(grid, camera).reshape(len(grid), 1, 2)
+    assert np.abs(camera["distortion"]).max() > 0.2
+    xyz, valid = oneview.reconstruct_one_view(pixels, np.ones((len(grid), 1)), camera, point, normal)
+    assert valid.all()
+    assert np.abs(xyz[:, 0] - grid).max() < 1e-4   # 0.1 mm
+
+
+def test_camera_centre_and_rays_follow_the_calibration():
+    camera = camera_at([1, 0, -1])
+    centre, rays = oneview.camera_centre_and_rays(np.array([[960.0, 540.0], [np.nan, 10.0]]), camera)
+    np.testing.assert_allclose(centre, -camera["R"].T @ camera["t"])
+    np.testing.assert_allclose(np.linalg.norm(rays[0]), 1.0)
+    assert np.isnan(rays[1]).all()
+    np.testing.assert_allclose(rays[0], camera["R"][2], atol=1e-9)   # the picture centre looks along the optical axis
+
+
+def test_planes_face_the_camera_or_follow_the_hip_line():
+    point, normal = oneview.movement_plane("fixed_distance", STANDING, UP, camera_centre=STANDING + [2, -1, -2])
+    np.testing.assert_allclose(normal, np.array([1, 0, -1]) / np.sqrt(2))   # flat part only
+    point, normal = oneview.movement_plane("movement_plane", STANDING, UP, hip_line=[3, 0.4, 0])
+    np.testing.assert_allclose(normal, [1, 0, 0])
+    with pytest.raises(ValueError):
+        oneview.movement_plane("fixed_distance", STANDING, UP)
+
+
+# ----------------------------------------------------------------------------- one camera, moving hips
+def test_squat_with_backwards_hips_from_45_degrees_and_side_on(capsys):
+    away = HIP_LINE - BACKWARDS                    # camera in front-side: backwards means away from it
+    at_45, side_on = camera_at(away), camera_at(HIP_LINE)
+    truth = np.array(DEPTHS)
+
+    plane, fixed = one_view_depths(at_45, "movement_plane"), one_view_depths(at_45, "fixed_distance")
+    assert len(plane) == len(fixed) == len(truth)
+    assert np.abs(plane - truth).max() < 0.002
+    short = 1 - fixed / truth
+    assert (short > 0.02).all() and (short < 0.06).all()
+
+    side_plane, side_fixed = one_view_depths(side_on, "movement_plane"), one_view_depths(side_on, "fixed_distance")
+    assert np.abs(side_plane - truth).max() < 0.002
+    assert np.abs(side_fixed - truth).max() < 0.002
+    with capsys.disabled():
+        print(f"\n45 deg: movement-plane worst error {np.abs(plane - truth).max() * 1000:.2f} mm, "
+              f"fixed-distance short by {short.min() * 100:.1f} to {short.max() * 100:.1f} %"
+              f"\nside-on: movement-plane {np.abs(side_plane - truth).max() * 1000:.2f} mm, "
+              f"fixed-distance {np.abs(side_fixed - truth).max() * 1000:.2f} mm")
+
+
+def test_a_hip_line_ten_degrees_wrong_changes_the_depth_by_less_than_three_percent(capsys):
+    camera = camera_at(HIP_LINE - BACKWARDS)
+    turn = np.radians(10)
+    wrong = np.array([np.cos(turn), 0.0, np.sin(turn)])
+    right_depth = one_view_depths(camera, "movement_plane")
+    wrong_depth = one_view_depths(camera, "movement_plane", hip_line=wrong)
+    change = np.abs(wrong_depth / right_depth - 1)
+    with capsys.disabled():
+        print(f"\nhip_line 10 deg wrong: depth changes by {change.min() * 100:.2f} to {change.max() * 100:.2f} %")
+    assert change.max() < 0.03
+
+
+def test_a_missing_hip_is_nan_never_filled():
+    camera = camera_at(HIP_LINE - BACKWARDS)
+    point, normal = oneview.movement_plane("movement_plane", STANDING, UP, hip_line=HIP_LINE)
+    pixels = np.tile(pixels_of(STANDING, camera), (6, 17, 1))
+    confidence = np.full((6, 17), 0.9)
+    confidence[1, 11] = 0.1          # too uncertain
+    pixels[2, 11] = np.nan           # not detected
+    pixels[3, 11] = [-5000, 5000]    # absurd pixel: the ray points away from the plane or never meets it validly
+    xyz, valid = oneview.reconstruct_one_view(pixels, confidence, camera, point, normal, min_confidence=0.3)
+    assert valid[[0, 4, 5], 11].all() and valid[:, 12].all()
+    assert not valid[[1, 2], 11].any() and np.isnan(xyz[[1, 2], 11]).all()
+    assert np.isfinite(xyz[0, 11]).all()
+    from rvectr import squat
+    assert np.isnan(squat.pelvis_track(xyz, valid)[[1, 2]]).all()   # no pelvis without both hips
+
+
+def test_a_ray_along_the_plane_or_behind_the_camera_is_invalid():
+    camera = camera_at([1, 0, -1])
+    # A plane that contains the optical axis: the picture-centre ray runs along it.
+    centre = oneview.camera_centre(camera)
+    along = camera["R"][2]
+    normal = np.cross(along, UP)
+    xyz, valid = oneview.reconstruct_one_view(np.array([[[960.0, 540.0]]]), np.ones((1, 1)), camera, centre + 0 * along, normal)
+    assert not valid.any() and np.isnan(xyz).all()
+    # The same plane square-on, but placed behind the camera.
+    behind = centre - 2 * camera["R"][2]
+    xyz, valid = oneview.reconstruct_one_view(np.array([[[960.0, 540.0]]]), np.ones((1, 1)), camera, behind,
+                                              camera["R"][2] * np.array([1, 0, 1]))
+    assert not valid.any()
+
+
+# ----------------------------------------------------------------------------- comparing views
+def make_session(angles, offsets, noise_px=0.5, seed=3):
+    """Hips-only synthetic observations for cameras at the given angles (degrees around the person)."""
+    rng = np.random.default_rng(seed)
+    K = intrinsic(1920, 1080, 1500)
+    cameras, observations, syncs = [], [], []
+    for index, (angle, offset) in enumerate(zip(angles, offsets)):
+        a = np.radians(angle)
+        centre = [0.3 + 3.2 * np.sin(a), -1.0, 0.5 - 3.2 * np.cos(a)]
+        R, t = look_at(centre, [0.3, -0.7, 0.5])
+        cameras.append({"K": K, "R": R, "t": t, "distortion": np.zeros(5), "units": "m",
+                        "board_frame_id": "setupA", "image_size": [1920, 1080]})
+        rate = 60 if index == 0 else 30
+        times = np.arange(0, 22, 1 / rate) + (0.0037 if index else 0.0)
+        observations.append(observe(times, skeleton(times + offset), cameras[-1], noise_px, rng))
+        syncs.append({"offset_s": offset, "drift_rate": 0.0, "anchor_s": 0.0})
+    return cameras, observations, syncs
+
+
+def run_comparison(angles, offsets, views=None):
+    cameras, observations, syncs = make_session(angles, offsets)
+    periods = [1 / 60] + [1 / 30] * (len(angles) - 1)
+    sequence = reconstruct_sequence(observations, cameras, syncs, frame_periods=periods, joints=HIPS)
+    result = measure_squats(sequence["times_s"], sequence["xyz"], sequence["valid"], UP,
+                            {"standing_window_s": [0.5, 2.5]})
+    config = {"cameras": [{"id": f"cam{i + 1}"} for i in range(len(angles))], "squat": result["settings"],
+              "triangulation": DEFAULTS["triangulation"], "views": {**DEFAULTS["views"], **(views or {})}}
+    return compare_views(observations, cameras, syncs, list(UP), config, sequence, result, periods)
+
+
+@pytest.fixture(scope="module")
+def two_view_comparison():
+    return run_comparison([-50, 40], [0.0, 0.6173])
+
+
+@pytest.fixture(scope="module")
+def three_view_comparison():
+    return run_comparison([-50, 40, 80], [0.0, 0.6173, -0.31])
+
+
+def test_two_cameras_give_five_conditions_with_matched_reps(two_view_comparison):
+    info = two_view_comparison
+    assert list(info["conditions"]) == ["one view, fixed distance (cam1)", "one view, movement plane (cam1)",
+                                        "one view, fixed distance (cam2)", "one view, movement plane (cam2)",
+                                        "all views (cam1+cam2)"]
+    assert info["plane_source"] == "multiview_standing"
+    for name, entry in info["conditions"].items():
+        assert entry["reps_found"] == 6, name
+        assert entry["assumes"]
+    everything = info["conditions"]["all views (cam1+cam2)"]
+    assert everything["depth_minus_all_views_m"]["mean"] == 0.0
+    # Rows keep the all-cameras numbering: six reps for each of the five conditions.
+    rows = info["rows"]
+    assert len(rows) == 30 and {r["rep"] for r in rows} == {1, 2, 3, 4, 5, 6}
+    # The people here squat in place, so the movement-plane model should agree with all views to a few mm.
+    movement = info["conditions"]["one view, movement plane (cam1)"]["depth_minus_all_views_m"]
+    assert abs(movement["mean"]) < 0.01
+
+
+def test_measured_plane_inputs_are_labelled_as_measured():
+    info = run_comparison([-50, 40], [0.0, 0.6173],
+                          views={"standing_point_m": [0.3, -0.95, 0.5], "hip_line": [1, 0, 0]})
+    assert info["plane_source"] == "measured"
+    assert all(c["plane_source"] == "measured" for c in info["conditions"].values() if c["plane_source"])
+
+
+def test_three_cameras_give_ten_conditions(three_view_comparison):
+    names = list(three_view_comparison["conditions"])
+    assert len(names) == 10
+    assert sum(n.startswith("one view") for n in names) == 6
+    assert sum(n.startswith("two views") for n in names) == 3
+    assert sum(n.startswith("all views") for n in names) == 1
+    for name in names:
+        if name.startswith("two views"):
+            entry = three_view_comparison["conditions"][name]
+            assert entry["reps_found"] == 6, name
+            # Pairs use a different timeline and sync chain; their depths must still match the all-views result.
+            assert abs(entry["depth_minus_all_views_m"]["mean"]) < 0.01, name
+
+
+# ----------------------------------------------------------------------------- whole run
+@needs_ffmpeg
+def test_full_run_writes_the_view_files_and_can_be_switched_off(tmp_path, monkeypatch):
+    paths, outputs, previous, _ = prepare_full_run(tmp_path, monkeypatch)
+    run, report = run_session(tmp_path / "session.json", paths, outputs, keypoints_from=previous,
+                              progress=lambda *_: None)
+    assert report["status"] == "measured"
+    for name in ("views_comparison.csv", "views_summary.json", "views_depth.png"):
+        assert (run / name).exists(), name
+    assert report["views"]["status"] == "done"
+    summary = json.loads((run / "views_summary.json").read_text())
+    assert len(summary["conditions"]) == 5 and summary["plane_source"] == "multiview_standing"
+    header = (run / "views_comparison.csv").read_text().splitlines()[0]
+    assert header.startswith("condition,cameras,model,rep,depth_m,depth_se_m")
+    assert json.loads((run / "report.json").read_text())["views"]["status"] == "done"
+
+    config = json.loads((tmp_path / "session.json").read_text())
+    config["views"] = {"compare": False}
+    (tmp_path / "session_off.json").write_text(json.dumps(config))
+    run_off, report_off = run_session(tmp_path / "session_off.json", paths, outputs, keypoints_from=previous,
+                                      progress=lambda *_: None)
+    assert report_off["status"] == "measured" and "views" not in report_off
+    assert not (run_off / "views_comparison.csv").exists()
+
+
+@needs_ffmpeg
+def test_a_failing_comparison_keeps_the_main_result(tmp_path, monkeypatch):
+    paths, outputs, previous, _ = prepare_full_run(tmp_path, monkeypatch)
+    from rvectr import pipeline
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("planes could not be placed")
+    monkeypatch.setattr(pipeline, "compare_views", broken)
+    run, report = run_session(tmp_path / "session.json", paths, outputs, keypoints_from=previous,
+                              progress=lambda *_: None)
+    assert report["status"] == "measured"
+    assert report["views"] == {"status": "failed", "error": "planes could not be placed"}
+    assert (run / "reps_raw.csv").exists() and not (run / "views_comparison.csv").exists()

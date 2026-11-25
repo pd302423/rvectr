@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=75,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rvectr"
+version = "1.1.1"
+description = "Timestamped multiview motion-capture research tools"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "numpy==1.26.4",
+  "scipy==1.15.3",
+  "opencv-contrib-python-headless==4.11.0.86",
+  "matplotlib==3.10.3",
+  "trimesh==4.6.8",
+  "requests==2.32.4",
+  "tqdm==4.67.1",
+  "python-dotenv==1.1.0",
+]
+
+[project.optional-dependencies]
+cuda = ["torch==2.7.1", "smplx==0.1.28"]
+pose = ["onnxruntime-gpu==1.22.0; sys_platform == 'linux'", "rtmlib==0.0.15; sys_platform == 'linux'"]
+
+[dependency-groups]
+dev = ["pytest==8.4.1", "onnx==1.18.0"]
+
+[project.scripts]
+rvectr = "rvectr.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["rvectr", "rvectr.*"]
+
+[tool.uv]
+required-version = ">=0.13.6,<0.14"
+exclude-dependencies = [
+  # These three upstream distributions overlap the cv2/onnxruntime modules.
+  # The project supplies one headless OpenCV and the GPU ONNX Runtime instead.
+  { package = { name = "rtmlib", version = "0.0.15" }, dependencies = ["opencv-python", "opencv-contrib-python", "onnxruntime"] },
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128", extra = "cuda" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+pythonpath = ["backend"]

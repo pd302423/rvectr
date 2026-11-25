@@ -1,0 +1,29 @@
+{
+  "session": "2026-11-16 pilot",
+  "participant": "P01",
+  "take": "controlled-pace-1",
+  "pace": "controlled",
+  "cameras": [
+    {"id": "cam1", "video": "2026-11-16/take1/cam1.mp4", "calibration": "2026-11-16/cam1_camera.json"},
+    {"id": "cam2", "video": "2026-11-16/take1/cam2.mp4", "calibration": "2026-11-16/cam2_camera.json"}
+  ],
+  "sync": {
+    "method": "flash",
+    "start_window_s": 10,
+    "end_window_s": 10,
+    "roi": {"cam1": null, "cam2": null}
+  },
+  "pose": {"mode": "balanced", "device": "cuda", "stride": 1, "det_frequency": 5},
+  "triangulation": {"min_confidence": 0.3, "max_reprojection_px": 10, "min_ray_angle_deg": 3},
+  "squat": {
+    "standing_window_s": [3.0, 6.0],
+    "reference_rep": 1,
+    "tolerance_m": 0.03,
+    "filter_frames": 5,
+    "min_rep_depth_m": 0.06,
+    "min_coverage": 0.85,
+    "borderline_m": 0.01,
+    "primary": "raw"
+  },
+  "labels": null
+}

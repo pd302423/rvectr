@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
+import { Container } from "@/components/site/Container";
+import { Notice } from "@/components/site/Notice";
+import { PageHeader } from "@/components/site/PageHeader";
 import { useBiomechanicsStore, isSampleAnalysis } from "@/lib/store";
 import { DualViewport } from "@/components/biomechanics/DualViewport";
 import { ScoreGauge } from "@/components/biomechanics/ScoreGauge";
@@ -9,7 +11,7 @@ import { TelemetryTable } from "@/components/biomechanics/TelemetryTable";
 import { TimelineScrubber } from "@/components/biomechanics/TimelineScrubber";
 import { KinematicWaveformChart } from "@/components/biomechanics/KinematicWaveformChart";
 import { BilateralAsymmetryMatrix } from "@/components/biomechanics/BilateralAsymmetryMatrix";
-import { Activity, Award, Lightbulb, FileText, Upload, RefreshCw, Scale, LineChart, ShieldCheck } from "lucide-react";
+import { Activity, Award, Lightbulb, FileText, RefreshCw, Scale, LineChart, ShieldCheck } from "lucide-react";
 
 export default function AnalysisPage() {
   const { currentAnalysis, activeTab, setActiveTab } = useBiomechanicsStore();
@@ -23,55 +25,46 @@ export default function AnalysisPage() {
     { id: "joints", label: "Joint Telemetry", icon: Award },
     { id: "waveform", label: "Waveform Studio", icon: LineChart },
     { id: "asymmetry", label: "Bilateral Asymmetry", icon: Scale },
-    { id: "posture", label: "Posture Diagnostic", icon: FileText },
+    { id: "posture", label: "Posture summary", icon: FileText },
     { id: "recommendations", label: "Recommendations", icon: Lightbulb },
   ] as const;
 
   return (
-    <div className="min-h-screen bg-[#000000] text-[#ffffff] font-sans flex flex-col selection:bg-[#ffffff] selection:text-[#000000]">
-      <Navbar />
+    <Container size="wide" className="grid grid-cols-[minmax(0,1fr)] gap-6 py-10 sm:py-14">
+      <PageHeader eyebrow="Sample analysis" title="A mock-up of a result page">
+        <p>
+          This shows how a Rvectr result could be laid out: a 3D viewport, a timeline, joint tables and charts. It is
+          not a result.
+        </p>
+      </PageHeader>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6 font-mono">
+      <Notice title="Sample data, not a measurement.">
+        <p>
+          Every number on this page is a synthetic placeholder, generated from a sine wave, so the layout can be
+          shown. Nothing has been analysed and no real recording was used.
+          {isSampleAnalysis(currentAnalysis)
+            ? " It is not the output of the Rvectr software and must not be cited or screenshotted as a result."
+            : ""}
+        </p>
+      </Notice>
 
-        {isSampleAnalysis(currentAnalysis) && (
-          <div
-            role="status"
-            className="border border-amber-500/60 bg-amber-500/10 text-amber-200 px-4 py-3 text-xs leading-relaxed"
-          >
-            <strong className="uppercase tracking-widest">Sample data — not a measurement.</strong>{" "}
-            Nothing has been analysed. Every number on this page is a synthetic
-            placeholder generated from a sine wave, shown so the interface can be
-            laid out. It is not the output of any capture pipeline and must not be
-            cited or screenshotted as a result.
-          </div>
-        )}
-
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#262626] pb-4">
-          <div>
-            <div className="flex items-center gap-2 text-xs text-[#a3a3a3]">
-              <span className="uppercase tracking-widest font-bold">SESSION ID</span>
-              <span className="bg-[#121212] px-2 py-0.5 border border-[#262626] text-[#ffffff] font-bold">{video_id}</span>
-              <span className="px-2 py-0.5 border border-[#ffffff] bg-[#ffffff] text-[#000000] font-bold uppercase tracking-widest text-[10px]">
-                Professional MoCap Mode
-              </span>
-            </div>
-            <h1 className="text-xl font-bold tracking-widest uppercase text-[#ffffff] font-sans mt-2">
-              Biomechanical Kinematic Telemetry Workspace
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href="/demo"
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-[#ffffff] bg-[#ffffff] text-[#000000] hover:bg-[#a3a3a3] text-xs font-mono font-bold uppercase tracking-widest transition-colors"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span>3D Motion Command</span>
-            </Link>
-          </div>
+      <div className="flex flex-col justify-between gap-4 border-b border-border pb-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground">
+          <span className="font-bold uppercase tracking-widest">Session ID</span>
+          <span className="max-w-full break-words border border-border bg-secondary px-2 py-0.5 font-bold text-foreground">
+            {video_id}
+          </span>
         </div>
+        <Link
+          href="/demo"
+          className="inline-flex min-h-10 w-fit items-center gap-2 border border-border px-3.5 text-sm transition-colors hover:bg-muted"
+        >
+          <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" />
+          <span>Open the 3D viewer</span>
+        </Link>
+      </div>
 
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 font-mono">
         {/* Dual Viewport (EasyMocap 3D Surface Mesh) */}
         <DualViewport />
 
@@ -79,14 +72,16 @@ export default function AnalysisPage() {
         <TimelineScrubber totalFrames={metadata?.total_frames || 291} fps={metadata?.fps || 30} />
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 border-b border-[#262626] pb-2 overflow-x-auto">
+        <div className="flex items-center gap-1 border-b border-[#262626] pb-2 overflow-x-auto" role="group" aria-label="Sample analysis sections">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2 text-xs font-mono font-bold uppercase tracking-widest transition-colors border ${
                   isActive
                     ? "bg-[#ffffff] text-[#000000] border-[#ffffff]"
@@ -131,7 +126,7 @@ export default function AnalysisPage() {
             <div className="p-6 border border-[#262626] bg-[#0a0a0a] space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-widest text-[#ffffff] flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-[#ffffff]" />
-                <span>Clinical Posture & Kinematic Diagnostic</span>
+                <span>Posture summary (sample)</span>
               </h3>
               <p className="text-xs text-[#a3a3a3] leading-relaxed">
                 {analysis.posture_report.description}
@@ -153,7 +148,7 @@ export default function AnalysisPage() {
             <div className="p-6 border border-[#262626] bg-[#0a0a0a] space-y-4">
               <h3 className="text-sm font-bold uppercase tracking-widest text-[#ffffff] flex items-center gap-2">
                 <Lightbulb className="h-4 w-4 text-[#ffffff]" />
-                <span>Biomechanics & Strength Coaching Recommendations</span>
+                <span>Recommendations (sample)</span>
               </h3>
               <ul className="space-y-2 text-xs">
                 {analysis.recommendations.map((rec, idx) => (
@@ -167,7 +162,7 @@ export default function AnalysisPage() {
           )}
         </div>
 
-      </main>
-    </div>
+      </div>
+    </Container>
   );
 }
