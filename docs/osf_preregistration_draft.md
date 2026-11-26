@@ -17,7 +17,7 @@ Velocity-dependent error in markerless 3D human pose estimation on consumer hard
 
 ## Authors
 
-Parth Dalal (independent researcher)
+student researcher (independent researcher)
 
 ## Description
 

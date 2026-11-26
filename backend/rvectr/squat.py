@@ -32,7 +32,7 @@ def height(points, up):
     return np.asarray(points, float) @ up
 
 
-def smooth(values, window):
+def smooth(values, window, times=None):
     """Centred moving average over `window` frames; NaN if any sample in the window is missing."""
     values = np.asarray(values, float)
     if window is None or window <= 1:
@@ -42,7 +42,11 @@ def smooth(values, window):
     half = window // 2
     flat = values.reshape(len(values), -1)
     out = np.full_like(flat, np.nan)
+    gaps = np.diff(times) if times is not None else None
+    period = np.median(gaps) if gaps is not None and len(gaps) else 0
     for i in range(half, len(values) - half):
+        if gaps is not None and np.any(gaps[i-half:i+half] > 1.5 * period):
+            continue
         block = flat[i - half:i + half + 1]
         if np.isfinite(block).all():
             out[i] = block.mean(axis=0)
@@ -65,14 +69,15 @@ def jitter(times, points, window_s, up=None):
         # frames only). Two independent errors differ by sqrt(2) times their size, hence the division.
         # Slow drift changes little from frame to frame, so it hardly shows up here.
         h = height(np.nan_to_num(points), up)
-        both = observed[:-1] & observed[1:]
+        both = observed[:-1] & observed[1:] & (np.diff(t) <= 1.5 * np.median(np.diff(t)))
         steps = np.diff(h)[both]
         if len(steps) >= 2:
             fast_sd = float(np.std(steps) / np.sqrt(2))
             # What is left of the total spread once the fast part is taken away is slow drift.
             slow_sd = float(np.sqrt(max(vertical_sd ** 2 - fast_sd ** 2, 0.0)))
     return {"status": "measured", "window_s": list(window_s), "samples": int(observed.sum()),
-            "coverage": float(observed.sum() / max(inside.sum(), 1)),
+            "coverage": _coverage(t[inside], np.where(observed[inside], 1.0, np.nan),
+                                  np.median(np.diff(t)), window_s[1] - window_s[0]),
             "rms_m": float(np.sqrt(np.mean(distance ** 2))), "p95_m": float(np.percentile(distance, 95)),
             "max_m": float(distance.max()),
             "vertical_sd_m": vertical_sd, "vertical_fast_sd_m": fast_sd, "vertical_slow_sd_m": slow_sd}
@@ -100,14 +105,69 @@ def segment_reps(times, h, standing=None, min_depth_m=0.06, enter_fraction=0.5, 
     Missing samples stay missing. A smoothed copy of the trace is used only to
     find dips and choose windows; heights are always measured on real samples.
     """
-    if estimator == "extreme":
-        return _segment_extreme(times, h, standing, min_depth_m, enter_fraction, edge_fraction)
-    if estimator != "parabola":
-        raise ValueError("estimator must be 'parabola' or 'extreme'")
     t, h = np.asarray(times, float), np.asarray(h, float)
-    finite = np.isfinite(h)
-    if finite.sum() < 10:
+    if t.shape != h.shape or not np.isfinite(t).all() or np.any(np.diff(t) <= 0):
+        raise ValueError("Height samples need one strictly increasing timestamp each")
+    observed = np.flatnonzero(np.isfinite(h))
+    if len(observed) < 10:
         return [], standing
+    period = float(np.median(np.diff(t)))
+    # A gap of this length can hide the transition between different attempts.
+    # Segment each observed stretch independently, retaining original indices.
+    gaps = np.flatnonzero(np.diff(t[observed]) > max(0.4, 3 * period) + 1e-6)
+    groups = np.split(observed, gaps + 1)
+    if standing is None:
+        smoothed = [_running_median(h[g[0]:g[-1]+1], _median_window(t)) for g in groups]
+        standing = float(np.nanpercentile(np.concatenate(smoothed), 95))
+    reps = []
+    for group in groups:
+        first, last = group[0], group[-1]
+        ts, heights = t[first:last+1], h[first:last+1]
+        if len(group) < 4:
+            continue
+        if estimator == "extreme":
+            found, _ = _segment_extreme(ts, heights, standing, min_depth_m, enter_fraction, edge_fraction)
+        elif estimator == "parabola":
+            found = _segment_observed(ts, heights, standing, min_depth_m, enter_fraction, edge_fraction,
+                                      standing_window_s, standing_guard_s, bottom_cap_m, max_bottom_gap_s,
+                                      min_bottom_samples)
+        else:
+            raise ValueError("estimator must be 'parabola' or 'extreme'")
+        for rep in found:
+            start, end = rep["start_index"], rep["end_index"]
+            edge = rep["standing_m"] - edge_fraction * rep["depth_m"]
+            complete = heights[start] >= edge and heights[end] >= edge
+            # Each observed sample accounts for at most one typical frame period.
+            # At a broken boundary include the adjacent unobserved interval.
+            cut_before = start == 0 and first != observed[0]     # a hole separates this stretch from the one before
+            cut_after = end == len(ts)-1 and last != observed[-1]  # ... or from the one after
+            lo = t[observed[np.searchsorted(observed, first)-1]] if cut_before else ts[start]
+            hi = t[observed[np.searchsorted(observed, last)+1]] if cut_after else ts[end]
+            rep["coverage"] = _coverage(ts[start:end+1], heights[start:end+1], period, hi-lo)
+            if not complete:
+                rep.update(bottom_observed=False, bottom_model="none", bottom_se_m=np.nan, depth_se_m=np.nan)
+            # A squat cut by a long hole is reported as pieces. Flag them so a piece is not
+            # mistaken for a separate extra squat. Which squats are accepted is not changed.
+            rep["split_by_gap"] = bool(not complete and (cut_before or cut_after))
+            rep["rep"] = len(reps) + 1
+            for key in ("start_index", "end_index", "bottom_index"):
+                rep[key] = int(rep[key] + first)
+            reps.append(rep)
+    return reps, standing
+
+
+def _coverage(t, h, period, elapsed):
+    valid_t = t[np.isfinite(h)]
+    if len(valid_t) == 0:
+        return 0.0
+    supported = period + np.minimum(np.diff(valid_t), period).sum()
+    return float(np.clip(supported / (elapsed + period), 0, 1))
+
+
+def _segment_observed(t, h, standing, min_depth_m, enter_fraction, edge_fraction,
+                      standing_window_s, standing_guard_s, bottom_cap_m, max_bottom_gap_s,
+                      min_bottom_samples):
+    finite = np.isfinite(h)
     smooth_h = _running_median(h, _median_window(t))
     if standing is None:
         standing = float(np.percentile(smooth_h[np.isfinite(smooth_h)], 95))
@@ -152,7 +212,7 @@ def segment_reps(times, h, standing=None, min_depth_m=0.06, enter_fraction=0.5, 
                      "standing_se_m": local["se"], "bottom_samples": bottom["samples"],
                      "bottom_max_gap_s": bottom["max_gap_s"], "bottom_se_m": bottom["se"],
                      "depth_se_m": float(np.sqrt(local["se"] ** 2 + bottom["se"] ** 2))})
-    return reps, standing
+    return reps
 
 
 def _median_window(t):
@@ -241,6 +301,12 @@ def _bottom_height(t, h, finite, smooth_h, segment, real, cap_m, max_gap_s, min_
     if len(usable) == 0:
         return fallback
     k = int(usable[np.argmin(smooth_h[usable])])
+
+    # Require a measured descent into, and rise out of, the low region.
+    # A few noise samples around a fitted vertex do not establish either limb.
+    above = real[smooth_h[real] > smooth_h[k] + cap_m]
+    if not np.any(above < k) or not np.any(above > k):
+        return fallback
 
     def widen(step, cap):
         """Walk from k in one direction while the smoothed height stays low; return the last index and why we stopped."""

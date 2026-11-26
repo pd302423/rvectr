@@ -1,6 +1,7 @@
 """Monte Carlo error budget for the two-phone squat-depth design.
 
-THIS IS A SIMULATION, NOT A MEASUREMENT. No real two-phone footage exists yet.
+This simulation uses a constructed motion and noise settings. The published
+validation contains no pilot measurements.
 The aim is a PREDICTION, made before recording, of how small a depth
 difference the design can detect and which error sources matter most.
 
@@ -23,6 +24,7 @@ project's own `squat.classify` rule.
 from __future__ import annotations
 
 import zlib
+import math
 from dataclasses import dataclass, replace
 
 import numpy as np
@@ -63,7 +65,6 @@ def image_px_to_mm(image_px):
 # Taken from the pipeline so the simulation uses the same numbers as a real run.
 RULES = DEFAULTS["squat"]
 STANDING_WINDOW_S = (0.5, 2.5)   # the person stands still here; used to find the standing level
-UNCLEAR_SCORE = -1e9             # stand-in for "unclear" when ranking scores (never flagged)
 REACHED, SHALLOWER, UNCLEAR = 0, 1, 2
 
 MODES = ("side_1cam", "oblique_1cam", "two_cam", "three_cam")
@@ -81,6 +82,14 @@ class Setup:
     beta: float = 0.0              # detected hip is raised by beta x current descent
     dropout: float = 0.0           # chance that a hip is missing in one camera in one frame
     sync_frames: float = 0.0       # camera B samples the motion at t + sync_frames / fps
+    sync_offsets_frames: tuple[float, ...] = ()  # per-camera time offset; overrides sync_frames when set
+    camera_bias_px: float = 0.0    # session-shared, camera-specific 2D keypoint bias sigma
+    shared_vertical_sigma_m: float = 0.0  # latent per-frame vertical hip error projected by every camera
+    motion_noise_factor: float = 0.0  # white-noise sigma rises by this fraction at peak speed
+    dropout_burst_probability: float = 0.0  # chance per frame of a shared-camera visibility gap
+    dropout_burst_frames: int = 0   # duration of each shared-camera visibility gap
+    camera_translation_sigma_m: float = 0.0  # per-camera extrinsic center error, shared for a session
+    camera_rotation_sigma_deg: float = 0.0   # per-camera extrinsic orientation error, shared for a session
     scale_error: float = 0.0       # reconstructed lengths x (1 + scale_error)
     tilt_deg: float = 0.0          # up-axis tilted this far towards the direction of travel
     separation_deg: float = SIDE_DEG - OBLIQUE_DEG   # angle between camera A and B
@@ -99,6 +108,15 @@ class Setup:
             raise ValueError("trace must be 'raw' or 'filtered'")
         if self.estimator not in ("parabola", "extreme"):
             raise ValueError("estimator must be 'parabola' or 'extreme'")
+        expected_cameras = 1 if self.mode.endswith("1cam") else (3 if self.mode == "three_cam" else 2)
+        if self.sync_offsets_frames and len(self.sync_offsets_frames) != expected_cameras:
+            raise ValueError("sync_offsets_frames must have one entry per camera in this mode")
+        if self.dropout_burst_frames < 0:
+            raise ValueError("dropout_burst_frames cannot be negative")
+        for name in ("camera_bias_px", "shared_vertical_sigma_m", "motion_noise_factor", "dropout_burst_probability",
+                     "camera_translation_sigma_m", "camera_rotation_sigma_deg"):
+            if getattr(self, name) < 0:
+                raise ValueError(f"{name} cannot be negative")
 
     @property
     def descent_s(self):
@@ -130,8 +148,26 @@ def make_camera(angle_deg):
     a = np.radians(angle_deg)
     center = [DISTANCE_M * np.sin(a), -LENS_HEIGHT_M, DISTANCE_M * np.cos(a)]   # y is down
     R, t = look_at(center, [0.0, -LENS_HEIGHT_M, 0.0])                          # look straight at the person, level
-    return {"K": intrinsic(IMAGE_W, IMAGE_H, FOCAL_PX), "R": R, "t": t, "distortion": np.zeros(5),
+    return {"K": intrinsic(IMAGE_W, IMAGE_H, FOCAL_PX), "R": R, "t": t, "center": np.asarray(center), "distortion": np.zeros(5),
             "units": "m", "board_frame_id": "sim", "image_size": [IMAGE_W, IMAGE_H]}
+
+
+def perturb_camera_calibration(cameras, setup, rng):
+    """Apply session-shared per-camera extrinsic errors, as a calibration would."""
+    if setup.camera_translation_sigma_m == 0 and setup.camera_rotation_sigma_deg == 0:
+        return cameras
+    result = []
+    for camera in cameras:
+        center = camera["center"] + rng.normal(0, setup.camera_translation_sigma_m, 3)
+        angles = np.radians(rng.normal(0, setup.camera_rotation_sigma_deg, 3))
+        cx, cy, cz = np.cos(angles)
+        sx, sy, sz = np.sin(angles)
+        rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+        ry = np.array([[cy, 0, sy], [0, 1, 0], [-sy, 0, cy]])
+        rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+        R = (rz @ ry @ rx) @ camera["R"]
+        result.append(dict(camera, R=R, t=-R @ center, center=center))
+    return result
 
 
 def camera_angles(setup):
@@ -238,23 +274,47 @@ def simulate_observations(setup, depths, rng):
     starts = rep_starts(setup, phase_s=rng.uniform(0, dt))        # random frame phase
     total = starts[-1] + 2 * setup.descent_s + setup.dwell_s + PAUSE_S
     times = np.arange(int(np.ceil(total / dt))) * dt
-    cameras = [make_camera(a) for a in camera_angles(setup)]
+    true_cameras = [make_camera(a) for a in camera_angles(setup)]
+    cameras = perturb_camera_calibration(true_cameras, setup, rng)
     n_cam = len(cameras)
     shape = (len(times), n_cam, 2, 2)                             # frame, camera, hip, (u, v)
     # Always draw the same random numbers so settings can be compared on equal terms.
     z_white = rng.standard_normal(shape)
     z_slow = rng.standard_normal(shape)
     z_drop = rng.random(shape[:3])
+    shared_height = rng.normal(0, setup.shared_vertical_sigma_m, len(times)) if setup.shared_vertical_sigma_m else None
     pixels = np.zeros(shape)
     for c in range(n_cam):
-        # Only camera B (the second camera of a two-camera pair) has a clock error.
-        shift = setup.sync_frames * dt if (c == 1 and setup.mode in ("two_cam", "three_cam")) else 0.0
+        if setup.sync_offsets_frames:
+            shift = setup.sync_offsets_frames[c] * dt
+        else:
+            shift = setup.sync_frames * dt if (c == 1 and setup.mode in ("two_cam", "three_cam")) else 0.0
         d = descent_profile(times + shift, starts, depths, setup.descent_s, setup.dwell_s)
-        pixels[:, c] = project(hip_points(d, setup.beta), cameras[c])
-    pixels += z_white * setup.white_px
+        # Project with the true physical camera; reconstruct with its perturbed calibration.
+        points = hip_points(d, setup.beta)
+        if shared_height is not None:
+            points[:, :, 1] += shared_height[:, None]
+        pixels[:, c] = project(points, true_cameras[c])
+    if setup.motion_noise_factor:
+        motion = np.zeros(len(times))
+        for start in starts:
+            s = times - start
+            moving = (s >= 0) & (s <= 2 * setup.descent_s + setup.dwell_s)
+            phase = np.clip(s[moving] / max(2 * setup.descent_s + setup.dwell_s, 1e-9), 0, 1)
+            motion[moving] = np.maximum(motion[moving], np.abs(np.sin(2 * np.pi * phase)))
+        pixels += z_white * setup.white_px * (1 + setup.motion_noise_factor * motion[:, None, None, None])
+    else:
+        pixels += z_white * setup.white_px
     if setup.slow_px > 0:
         pixels += slow_noise(z_slow, setup.slow_px, dt, setup.slow_tau_s)
+    if setup.camera_bias_px:
+        # Camera-specific keypoint bias persists across the take and is shared by both hips.
+        pixels += rng.normal(0, setup.camera_bias_px, (1, n_cam, 1, 2))
     present = z_drop >= setup.dropout                             # False = this hip missing in this camera
+    if setup.dropout_burst_probability and setup.dropout_burst_frames:
+        burst_starts = np.flatnonzero(rng.random(len(times)) < setup.dropout_burst_probability)
+        for frame in burst_starts:
+            present[frame:min(len(times), frame + setup.dropout_burst_frames), :, :] = False
     return times, pixels, present, cameras, starts
 
 
@@ -323,6 +383,9 @@ def measure_with_models(setup, times, h, true_bottoms_s):
     for bottom in true_bottoms_s:
         gaps = np.array([abs(r["bottom_s"] - bottom) for r in reps])
         matched.append(int(np.argmin(gaps)) if gaps.min() <= setup.descent_s else None)
+    for i, k in enumerate(matched):
+        if k is not None:
+            models[i] = reps[k].get("bottom_model", "none")
     if matched[0] is None:
         return depths, outcomes, len(reps), depth_se, models              # reference not found: nothing can be compared
     try:
@@ -397,11 +460,11 @@ def difference_error(run):
 def score(run):
     """How strongly each test repetition looks shallower than the reference (metres; bigger = shallower).
 
-    score = measured reference depth - measured test depth. Unclear repetitions get a very low
-    score so they are never counted as flagged.
+    score = measured reference depth - measured test depth. Unclear repetitions
+    remain in the denominator and can never be counted as flagged.
     """
     s = -difference_error(run) + run["delta_m"]
-    return np.where(np.isfinite(s), s, UNCLEAR_SCORE).ravel()
+    return np.where(np.isfinite(s), s, -np.inf).ravel()
 
 
 def depth_error_sd_m(run):
@@ -443,8 +506,9 @@ def flag_rate(run):
 
 
 def extra_reps(run):
-    """Average number of repetitions per session that the software found beyond the real ones (or missed, if negative)."""
-    return float(np.mean(run["extra_reps"]))
+    """Unmatched detections per session, counted separately from missed attempts."""
+    missed = (run["bottom_model"] == "missing").sum(axis=1)
+    return float(np.mean(run["extra_reps"] + missed))
 
 
 def unclear_rate(run):
@@ -452,29 +516,97 @@ def unclear_rate(run):
 
 
 def minimum_detectable_difference_m(runs, level=0.95):
-    """Smallest true difference for which SOME threshold flags >= 95% of shallow reps and <= 5% of matching reps.
+    """Select the first passing grid difference using the training half only.
 
-    runs: list of run_config results; runs[0] must have delta 0 (the matching case).
-    A threshold exists exactly when the 5th percentile of the shallow scores is above the
-    95th percentile of the matching scores. That gap grows almost linearly with the true
-    difference, so the crossing point is found by linear interpolation. Returns
-    (mdd_m, threshold_m); mdd is inf if even the largest difference tried is not detectable.
+    The independent second half is reserved for detection_bracket to evaluate the
+    frozen cutoff and grid point. The three tests sharing a reference stay together.
     """
     runs = sorted(runs, key=lambda r: r["delta_m"])
     if runs[0]["delta_m"] != 0:
         raise ValueError("The first run must be the matching case (delta 0)")
-    threshold = float(np.quantile(score(runs[0]), level, method="higher"))
-    deltas = np.array([r["delta_m"] for r in runs])
-    gaps = np.array([float(np.quantile(score(r), 1 - level, method="lower")) - threshold for r in runs])
-    if gaps[0] > 0:
-        return 0.0, threshold
-    for i in range(1, len(runs)):
-        if gaps[i] > 0:
-            if gaps[i - 1] < UNCLEAR_SCORE / 2 or gaps[i] < UNCLEAR_SCORE / 2:
-                return float(deltas[i]), threshold
-            share = -gaps[i - 1] / (gaps[i] - gaps[i - 1])
-            return float(deltas[i - 1] + share * (deltas[i] - deltas[i - 1])), threshold
+    n_sessions = len(runs[0]["outcome"])
+    split = n_sessions // 2
+    if split < 1 or split == n_sessions:
+        raise ValueError("at least two sessions are needed to calibrate and evaluate a threshold")
+    match_train = score(subset_sessions(runs[0], 0, split))
+    threshold, _ = choose_threshold(match_train, level=level)
+    if threshold is None:
+        return float("inf"), float("nan")
+    for run in runs[1:]:
+        shallow_train = score(subset_sessions(run, 0, len(run["outcome"]) // 2))
+        candidate, counts = choose_threshold(match_train, shallow_train, level)
+        if counts["passes"]:
+            return float(run["delta_m"]), candidate
     return float("inf"), threshold
+
+
+def subset_sessions(run, start, stop):
+    """Copy a run result restricted to complete session rows."""
+    return {key: value[start:stop] if isinstance(value, np.ndarray) and value.ndim else value
+            for key, value in run.items()}
+
+
+def threshold_counts(matching_scores, shallow_scores, threshold, level=0.95):
+    """Exact confusion counts using all repetitions, with unclear as not-detected."""
+    matching = np.asarray(matching_scores, float)
+    shallow = np.asarray(shallow_scores, float)
+    if not len(matching) or not len(shallow):
+        raise ValueError("matching and shallow sets must be non-empty")
+    valid_match = np.isfinite(matching)
+    valid_shallow = np.isfinite(shallow)
+    usable_threshold = threshold is not None and np.isfinite(threshold)
+    false_alarms = int(np.count_nonzero(valid_match & (matching > threshold))) if usable_threshold else 0
+    detected = int(np.count_nonzero(valid_shallow & (shallow > threshold))) if usable_threshold else 0
+    matching_unclear = int(np.count_nonzero(~valid_match))
+    shallow_unclear = int(np.count_nonzero(~valid_shallow))
+    max_false = math.floor((1 - level) * len(matching) + 1e-12)
+    min_detected = math.ceil(level * len(shallow) - 1e-12)
+    return {"matching_total": len(matching), "false_alarms": false_alarms,
+            "shallow_total": len(shallow), "detected_shallow": detected,
+            "matching_unclear": matching_unclear, "matching_unclear_rate": matching_unclear / len(matching),
+            "shallow_unclear": shallow_unclear, "shallow_unclear_rate": shallow_unclear / len(shallow),
+            "false_alarm_rate": false_alarms / len(matching), "detection_rate": detected / len(shallow),
+            "max_false_alarms": max_false, "min_detected_shallow": min_detected,
+            "passes": bool(usable_threshold and false_alarms <= max_false and detected >= min_detected)}
+
+
+def choose_threshold(matching_scores, shallow_scores=None, level=0.95):
+    """Choose the lowest observed cutoff allowed by the training false-alarm budget."""
+    matching = np.asarray(matching_scores, float)
+    ordered = np.sort(matching[np.isfinite(matching)])
+    if not len(ordered):
+        return None, {"matching_total": len(matching), "matching_unclear": len(matching), "passes": False}
+    max_false = math.floor((1 - level) * len(matching) + 1e-12)
+    if len(ordered) > max_false:
+        threshold = float(ordered[-max_false - 1])
+    else:
+        # Flagging all usable training scores stays within the false-alarm budget.
+        scores = ordered if shallow_scores is None else np.r_[ordered, shallow_scores]
+        threshold = float(np.nextafter(np.min(scores[np.isfinite(scores)]), -np.inf))
+    counts = (threshold_counts(matching, shallow_scores, threshold, level) if shallow_scores is not None
+              else {"matching_total": len(matching), "matching_unclear": len(matching) - len(ordered),
+                    "false_alarms": int(np.count_nonzero(ordered > threshold)), "max_false_alarms": max_false})
+    return threshold, counts
+
+
+def session_bootstrap_rate(run, outcome, n_boot=500, seed=0):
+    """95% percentile interval for a repetition rate, resampling whole sessions."""
+    values = (run["outcome"][:, 1:] == outcome).mean(axis=1)
+    if not len(values):
+        return [float("nan"), float("nan")]
+    rng = np.random.default_rng(seed)
+    means = np.array([rng.choice(values, size=len(values), replace=True).mean() for _ in range(n_boot)])
+    return [float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))]
+
+
+def session_bootstrap_flag_rate(run, threshold, n_boot=500, seed=0):
+    """95% interval for a threshold flag rate, resampling the shared-reference session."""
+    flagged = (score(run).reshape(run["outcome"][:, 1:].shape) > threshold).mean(axis=1)
+    if not len(flagged):
+        return [float("nan"), float("nan")]
+    rng = np.random.default_rng(seed)
+    means = np.array([rng.choice(flagged, size=len(flagged), replace=True).mean() for _ in range(n_boot)])
+    return [float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))]
 
 
 # ----------------------------------------------------------------------------- analytic cross-check

@@ -9,8 +9,8 @@ under separate headings.
 
 **What an entry is for:** what you tried, what broke, what you found out, what
 you decided and why. Not a changelog — `git log` already does that. The value is
-the reasoning and the dead ends, because those are what portfolio item #9 and
-the fair interview draw on.
+the reasoning and the dead ends, because those are what a reviewer or judge
+wants to see.
 
 **Template:**
 

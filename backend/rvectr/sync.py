@@ -59,7 +59,8 @@ def interpolate_observations(timestamps, xy, confidence, query, max_gap_s=0.08):
         if j < len(t) and np.isclose(q, t[j], atol=1e-8, rtol=0):
             out[i], scores[i] = xy[j], confidence[j]
         elif 0 < j < len(t) and t[j]-t[j-1] <= max_gap_s:
-            valid = np.isfinite(xy[j]).all(-1) & np.isfinite(xy[j-1]).all(-1)
+            valid = (np.isfinite(xy[j]).all(-1) & np.isfinite(xy[j-1]).all(-1)
+                     & (confidence[j] > 0) & (confidence[j-1] > 0))
             alpha = (q-t[j-1])/(t[j]-t[j-1])
             out[i, valid] = (1-alpha)*xy[j-1,valid]+alpha*xy[j,valid]
             scores[i, valid] = np.minimum(confidence[j-1, valid], confidence[j, valid])

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Versioned capture diagnostics. Reconstruction integration remains unfinished.
+"""Rvectr camera calibration, synchronization and squat measurement commands.
 
-Never promotes uncalibrated videos into metric 3D or claims validation.
+Use `rvectr run --help` for the calibrated multiview pipeline. Pilot scoring
+uses the same independent timed annotation list for every camera condition.
+Measurements are not accuracy claims; inspect run diagnostics and independent
+reference comparisons.
 """
 import argparse
 import importlib.metadata
@@ -38,16 +41,21 @@ def main():
         print(json.dumps(result,indent=2))
         return 0 if result['passed'] else 1
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     epilog='Two-camera squat pipeline commands (see docs/TWO_CAMERA_PIPELINE.md):\n  '
+                                     epilog='Main pipeline commands (see docs/TWO_CAMERA_PIPELINE.md):\n  '
                                             + '\n  '.join(f'rvectr {c} --help' for c in COMMANDS)
-                                            + '\n  rvectr doctor')
-    parser.add_argument('--config', type=Path, required=True)
+                                            + '\n  rvectr doctor'
+                                            + '\n\nPilot example: rvectr run --config /path/to/take/session.json --annotations /path/to/take/pilot_annotations.csv'
+                                            + '\nThe annotations include one same-take reference and timed test repetitions.')
+    parser.add_argument('--config', type=Path,
+                        help='capture config for the diagnostics-only mode; use `rvectr run --config ...` for measurement')
     parser.add_argument('--diagnose-only', action='store_true',
-                        help='Required until the reconstruction stages are integrated and tested')
+                        help='write metadata, calibration, synchronization and provenance diagnostics without metric measurement')
     parser.add_argument('--output-root', type=Path)
     args = parser.parse_args()
     if not args.diagnose_only:
-        parser.error('Reconstruction integration is unfinished. Use --diagnose-only; no metric result will be invented.')
+        parser.error('This direct capture-config mode is diagnostics only. Add --diagnose-only or use `rvectr run`.')
+    if not args.config:
+        parser.error('--config is required for diagnostics-only mode')
     paths=RuntimePaths.discover()
     project=paths.project
     config=load_capture_config(args.config)

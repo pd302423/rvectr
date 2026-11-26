@@ -13,8 +13,23 @@ const last = DROPOUTS.labels.length - 1;
 const x = (i: number) => LEFT + (i * (W - LEFT - RIGHT)) / last;
 const y = (percent: number) => TOP + (1 - percent / 100) * (H - TOP - BOTTOM);
 
+function segments(values: readonly (number | null)[]) {
+  const result: string[] = [];
+  let current: string[] = [];
+  values.forEach((value, index) => {
+    if (value == null) {
+      if (current.length) result.push(current.join(" "));
+      current = [];
+    } else {
+      current.push(`${x(index)},${y(value)}`);
+    }
+  });
+  if (current.length) result.push(current.join(" "));
+  return result.filter((points) => points.includes(" "));
+}
+
 const ARIA_LABEL =
-  "Line chart: the share of squats judged unclear as missed hip detections become more frequent, for the old rule and the new rule. The old rule gives up on 6% of squats at 1 miss in 200 frames and 30% at 1 in 50. The new rule gives up on none up to 1 in 50 and on 14% at 1 in 33.";
+  "Line chart: the simulated share of squats judged unclear as independent hip detections are missed more often, comparing the old and new depth rules.";
 
 const SERIES = [
   { id: "old", name: "Old rule", values: DROPOUTS.oldRule, stroke: "stroke-warm", fill: "fill-warm" },
@@ -35,8 +50,8 @@ export function DropoutChart() {
       caption={
         <>
           When the pose detector sometimes misses a hip, how many squats does the software refuse to judge? Missing
-          points are never filled in, so a refusal is the honest answer. The old rule gave up on 6% of squats with only
-          1 miss in 200 frames.
+          points are never filled in. The values come from the named simulation run and show the share marked unclear
+          at each independent dropout rate.
         </>
       }
     >
@@ -75,34 +90,16 @@ export function DropoutChart() {
         </text>
         {SERIES.map((series) => (
           <g key={series.id}>
-            <polyline
-              points={series.values.map((v, i) => `${x(i)},${y(v)}`).join(" ")}
-              fill="none"
-              strokeWidth={2.5}
-              strokeLinejoin="round"
-              className={series.stroke}
-            />
-            {series.values.map((v, i) => (
+            {segments(series.values).map((points, i) => (
+              <polyline key={i} points={points} fill="none" strokeWidth={2.5} strokeLinejoin="round" className={series.stroke} />
+            ))}
+            {series.values.map((v, i) => v == null ? (
+              <text key={i} x={x(i)} y={TOP + 12} textAnchor="middle" className="fill-muted-foreground text-[10px]">?</text>
+            ) : (
               <circle key={i} cx={x(i)} cy={y(v)} r={3.5} className={series.fill} />
             ))}
           </g>
         ))}
-        <text
-          x={x(1) - 6}
-          y={y(DROPOUTS.oldRule[1]) - 8}
-          textAnchor="end"
-          className="fill-warm font-mono text-[13px] tabular-nums"
-        >
-          6%
-        </text>
-        <text
-          x={x(3) - 8}
-          y={y(DROPOUTS.oldRule[3]) - 6}
-          textAnchor="end"
-          className="fill-foreground font-mono text-[13px] tabular-nums"
-        >
-          30% vs 0%
-        </text>
       </svg>
       <div className="sr-only">
         <table>
@@ -118,8 +115,8 @@ export function DropoutChart() {
             {DROPOUTS.labels.map((label, i) => (
               <tr key={label}>
                 <th scope="row">{label}</th>
-                <td>{DROPOUTS.oldRule[i]}%</td>
-                <td>{DROPOUTS.newRule[i]}%</td>
+                <td>{DROPOUTS.oldRule[i] == null ? "unknown" : `${DROPOUTS.oldRule[i]}%`}</td>
+                <td>{DROPOUTS.newRule[i] == null ? "unknown" : `${DROPOUTS.newRule[i]}%`}</td>
               </tr>
             ))}
           </tbody>

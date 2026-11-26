@@ -11,7 +11,7 @@ import { TelemetryTable } from "@/components/biomechanics/TelemetryTable";
 import { TimelineScrubber } from "@/components/biomechanics/TimelineScrubber";
 import { KinematicWaveformChart } from "@/components/biomechanics/KinematicWaveformChart";
 import { BilateralAsymmetryMatrix } from "@/components/biomechanics/BilateralAsymmetryMatrix";
-import { Activity, Award, Lightbulb, FileText, RefreshCw, Scale, LineChart, ShieldCheck } from "lucide-react";
+import { Activity, Award, FileText, RefreshCw, Scale, LineChart, ShieldCheck } from "lucide-react";
 
 export default function AnalysisPage() {
   const { currentAnalysis, activeTab, setActiveTab } = useBiomechanicsStore();
@@ -26,7 +26,6 @@ export default function AnalysisPage() {
     { id: "waveform", label: "Waveform Studio", icon: LineChart },
     { id: "asymmetry", label: "Bilateral Asymmetry", icon: Scale },
     { id: "posture", label: "Posture summary", icon: FileText },
-    { id: "recommendations", label: "Recommendations", icon: Lightbulb },
   ] as const;
 
   return (
@@ -119,7 +118,7 @@ export default function AnalysisPage() {
           )}
 
           {activeTab === "asymmetry" && (
-            <BilateralAsymmetryMatrix />
+            <BilateralAsymmetryMatrix frames={currentAnalysis.frame_analyses ?? []} />
           )}
 
           {activeTab === "posture" && (
@@ -144,22 +143,7 @@ export default function AnalysisPage() {
             </div>
           )}
 
-          {activeTab === "recommendations" && (
-            <div className="p-6 border border-[#262626] bg-[#0a0a0a] space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-[#ffffff] flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-[#ffffff]" />
-                <span>Recommendations (sample)</span>
-              </h3>
-              <ul className="space-y-2 text-xs">
-                {analysis.recommendations.map((rec, idx) => (
-                  <li key={idx} className="p-3 border border-[#262626] bg-[#000000] text-[#ffffff] flex items-center gap-3">
-                    <span className="font-bold text-[#a3a3a3]">0{idx + 1}.</span>
-                    <span>{rec}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+
         </div>
 
       </div>

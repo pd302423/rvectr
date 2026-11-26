@@ -4,10 +4,12 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 export PATH="$HOME/.local/bin:$PATH"
 export UV_HTTP_TIMEOUT="${UV_HTTP_TIMEOUT:-600}"
 export UV_CONCURRENT_DOWNLOADS="${UV_CONCURRENT_DOWNLOADS:-4}"
+with_cuda=0
 with_pose=0
 with_web=0
 for argument in "$@"; do
   case "$argument" in
+    --cuda) with_cuda=1 ;;
     --pose) with_pose=1 ;;
     --web) with_web=1 ;;
     *) printf 'Unknown option: %s\n' "$argument" >&2; exit 2 ;;
@@ -28,10 +30,17 @@ for tool in ffmpeg ffprobe; do
   fi
 done
 uv python install 3.11
-sync_arguments=(--frozen --extra cuda)
-if [[ "$with_pose" == 1 ]]; then sync_arguments+=(--extra pose); fi
+sync_arguments=(--frozen)
+doctor_arguments=()
+if [[ "$with_cuda" == 1 ]]; then
+  sync_arguments+=(--extra cuda)
+  doctor_arguments+=(--require-cuda)
+  if [[ "$with_pose" == 1 ]]; then sync_arguments+=(--extra pose); fi
+elif [[ "$with_pose" == 1 ]]; then
+  sync_arguments+=(--extra pose-cpu)
+fi
 uv sync "${sync_arguments[@]}"
-uv run --no-sync rvectr doctor --require-cuda
+uv run --no-sync rvectr doctor "${doctor_arguments[@]}"
 uv run --no-sync pytest -q
 if [[ "$with_web" == 1 ]]; then
   command -v npm >/dev/null || { printf '%s\n' 'Install a supported Node.js LTS and npm first.' >&2; exit 1; }

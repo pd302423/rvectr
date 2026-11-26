@@ -255,11 +255,23 @@ def test_full_run_writes_the_view_files_and_can_be_switched_off(tmp_path, monkey
 
     config = json.loads((tmp_path / "session.json").read_text())
     config["views"] = {"compare": False}
+    config["experiment"] = {"annotations": "roster.csv"}
+    (tmp_path / "roster.csv").write_text(
+        "annotation_id,start_s,bottom_s,end_s,role,label,target_height_m,marker_depth_m,marker_uncertainty_m,reader,reader_uncertainty_s,reader_uncertainty_m\n"
+        "S1,3,4,5,test,match,0,,,,,\n"
+        "S2,5.8,6.8,7.8,reference,match,0,,,,,\n"
+    )
     (tmp_path / "session_off.json").write_text(json.dumps(config))
     run_off, report_off = run_session(tmp_path / "session_off.json", paths, outputs, keypoints_from=previous,
                                       progress=lambda *_: None)
     assert report_off["status"] == "measured" and "views" not in report_off
     assert not (run_off / "views_comparison.csv").exists()
+    saved = json.loads((run_off / "report.json").read_text())
+    assert saved["reference_source"]["annotation_id"] == "S2"
+    assert saved["scoring"]["decision_settings"]["tolerance_m"] == 0.03
+    score = saved["experiment"][saved["scoring"]["primary_condition"]]
+    assert score["counts"]["reference_excluded"] == 1 and score["counts"]["extra"] == 4
+    assert score["classification"]["denominator"] == 1
 
 
 @needs_ffmpeg
@@ -275,3 +287,168 @@ def test_a_failing_comparison_keeps_the_main_result(tmp_path, monkeypatch):
     assert report["status"] == "measured"
     assert report["views"] == {"status": "failed", "error": "planes could not be placed"}
     assert (run / "reps_raw.csv").exists() and not (run / "views_comparison.csv").exists()
+
+
+def annotated_session():
+    """Two synthetic cameras and an annotation list built from the squats the all-views result found."""
+    cameras, observations, syncs = make_session([-50, 40], [0.0, 0.6173])
+    periods = [1 / 60, 1 / 30]
+    sequence = reconstruct_sequence(observations, cameras, syncs, frame_periods=periods, joints=HIPS)
+    measured = measure_squats(sequence["times_s"], sequence["xyz"], sequence["valid"], UP,
+                              {"standing_window_s": [0.5, 2.5]})
+    found = measured["reps"]["raw"]["reps"]
+    annotations = []
+    for rep in found:
+        is_reference = rep["rep"] == 1
+        annotations.append({"annotation_id": f"rep{rep['rep']}", "start_s": rep["start_s"],
+                            "bottom_s": rep["bottom_s"], "end_s": rep["end_s"],
+                            "role": "reference" if is_reference else "test",
+                            "label": "match" if is_reference or rep["rep"] % 2 else "shallow",
+                            "target_height_m": None, "marker_depth_m": None,
+                            "marker_uncertainty_m": None, "reader": "reader-a",
+                            "reader_uncertainty_s": 0.03, "reader_uncertainty_m": None})
+    config = {"cameras": [{"id": "cam1"}, {"id": "cam2"}], "squat": measured["settings"],
+              "triangulation": DEFAULTS["triangulation"], "views": {"compare": True,
+                  "standing_point_m": STANDING.tolist(), "hip_line": HIP_LINE.tolist()},
+              "experiment": {"annotations": "pilot.csv", "match_window_s": 0.5,
+                             "tolerance_m": 0.03, "borderline_m": 0.01}}
+    result = {"reps": {"raw": {"reps": [], "classification": None}}, "jitter": {},
+              "settings": measured["settings"], "primary": "raw"}
+    return cameras, observations, syncs, periods, sequence, result, config, annotations, found
+
+
+def test_independent_annotation_list_scores_each_condition_even_without_all_view_reference(monkeypatch):
+    from rvectr.pipeline import compare_views
+
+    cameras, observations, syncs, periods, sequence, result, config, annotations, found = annotated_session()
+    from rvectr import pipeline
+    original = pipeline._measure_condition
+    middle_time = found[2]["bottom_s"]
+
+    def less_accurate_all_views(times, xyz, valid, up, settings, reference_reps):
+        scored = original(times, xyz, valid, up, settings, reference_reps)
+        if xyz is sequence["xyz"]:
+            scored["reps"] = [rep for rep in scored["reps"] if abs(rep["bottom_s"] - middle_time) > 0.5]
+        return scored
+
+    monkeypatch.setattr(pipeline, "_measure_condition", less_accurate_all_views)
+    info = pipeline.compare_views(observations, cameras, syncs, UP, config, sequence, result,
+                                  periods, annotations=annotations)
+    conditions = info["experiment"]["conditions"]
+    assert len(conditions) == 5
+    assert all(item["status"] == "scored" for item in conditions.values())
+    expected_ids = {item["annotation_id"] for item in annotations}
+    for condition in conditions:
+        rows = [row for row in info["experiment"]["rows"] if row["condition"] == condition]
+        assert {row["annotation_id"] for row in rows if row["annotation_id"]} == expected_ids
+        assert sum(row["status"] == "reference_excluded" for row in rows) == 1
+    all_view_name = next(name for name in conditions if name.startswith("all views"))
+    all_rows = [row for row in info["experiment"]["rows"] if row["condition"] == all_view_name]
+    assert next(row for row in all_rows if row["annotation_id"] == "rep3")["status"] == "missed"
+    better_camera = next(name for name in conditions if name.startswith("one view"))
+    better_rows = [row for row in info["experiment"]["rows"] if row["condition"] == better_camera]
+    assert next(row for row in better_rows if row["annotation_id"] == "rep3")["status"] != "missed"
+
+
+def test_annotated_run_says_which_tolerances_it_used_and_which_squat_values_it_ignored():
+    from rvectr.pipeline import _annotated_decision_settings
+
+    config = {"experiment": {"tolerance_m": 0.03, "borderline_m": 0.01},
+              "squat": {"tolerance_m": 0.05, "borderline_m": 0.01}}
+    settings = _annotated_decision_settings(config)
+    assert settings["tolerance_m"] == 0.03 and settings["borderline_m"] == 0.01
+    assert settings["squat_values_not_used"] == {"squat.tolerance_m": 0.05}
+    assert settings["warning"] == ("Annotated scoring used experiment.tolerance_m=0.03 and "
+                                   "experiment.borderline_m=0.01; ignored squat.tolerance_m=0.05.")
+    # Matching values need no warning, but the values used are still recorded.
+    same = _annotated_decision_settings({"experiment": config["experiment"], "squat": config["experiment"]})
+    assert same["warning"] is None and same["squat_values_not_used"] == {} and same["tolerance_m"] == 0.03
+
+
+def test_a_failed_one_view_condition_is_not_scored_as_every_squat_missed(monkeypatch):
+    cameras, observations, syncs, periods, sequence, result, config, annotations, _ = annotated_session()
+
+    def broken(*args, **kwargs):
+        raise ValueError("this camera could not be triangulated")
+
+    monkeypatch.setattr(oneview, "reconstruct_one_view", broken)
+    info = compare_views(observations, cameras, syncs, UP, config, sequence, result, periods,
+                         annotations=annotations)
+    conditions = info["experiment"]["conditions"]
+    failed = {name: item for name, item in conditions.items() if item["status"] == "failed"}
+    assert len(failed) == 4 and conditions["all views (cam1+cam2)"]["status"] == "scored"
+    eligible = sum(a["role"] == "test" and a["label"] in ("match", "shallow") for a in annotations)
+    for name, item in failed.items():
+        rows = [row for row in info["experiment"]["rows"] if row["condition"] == name]
+        assert {row["annotation_id"] for row in rows} == {a["annotation_id"] for a in annotations}
+        assert {row["status"] for row in rows} == {"condition_failed"}
+        assert all(row["condition_failure"] == "this camera could not be triangulated" for row in rows)
+        assert item["error"] == item["failure_reason"] == "this camera could not be triangulated"
+        assert item["counts"]["missed"] is None and item["counts"]["correct"] is None
+        assert item["classification"]["accuracy"] is None
+        assert item["classification"]["end_to_end_accuracy"] is None
+        assert item["classification"]["all_eligible_tests_denominator"] == eligible
+    # The condition that did run still gets real numbers.
+    assert conditions["all views (cam1+cam2)"]["classification"]["end_to_end_accuracy"] is not None
+    assert {row["outcome"] for row in info["rows"] if row["condition"] in failed} == {"condition_failed"}
+
+
+def test_invalid_config_still_records_a_failed_attempt_and_annotation_roster(tmp_path):
+    from rvectr.paths import RuntimePaths
+
+    annotations = tmp_path / "pilot.csv"
+    annotations.write_text(
+        "annotation_id,start_s,bottom_s,end_s,role,label,target_height_m,marker_depth_m,marker_uncertainty_m,reader,reader_uncertainty_s,reader_uncertainty_m\n"
+        "ref,0,1,2,reference,match,0,,,,,\n"
+        "rep2,3,4,5,test,shallow,0.04,,,,,\n", encoding="utf-8")
+    config = tmp_path / "bad-session.json"
+    config.write_text(json.dumps({"cameras": [{"id": "cam1", "video": "one.mp4"}],
+                                  "experiment": {"annotations": "pilot.csv"}}), encoding="utf-8")
+    outputs = tmp_path / "outputs"
+    paths = RuntimePaths(tmp_path, tmp_path, tmp_path, tmp_path, outputs)
+    with pytest.raises(ValueError, match="at least two cameras"):
+        run_session(config, paths, progress=lambda *_: None)
+    run = outputs / "V1.1.1"
+    manifest = json.loads((run / "manifest.json").read_text())
+    report = json.loads((run / "report.json").read_text())
+    assert manifest["status"] == report["status"] == "failed"
+    assert report["stage"] == "configuration"
+    records = report["experiment_attempt"]["records"]
+    assert [item["status"] for item in records] == ["unscorable_run_failed_before_result"] * 2
+
+
+
+def test_match_window_too_wide_for_the_annotations_is_a_recorded_configuration_failure(tmp_path):
+    from rvectr.paths import RuntimePaths
+
+    (tmp_path / "pilot.csv").write_text(
+        "annotation_id,start_s,bottom_s,end_s,role,label,target_height_m,marker_depth_m,marker_uncertainty_m,reader,reader_uncertainty_s,reader_uncertainty_m\n"
+        "ref,0,1,2,reference,match,0,,,,,\n"
+        "rep2,1.2,1.8,2.5,test,shallow,0.04,,,,,\n", encoding="utf-8")
+    config = tmp_path / "session.json"
+    config.write_text(json.dumps({"cameras": [{"id": "cam1", "video": "a.mp4"}, {"id": "cam2", "video": "b.mp4"}],
+                                  "experiment": {"annotations": "pilot.csv", "match_window_s": 0.5}}),
+                      encoding="utf-8")
+    outputs = tmp_path / "outputs"
+    paths = RuntimePaths(tmp_path, tmp_path, tmp_path, tmp_path, outputs)
+    with pytest.raises(ValueError, match="less than half the smallest gap"):
+        run_session(config, paths, progress=lambda *_: None)
+    run = outputs / "V1.1.1"
+    manifest = json.loads((run / "manifest.json").read_text())
+    report = json.loads((run / "report.json").read_text())
+    assert manifest["status"] == report["status"] == "failed"
+    assert report["stage"] == "configuration" and "match_window_s" in report["error"]
+    assert [item["annotation_id"] for item in report["experiment_attempt"]["records"]] == ["ref", "rep2"]
+
+
+def test_invalid_json_structure_has_a_failed_report(tmp_path):
+    from rvectr.paths import RuntimePaths
+
+    cfg = tmp_path / "session.json"
+    cfg.write_text("[]", encoding="utf-8")
+    paths = RuntimePaths(tmp_path, tmp_path, tmp_path, tmp_path, tmp_path / "outputs")
+    with pytest.raises(ValueError, match="JSON object"):
+        run_session(cfg, paths, progress=lambda *_: None)
+    run = paths.outputs / "V1.1.1"
+    assert json.loads((run / "report.json").read_text())["reference_source"]["kind"] == "unavailable"
+    assert json.loads((run / "manifest.json").read_text())["status"] == "failed"

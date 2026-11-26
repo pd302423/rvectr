@@ -1,46 +1,6 @@
-# rvectr — Research Roadmap
+# Earlier research roadmap
 
-**Program:** Velocity-dependent error in markerless 3D human pose estimation
-**Author:** Parth Dalal · solo researcher
-**Written:** 2026-07-26 · **Revised:** 2026-07-26 (relocation constraint)
-**Supersedes:** `ROADMAP.md` (SaaS launch plan, retired)
-
----
-
-## The constraint that defines this document
-
-**Relocation to Japan in 2027 makes IRIS a one-shot competition.**
-
-IRIS requires enrollment at a school based in India. Students studying abroad are ineligible regardless of citizenship. There is no second attempt, no rehearsal year, no fallback cycle.
-
-| Date | Event | Status |
-|---|---|---|
-| **Oct 15, 2026** | IRIS submission deadline | **The only shot.** 12 weeks out. |
-| **Jan 2027** | IRIS National Fair, ~100 shortlisted exhibit | If selected |
-| **May 2027** | Regeneron ISEF, if Grand Award | ⚠️ see open question |
-| 2027 onward | Relocation to Japan | IRIS permanently closed |
-| **Nov 1, 2028** | MIT Early Action | Unaffected — program continues |
-
-### Two questions only IRIS can answer — ask this week
-
-1. Confirm the exact Oct 15, 2026 deadline and the entry fee (sources conflict: ₹5,000 + taxes per project with EWS waiver, vs. free).
-2. **If selected for Team India in January 2027, does relocating to Japan before May 2027 affect ISEF participation?** This determines whether ISEF is reachable at all. Nobody but IRIS can tell you.
-
-### Second life: JSEC
-
-[JSEC](https://isef.jp/about/perticipation/) is one of Japan's two ISEF-affiliated contests, run by Asahi Shimbun and TV Asahi. No regional preliminaries — direct application to the national contest. **Eligibility for a foreign student enrolled in Japan is undocumented; contact them directly once relocated.** If eligible, the 2027–28 running study finds a home there.
-
----
-
-## Why 12 weeks is survivable
-
-One design decision makes this feasible: **synthetic ground truth plus self-only filming requires no IRB, no recruitment, no scheduling, no consent forms.**
-
-Filming yourself to test your own invention is generally exempt from IRB pre-approval. Authoring known SMPL poses and rendering them requires no human participants at all. Every logistical dependency that would have eaten the twelve weeks is removed by construction.
-
-The multi-subject study, the ethics packet, the mentor recruitment — all of it moves past October. None of it is needed to submit.
-
----
+Written 26 July 2026 for a proposed angular-velocity benchmark. For the current CBSE project and recording plan, see the [active submission](writeups/CBSE_2026_27.md) and [pilot checklist](PILOT_RECORDING_CHECKLIST.md).
 
 ## The research question
 
@@ -62,7 +22,7 @@ The multi-subject study, the ethics packet, the mentor recruitment — all of it
 - Delete the unbacked results in `cbse_science_exhibition_final_writeup.md`. No number ships without a script behind it.
 - Strip the SaaS: `dashboard`, `onboarding`, `signin`, `workouts`, `roster`, `supabase/`, `anthropic.ts`, `knowledge/`, mock `api/v1/analyze`. Relicense research-only.
 - Open `docs/log/` — dated entry every session, starting now.
-- **Pre-register on OSF.** Hypotheses and analysis plan, timestamped, before any data. Costs an evening; almost no pre-college researcher does it.
+- **Pre-register on OSF.** Hypotheses and analysis plan, timestamped, before any data. Costs an evening; few student researchers do it.
 - `smplx` loads; pose a mesh from known θ; render one frame offscreen (pyrender + EGL).
 
 ## W3–5 · Aug 10 – Aug 30 · The harness
@@ -117,36 +77,23 @@ If the schedule slips, this still constitutes a legitimate entry — novelty cla
 
 Web viewer · 3DPW/EMDB benchmark calibration · multi-subject study · IRB packet · TRAM/WHAM fourth backend · Blender pipeline work · paper publication · upstream PRs · mentor recruitment.
 
-None of it is needed to submit. All of it still serves Nov 2028.
+None of it is needed to submit. It all stays on the list for later.
 
 ---
 
-# PART 2 — Post-October, through Nov 2028
+# PART 2 — After October
 
-**Relocation does not touch this.** The research program is geography-independent; only the fair pathway changed.
+The remaining work was proposed for a later benchmark.
 
 | Window | Work |
 |---|---|
 | Nov 2026 – Jan 2027 | IRIS fair prep if shortlisted. Benchmark calibration vs. 3DPW/EMDB. Paper draft. |
 | Feb – May 2027 | ISEF if reachable. Otherwise: workshop paper submission, Zenodo dataset, upstream PRs. |
-| Jun 2027 – Mar 2028 | Japan. Contact JSEC re: eligibility. Multi-subject running study **with local IRB approval first**. Extended benchmark. |
+| Jun 2027 – Mar 2028 | Multi-subject running study **with local IRB approval first**. Extended benchmark. |
 | Apr – Sep 2028 | v1.0.0, publication, real external users, leaderboard submissions. |
-| Oct 2028 | Portfolio assembly — 27 months of log → 10 SlideRoom items. |
 
-### The 10 portfolio items
-
-1. The rig — two phones, checkerboard, your actual floor. Unstaged.
-2. **Video, 60–90 s:** one stride through all three pipelines, error overlaid live.
-3. Drift bug: before/after, with the root-translation diagnosis.
-4. Orientation bug: sideways mesh + your rotation math on paper.
-5. Harness diagram: known θ → render → recover → error.
-6. **The money figure:** error vs. angular velocity.
-7. Real-world validation: measurement photo + Bland–Altman plot.
-8. Repo: README, CI badge, DOI badge, real issues and stars.
-9. Engineering log spread — dated, messy, authentic.
-10. What I deleted and why — the SaaS, one honest paragraph.
-
-Every description answers: what broke, how you found it, what *you* did versus what the library did.
+Whatever is shown publicly should say what broke, how it was found, and what the
+project did itself versus what a library did.
 
 ---
 
@@ -164,7 +111,7 @@ Every description answers: what broke, how you found it, what *you* did versus w
 
 **Capture** — 120/240 fps phone slow-mo · OpenCV ChArUco · audio/LED sync · treadmill for known ground-truth speed
 
-**Experiments** — Hydra sweeps · Weights & Biases (public dashboards double as portfolio evidence)
+**Experiments** — Hydra sweeps · Weights & Biases (public dashboards let anyone check the results)
 
 **Validation** — authored-θ synthetic ground truth · *(3DPW, EMDB — post-October)* · Bland–Altman · bootstrap CIs
 
@@ -182,4 +129,3 @@ Every description answers: what broke, how you found it, what *you* did versus w
 - **Building the viewer.** It's the fun part and contributes least. It is cut.
 - **A number without a script.** The reason `ROADMAP.md` was retired.
 - **Retroactive log-writing.** Reviewers can tell. Write it the day it happens.
-- **Discovering the deadline moved.** Confirm with IRIS this week.

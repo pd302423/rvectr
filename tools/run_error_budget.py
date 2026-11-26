@@ -9,9 +9,13 @@ Writes summary.json, summary.md and PNG figures into outputs/sim/error_budget_<U
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
 import multiprocessing
 import os
+import platform
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -55,19 +59,31 @@ SWEEPS = {
     "tilt": ([0, 0.5, 1, 2, 3, 5], lambda s, v: s.with_(tilt_deg=float(v)), 2, 0, "degrees towards travel"),
 }
 
+EXTENDED_SENSITIVITY = {
+    "clustered_missing_8_frames": eb.Setup(dropout_burst_probability=0.004, dropout_burst_frames=8),
+    "motion_dependent_noise_100pct": eb.Setup(motion_noise_factor=1.0),
+    "camera_specific_bias_0_5_px": eb.Setup(camera_bias_px=0.5),
+    "shared_vertical_error_4mm": eb.Setup(shared_vertical_sigma_m=0.004),
+    "slow_drift_0_5_model_px": eb.Setup(slow_px=model(0.5)),
+    "two_camera_offset_1_frame": eb.Setup(sync_offsets_frames=(0.0, -1.0)),
+    "three_camera_offsets_1_frame": eb.Setup(mode="three_cam", sync_offsets_frames=(0.0, -1.0, 1.0)),
+    "camera_center_error_10mm": eb.Setup(camera_translation_sigma_m=0.01),
+    "camera_rotation_error_0_5deg": eb.Setup(camera_rotation_sigma_deg=0.5),
+}
+
 
 def settings(quick, sessions):
     if quick:
-        return {"sessions": sessions or 20, "ref_grid_cm": (0, 2, 3, 4, 6, 8, 12), "sweep_grid_cm": (0, 4, 8, 16),
+        return {"sessions": sessions or 20, "ref_grid_cm": (0, 0.3, 2, 3, 4, 6, 8, 12), "sweep_grid_cm": (0, 4, 8, 16),
                 "check_sessions": 30}
-    return {"sessions": sessions or 300, "ref_grid_cm": (0, 1, 2, 2.5, 3, 3.5, 4, 5, 6, 8, 12, 16),
+    return {"sessions": sessions or 300, "ref_grid_cm": (0, 0.3, 0.5, 0.8, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 8, 12, 16),
             "sweep_grid_cm": (0, 2, 4, 8, 12, 16), "check_sessions": 150}
 
 
 # ----------------------------------------------------------------------------- parallel work
 def work(job):
     kind, setup, arg, n, seed = job
-    if kind == "run":
+    if kind in ("run", "target"):
         return job[:3], eb.run_config(setup, arg, n, seed)
     return job[:3], eb.single_frame_difference_sd_m(setup, n, seed)
 
@@ -92,6 +108,35 @@ def mdd_mm(done, setup, grid_cm):
     return (None if not np.isfinite(mdd) else mdd * 1000), threshold * 1000
 
 
+def detection_bracket(done, setup, grid_cm, seed=0):
+    """Training-selected grid point and one frozen held-out evaluation with clustered intervals."""
+    runs = [done[("run", setup, d / 100)] for d in grid_cm]
+    first, threshold = eb.minimum_detectable_difference_m(runs)
+    split = len(runs[0]["outcome"]) // 2
+    train_match = eb.score(eb.subset_sessions(runs[0], 0, split))
+    if np.isfinite(first):
+        idx = next(i for i, d in enumerate(grid_cm) if abs(d / 100 - first) < 1e-12)
+    else:
+        idx = len(grid_cm) - 1
+    train_shallow = eb.score(eb.subset_sessions(runs[idx], 0, split))
+    training = eb.threshold_counts(train_match, train_shallow, threshold)
+    match_run = eb.subset_sessions(runs[0], split, len(runs[0]["outcome"]))
+    shallow_run = eb.subset_sessions(runs[idx], split, len(runs[idx]["outcome"]))
+    heldout = eb.threshold_counts(eb.score(match_run), eb.score(shallow_run), threshold)
+    return {"lower_tested_mm": grid_cm[idx - 1] * 10 if idx else 0,
+            "first_passing_tested_mm": first * 1000 if np.isfinite(first) else None,
+            "diagnostic_tested_mm": grid_cm[idx] * 10, "threshold_mm": threshold * 1000,
+            "training_counts": training,
+            "heldout_matching_false_alarm_rate": heldout["false_alarm_rate"],
+            "heldout_matching_false_alarm_rate_95ci": eb.session_bootstrap_flag_rate(match_run, threshold, seed=seed),
+            "heldout_shallow_detection_rate": heldout["detection_rate"],
+            "heldout_shallow_detection_rate_95ci": eb.session_bootstrap_flag_rate(shallow_run, threshold, seed=seed + 1),
+            "heldout_matching_counts": {k: heldout[k] for k in ("matching_total", "matching_unclear", "matching_unclear_rate", "false_alarms", "max_false_alarms")},
+            "heldout_shallow_counts": {k: heldout[k] for k in ("shallow_total", "shallow_unclear", "shallow_unclear_rate", "detected_shallow", "min_detected_shallow")},
+            "passes_on_training_grid": bool(np.isfinite(first)),
+            "passes_on_heldout_sessions": heldout["passes"]}
+
+
 def effective_tolerance_mm(done, setup):
     """True difference that the pipeline's fixed 3 cm line really corresponds to (3 cm / gain, gain from the 8 cm runs)."""
     return setup.tolerance_m * 1000 / eb.difference_gain(done[("run", setup, 0.08)])
@@ -114,6 +159,8 @@ def main():
     parser.add_argument("--workers", type=int, default=min(16, os.cpu_count() or 1))
     parser.add_argument("--out-root", default=str(ROOT / "outputs" / "sim"))
     args = parser.parse_args()
+    if args.sessions is not None and args.sessions < 2:
+        parser.error("--sessions must be at least 2 for a training/holdout split")
     cfg = settings(args.quick, args.sessions)
     n, seed = cfg["sessions"], args.seed
     ref_grid, sweep_grid = cfg["ref_grid_cm"], cfg["sweep_grid_cm"]
@@ -121,6 +168,19 @@ def main():
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = Path(args.out_root) / f"error_budget_{stamp}"
     out.mkdir(parents=True, exist_ok=False)
+    try:
+        code_version = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True,
+                                      text=True, check=True).stdout.strip()
+        dirty = bool(subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True,
+                                    text=True, check=True).stdout.strip())
+    except (OSError, subprocess.CalledProcessError):
+        code_version = "working-tree-uncommitted"
+        dirty = True
+    source_files = ("backend/rvectr/errorbudget.py", "backend/rvectr/squat.py",
+                    "backend/rvectr/pipeline.py", "tools/run_error_budget.py", "uv.lock", "pyproject.toml")
+    source_hashes = {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest() for path in source_files}
+    runtime = {"python": platform.python_version(),
+               **{name: importlib.metadata.version(name) for name in ("numpy", "scipy")}}
 
     # ---- list every (set-up, true difference) simulation we need
     wanted = {}   # setup -> grid
@@ -167,7 +227,25 @@ def main():
     measured_setups = measured_noise_setups(args.pelvis_fast_mm, args.pelvis_slow_mm)
     for setup in measured_setups.values():
         need(setup, ref_grid)
+    sensitivity_setups = {}
+    for name, template in EXTENDED_SENSITIVITY.items():
+        modes = eb.MODES if name in {"clustered_missing_8_frames", "motion_dependent_noise_100pct",
+                                     "camera_specific_bias_0_5_px", "shared_vertical_error_4mm", "slow_drift_0_5_model_px",
+                                     "camera_center_error_10mm", "camera_rotation_error_0_5deg"} else (template.mode,)
+        for mode in modes:
+            for pace in eb.PACES:
+                overrides = {**template.__dict__, "mode": mode, "pace": pace}
+                if template.sync_offsets_frames and len(template.sync_offsets_frames) != (3 if mode == "three_cam" else 2):
+                    continue
+                if mode.endswith("1cam") and template.sync_offsets_frames:
+                    continue
+                setup = BASE.with_(**overrides)
+                sensitivity_setups[(name, mode, pace)] = setup
+                need(setup, ref_grid)
     jobs = [("run", s, d / 100, n, seed) for s, grid in wanted.items() for d in grid]
+    target_setup = BASE.with_(pace="controlled")
+    target_sessions = 600
+    jobs += [("target", target_setup, d / 1000, target_sessions, seed + 73491) for d in (0, 3)]
     check_setups = {(noise, pace): BASE.with_(white_px=model(noise), pace=pace)
                     for noise in NOISE_LEVELS for pace in eb.PACES}
     jobs += [("single", s, 0, cfg["check_sessions"], seed) for s in check_setups.values()]
@@ -179,17 +257,23 @@ def main():
     for (mode, noise, pace), setup in reference.items():
         run0 = done[("run", setup, 0.0)]
         mdd, threshold = mdd_mm(done, setup, ref_grid)
+        bracket = detection_bracket(done, setup, ref_grid, seed=seed)
         table.append({"mode": mode, "white_noise_model_px": noise, "white_noise_image_px": setup.white_px,
                       "white_noise_mm_at_person": eb.image_px_to_mm(setup.white_px), "pace": pace,
                       "sd_single_depth_error_mm": eb.depth_error_sd_m(run0) * 1000,
                       "mean_depth_error_mm": float(np.nanmean(run0["depth_error_m"])) * 1000,
                       "sd_difference_two_reps_mm": eb.difference_sd_m(run0) * 1000,
-                      "minimum_detectable_difference_mm": mdd, "threshold_mm": threshold,
+                      "minimum_detectable_difference_mm": mdd, "tested_grid_bracket_mm": bracket, "threshold_mm": threshold,
                       "unclear_rate": eb.unclear_rate(run0), "extra_detected_reps_per_session": eb.extra_reps(run0)})
         curve = {}
         for d in ref_grid:
             r = done[("run", setup, d / 100)]
-            curve[d] = {"flagged_shallower": eb.flag_rate(r), "unclear": eb.unclear_rate(r)}
+            attempts = r["outcome"][:, 1:]
+            curve[d] = {"flagged_shallower": eb.flag_rate(r), "unclear": eb.unclear_rate(r),
+                        "total": attempts.size, "flagged_count": int(np.count_nonzero(attempts == eb.SHALLOWER)),
+                        "unclear_count": int(np.count_nonzero(attempts == eb.UNCLEAR)),
+                        "missed_count": int(np.count_nonzero(r["bottom_model"][:, 1:] == "missing")),
+                        "extra_detections_per_session": eb.extra_reps(r)}
         detection.append({"mode": mode, "white_noise_model_px": noise, "pace": pace,
                           "tolerance_mm": setup.tolerance_m * 1000,
                           "by_true_difference_cm": {str(k): v for k, v in curve.items()}})
@@ -260,14 +344,51 @@ def main():
             measured["rows"].append({"mode": mode, "pace": pace, "minimum_detectable_difference_mm": mdd,
                                      "unclear_rate": eb.unclear_rate(done[("run", setup, 0.0)])})
 
+    extended = []
+    for (name, mode, pace), setup in sensitivity_setups.items():
+        bracket = detection_bracket(done, setup, ref_grid, seed=seed + len(extended) * 7)
+        run0 = done[("run", setup, 0.0)]
+        extended.append({"scenario": name, "pace": pace, "mode": mode,
+                         "minimum_detectable_difference_mm": bracket["first_passing_tested_mm"],
+                         "tested_grid_bracket_mm": bracket,
+                         "unclear_rate": eb.unclear_rate(run0),
+                         "fixed_3cm_shallow_flag_rate_at_0cm": eb.flag_rate(run0),
+                         "fixed_3cm_shallow_flag_rate_95ci_at_0cm": eb.session_bootstrap_rate(run0, eb.SHALLOWER, seed=seed + len(extended))})
+
     comparison = estimator_comparison(done, ref_grid, comparison_setups, dropout_setups, noisy_setups, slow_setups)
     assumptions = assumption_list(n, seed, cfg)
+    target_match = done[("target", target_setup, 0.0)]
+    target_shallow = done[("target", target_setup, 0.003)]
+    target_split = len(target_match["outcome"]) // 2
+    target_threshold, _ = eb.choose_threshold(eb.score(eb.subset_sessions(target_match, 0, target_split)))
+    target_match_holdout = eb.subset_sessions(target_match, target_split, target_sessions)
+    target_shallow_holdout = eb.subset_sessions(target_shallow, target_split, target_sessions)
+    target_counts = eb.threshold_counts(eb.score(target_match_holdout), eb.score(target_shallow_holdout), target_threshold)
+    target_result = {"difference_mm": 3, "sessions_total": target_sessions,
+                     "sessions_for_threshold": target_split, "sessions_held_out": target_sessions - target_split,
+                     "threshold_mm": target_threshold * 1000,
+                     "heldout_matching_counts": {k: target_counts[k] for k in ("matching_total", "matching_unclear", "matching_unclear_rate", "false_alarms", "max_false_alarms")},
+                     "heldout_shallow_counts": {k: target_counts[k] for k in ("shallow_total", "shallow_unclear", "shallow_unclear_rate", "detected_shallow", "min_detected_shallow")},
+                     "heldout_matching_false_alarm_rate": target_counts["false_alarm_rate"],
+                     "heldout_matching_false_alarm_rate_95ci": eb.session_bootstrap_flag_rate(target_match_holdout, target_threshold, seed=seed + 2),
+                     "heldout_shallow_detection_rate": target_counts["detection_rate"],
+                     "heldout_shallow_detection_rate_95ci": eb.session_bootstrap_flag_rate(target_shallow_holdout, target_threshold, seed=seed + 3),
+                     "passes_on_heldout_sessions": target_counts["passes"]}
     result = {"title": "Squat-depth error budget: simulation, not a measurement",
               "created_utc": stamp, "quick": args.quick, "sessions_per_condition": n, "seed": seed,
-              "settings": {"reference_grid_cm": list(ref_grid), "sweep_grid_cm": list(sweep_grid)},
+              "code_version": code_version, "source_dirty": dirty, "source_sha256": source_hashes, "runtime": runtime,
+              "settings": {"reference_grid_cm": list(ref_grid), "sweep_grid_cm": list(sweep_grid),
+                           "baseline_frame_rate_fps": BASE.fps, "frame_rate_sensitivity_fps": SWEEPS["frame_rate"][0],
+                           "baseline_camera_geometry": f"Side at {eb.SIDE_DEG:g}°, oblique at {eb.OBLIQUE_DEG:g}°, optional mirrored oblique at {-eb.OBLIQUE_DEG:g}°. Distance {eb.DISTANCE_M:g} m, lens height {eb.LENS_HEIGHT_M:g} m.",
+                           "pipeline_defaults_squat": eb.RULES,
+                           "session_test_repetitions": BASE.n_test_reps,
+                           "units": {"depth": "m internally; mm/cm in reports", "image_noise": "image px at camera; model px converted at person", "timing": "frames", "camera_angles": "degrees"},
+                           "confidence_interval": "95% percentile bootstrap resampling whole sessions; 500 replicates"},
               "assumptions": assumptions, "reference_table": table, "reference_filtered_trace": filtered,
               "detection_curves_default_rule": detection, "sweeps": sweeps, "ranking": ranking,
               "analytic_cross_check": check, "estimator_comparison": comparison,
+              "extended_sensitivity": extended,
+              "targeted_3mm_heldout": target_result,
               "pause_at_bottom": pause, "measured_noise_scenario": measured,
               "runtime_s": time.time() - started}
     (out / "summary.json").write_text(json.dumps(clean(result), indent=2, default=float, allow_nan=False), encoding="utf-8")
@@ -346,13 +467,15 @@ def assumption_list(n, seed, cfg):
         f"White noise is set in 'model pixels' (1 model pixel = 1.70 m x 1.25 / 256 = {s.MM_PER_MODEL_PX:.2f} mm at the person) and converted at {s.MM_PER_IMAGE_PX:.2f} mm per image pixel: 0.5 model px = {s.model_px_to_image_px(0.5):.2f} image px, 1.0 model px = {s.model_px_to_image_px(1.0):.2f} image px, per frame, per camera, per hip, per image axis, 1 sigma, independent.",
         "Slow noise: AR(1) per camera, hip and image axis, correlation time 0.2 s, given as stationary sigma. Posture bias: the detected hip is displaced upward in 3D by beta x current descent (same displacement seen by every camera). Dropouts: each hip in each camera is missing in a frame with probability p, independently. Missing data is never filled in.",
         "Sync error: camera B samples the motion at t + d frames and is then treated as simultaneous (cameras A and C are exact). Only the two-camera and three-camera modes have it.",
+        "Extended sensitivity cases: missing blocks last 8 frames and affect every camera/hip together; detector noise can rise by 100% at peak motion; a 0.5 image-pixel camera-specific bias is fixed for an entire take; a separate case projects the same 4 mm SD vertical error into every camera for each frame; phone offsets are supplied per camera; camera-center and camera-orientation errors are drawn independently per camera and stay fixed within a take.",
         "Calibration errors: scale error multiplies every reconstructed length by (1 + s); tilt leans the calibrated up-axis by e degrees towards the direction of horizontal travel (backwards). Tilt does not apply to the one-camera modes (they have no horizontal position).",
         "Two or more cameras: hips are triangulated by a vectorised linear (DLT) method (checked against rvectr.geometry.triangulate_points), then the pipeline's own steps are used: squat.pelvis_track, squat.segment_reps, squat.classify, pipeline defaults (tolerance 3 cm, min depth 6 cm, min coverage 0.85, reference rep 1, raw trace; standing level from the 0.5-2.5 s window). Not simulated: the pipeline's confidence, reprojection-error and ray-angle rejection, the robust refinement step, left/right hip swaps, lens distortion, and correlation between the two hips' errors.",
         "Depth estimator (sections 1 to 5): the pipeline default 'parabola' (standing height = median of the standing samples; bottom = vertex of a parabola fitted to the samples near the lowest point; the lowest point needs at least 5 usable samples, an upward-opening fit, the vertex inside the samples with 2 on each side, and no gap above 0.1 s). The original 'extreme' estimator (highest standing sample minus lowest bottom sample) is compared in section 6.",
-        "One camera: height = lens height - (image row - centre) x 3.0 m / focal length, i.e. the scale that is correct at the standing position. Moving towards or away from the camera therefore causes a perspective error (the side camera has none because the pelvis moves across its view).",
+        "One camera: the comparison uses image-row scale at the person's standing distance. During this simulated descent, the hips move backwards, away from the angled front camera. Their image displacement understates depth when scaled at the standing distance. Other paths and placements can change this bias. A side view has no depth motion in this particular simulated path. Multi-view triangulation can recover depth when camera calibration and timing are accurate; it does not remove calibration or detector errors by itself.",
         "Detected repetitions are matched to the true ones by bottom time. A repetition the software does not find, or finds with too little coverage, is 'unclear'. If the reference repetition itself is unusable (classify refuses it), every test repetition of that session is 'unclear'.",
-        "Minimum detectable difference (MDD): the smallest true difference for which SOME decision threshold flags at least 95% of shallow repetitions and at most 5% of matching repetitions. 'Flagged' means measured reference depth minus measured test depth is above the threshold. Unclear repetitions are never counted as flagged, so an unclear rate above 5% makes the MDD unreachable. The threshold is chosen with knowledge of the simulated noise, so it is a best case; the pipeline's fixed 3 cm tolerance is evaluated separately.",
-        f"Statistics: {n} sessions x 3 test repetitions per condition, seed {seed}. The same random numbers are reused in every condition (common random numbers) so conditions are compared on equal terms. Repetitions within a session share the reference repetition's error, so they are not fully independent. MDD is interpolated linearly between the tried true differences. Expect noticeable Monte Carlo scatter (roughly 0.5 to 1 mm) in the MDD of {'a --quick run' if cfg['sessions'] < 100 else 'a full run'}.",
+        "Detection threshold: the measured reference depth minus measured test depth must be above one cutoff. The training half sets the cutoff allowed by the false-alarm budget and selects the first grid difference meeting both count limits. The second half evaluates this frozen pair. Unclear test repetitions stay in the denominator and count as not detected; unclear matching repetitions stay in the denominator and are not false alarms. At least 95% of all shallow repetitions must be flagged and no more than 5% of all matching repetitions may be flagged. The reported value is the first passing tested grid point, with the previous tested point as a lower bracket; no interpolation is used. This best-threshold comparison is separate from the pipeline's fixed 3 cm decision rule.",
+        f"Statistics: {n} simulated sessions per condition, each with 3 test repetitions sharing one reference; seed {seed}. The first half calibrates the cutoff and the second half evaluates it. The same session random streams are reused across comparable conditions (common random numbers). Rate intervals resample whole sessions (500 bootstrap samples), preserving the within-session dependence.",
+        "Production differences: simulated keypoints are generated from the motion and noise settings. The real pipeline uses RTMPose detections and also applies confidence, reprojection-error and ray-angle rejection and robust triangulation refinement. Those effects, lens distortion, hip swaps, clothing, real camera-to-camera error correlation and measured calibration/sync distributions are not validated by this simulation.",
     ]
 
 
@@ -370,8 +493,8 @@ def markdown(r, ref_grid, sweep_grid):
            "## Assumptions", ""] + [f"- {a}" for a in r["assumptions"]]
     out += ["", "## 1. Reference set-up: how small a difference can be detected", "",
             "Reference: camera A side-on, camera B at 45 degrees (cameras 45 degrees apart), 60 fps. "
-            "'extra reps found' is how many more repetitions than the 4 real ones the segmentation reports per session (noise can split a repetition). 'sd depth' is the spread of one measured depth around the truth; 'sd diff' is the spread of (test - reference) with no true difference; "
-            f"MDD is the minimum detectable difference defined above (a '>' means not reached within {top:.0f} mm). Millimetres.", ""]
+            "'extra reps found' counts detections unmatched to the four true attempts per session, even when another attempt was missed. 'sd depth' is the spread of one measured depth around the truth; 'sd diff' is the spread of (test - reference) with no true difference; "
+            f"First passing tested difference on the training grid (a '>' means not reached within {top:.0f} mm). Grid values only; see the bracket and counts in summary.json. Millimetres.", ""]
     rows = []
     for e in r["reference_table"]:
         rows.append([MODE_LABELS[e["mode"]], f"{e['white_noise_model_px']} ({e['white_noise_mm_at_person']:.1f} mm)", e["pace"],
@@ -379,6 +502,14 @@ def markdown(r, ref_grid, sweep_grid):
                      text_mm(e["minimum_detectable_difference_mm"], ref_grid), f"{e['threshold_mm']:.1f}", f"{100 * e['unclear_rate']:.0f}%",
                      f"{e['extra_detected_reps_per_session']:+.2f}"])
     out.append(table_md(["mode", "white noise, model px (mm at person)", "pace", "sd depth", "mean depth error", "sd diff", "MDD", "best threshold", "unclear", "extra reps found"], rows))
+    target = r["targeted_3mm_heldout"]
+    matches, shallow = target["heldout_matching_counts"], target["heldout_shallow_counts"]
+    out += ["", f"Independent targeted 3 mm check at {target['threshold_mm']:.3f} mm: "
+            f"{matches['false_alarms']}/{matches['matching_total']} matching attempts flagged "
+            f"({matches['matching_unclear']} unclear); {shallow['detected_shallow']}/{shallow['shallow_total']} "
+            f"shallower attempts flagged ({shallow['shallow_unclear']} unclear). "
+            f"Meets both held-out count limits: {target['passes_on_heldout_sessions']}. "
+            "Session-bootstrap intervals and per-condition counts are in summary.json."]
     out += ["", "Same, two cameras but using the pipeline's 5-frame filtered trace instead of the raw trace (0.5 model px):", ""]
     out.append(table_md(["pace", "sd diff", "MDD"], [[f["pace"], f"{f['sd_difference_two_reps_mm']:.1f}", text_mm(f["minimum_detectable_difference_mm"], ref_grid)] for f in r["reference_filtered_trace"]]))
     out += ["", "## 2. Detection curve with the pipeline's default rule (tolerance 3 cm)", "",

@@ -170,12 +170,12 @@ Eleven scripts contain machine-specific absolute paths. Representative:
 
 | File | Path |
 |---|---|
-| `process_video_3d.py:259` | `/home/pd/Downloads/20260723_121036.mp4` |
-| `fix_jitter.py:7` | `/home/pd/Documents/rvector/backend/squat_demo_out` |
-| `smooth_and_center_mesh.py:64` | `/home/pd/Downloads/20260723_121036_3d_mesh/obj_sequence` |
-| `make_video.py:52` | `/home/pd/Documents/rvector/backend/squat_demo_out` |
-| `import_objs_blender.py:55` | `/home/pd/.gemini/antigravity-cli/brain/0ee7170b-…/animated_squat.blend` |
-| `make_video.py:53` | `/home/pd/.gemini/antigravity-cli/brain/0ee7170b-…/final_squat_overlay_blackbox.mp4` |
+| `process_video_3d.py:259` | `<private local path>` |
+| `fix_jitter.py:7` | `<private local path>` |
+| `smooth_and_center_mesh.py:64` | `<private local path>` |
+| `make_video.py:52` | `<private local path>` |
+| `import_objs_blender.py:55` | `<private local path>` |
+| `make_video.py:53` | `<private local path>` |
 
 Nothing runs on another machine without editing source. Reproducibility is a graded criterion, and "clone and run" failing at line 7 is the first thing a technically curious judge would hit.
 

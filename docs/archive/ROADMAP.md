@@ -32,7 +32,7 @@ That single instruction loads everything Claude needs to know — the goal, the 
 | **Brand voice** | Clinical, citation-heavy, no hype |
 | **Primary CV exercise (launch)** | squat |
 | **Launch exercises (Phase 1)** | squat, Pull-up, Plank |
-| **Sender email** | `noreply@rvector.fit` (pending domain) |
+| **Sender email** | `<sender address>` (pending domain) |
 | **Analytics** | PostHog |
 | **Payments** | Stripe |
 
@@ -83,17 +83,17 @@ The product must do **one thing exceptionally**: a person opens it on their phon
 - First weekly delivery target: 20 squat clips (10 good, 10 bad) by Jun 1
 
 ### Metrics (Week 1 — none yet, infrastructure only)
-- ✅ Live URL responds < 1s globally
-- ✅ Signup flow completes in < 60s
-- ✅ Bedrock call returns valid JSON in < 8s
-- ✅ Test transaction in Stripe (test mode) succeeds
+- Live URL responds < 1s globally
+- Signup flow completes in < 60s
+- Bedrock call returns valid JSON in < 8s
+- Test transaction in Stripe (test mode) succeeds
 
 ### Done criteria
 A friend can open your URL on their phone, sign up with their real email, confirm via Resend email, complete onboarding, generate an assessment, and see real LLM-generated exercises — all on a non-localhost URL, all in under 5 minutes.
 
 ### Session briefing template for new Claude Code sessions
 
-> "Read ROADMAP.md. We are in Week 1 (May 26 – Jun 1). Today I want to work on [Vercel deploy / Storage bucket / PostHog / etc]. The repo is at C:\Users\Parth Dalal\FitnessApp. The codebase is Next.js 16, NOT what's in your training data — always read web/AGENTS.md and the local Next docs before writing code. Read the Week 1 section, confirm what's done vs pending, then propose a plan before writing code."
+> "Read ROADMAP.md. We are in Week 1 (May 26 – Jun 1). Today I want to work on [Vercel deploy / Storage bucket / PostHog / etc]. The repo is at <checkout>. The codebase is Next.js 16, NOT what's in your training data — always read web/AGENTS.md and the local Next docs before writing code. Read the Week 1 section, confirm what's done vs pending, then propose a plan before writing code."
 
 ---
 
@@ -132,8 +132,8 @@ A friend can open your URL on their phone, sign up with their real email, confir
 - Beginning Sunday morning, partners send weekly delivery + 1-line note on what was hard
 
 ### Metrics
-- ✅ Pose detection runs at 25–30 fps on iPhone 12+ and mid-tier Android (Pixel 5+)
-- ✅ Latency from frame capture to angle readout < 100ms
+- Pose detection runs at 25–30 fps on iPhone 12+ and mid-tier Android (Pixel 5+)
+- Latency from frame capture to angle readout < 100ms
 
 ### Done criteria
 You can open `/test/squat` on your phone, allow camera, and see your full skeleton tracking your movement at 30 fps with live elbow + hip angle readouts in mono font.
@@ -178,9 +178,9 @@ You can open `/test/squat` on your phone, allow camera, and see your full skelet
 - They also start labeling specific failure modes in clip filenames
 
 ### Metrics
-- ✅ Rep counter accuracy ≥ 95% on 20 controlled test recordings (you do them)
-- ✅ Score variance < 5 points across 3 attempts of the same person doing identical reps
-- ✅ Total latency from rep completion to score displayed < 500ms
+- Rep counter accuracy ≥ 95% on 20 controlled test recordings (you do them)
+- Score variance < 5 points across 3 attempts of the same person doing identical reps
+- Total latency from rep completion to score displayed < 500ms
 
 ### Done criteria
 You do 10 squats on camera, the counter says "10", and you can see each rep's individual score in the breakdown panel. Show this to one friend without explanation — they should understand what just happened.
@@ -237,9 +237,9 @@ You do 10 squats on camera, the counter says "10", and you can see each rep's in
 - Total deliverables by end of week: 80 clips across push/pull/plank
 
 ### Metrics
-- ✅ Share card generates in < 500ms
-- ✅ Web Share API works on iOS Safari 15+ and Chrome Android 90+
-- ✅ Percentile loads from cache in < 50ms
+- Share card generates in < 500ms
+- Web Share API works on iOS Safari 15+ and Chrome Android 90+
+- Percentile loads from cache in < 50ms
 
 ### Done criteria
 You do a squat set on your phone, tap "Share," and your form score card appears in the iOS share sheet ready to post directly to TikTok / IG / WhatsApp.
@@ -295,9 +295,9 @@ You do a squat set on your phone, tap "Share," and your form score card appears 
 - Continue weekly delivery; total target by end of June = 200 clips
 
 ### Metrics
-- ✅ Test transaction processes end-to-end
-- ✅ Webhook updates subscription_status in DB
-- ✅ Paywall shows correctly for free users at limit, doesn't show for Pro users
+- Test transaction processes end-to-end
+- Webhook updates subscription_status in DB
+- Paywall shows correctly for free users at limit, doesn't show for Pro users
 
 ### Done criteria
 You sign up with a test card (`4242 4242 4242 4242`), complete checkout, see your dashboard say "Pro," then cancel via Stripe portal and see the dashboard revert to "Free" within 30 seconds.
@@ -341,10 +341,10 @@ You sign up with a test card (`4242 4242 4242 4242`), complete checkout, see you
 - End of Phase 1 review: total clips delivered, quality assessment, what needs more coverage
 
 ### Metrics
-- ✅ Pull-up rep counter accuracy ≥ 90% on 10 test sets
-- ✅ Plank failure detection within 1s of actual failure
-- ✅ < 5 reproducible bugs remaining
-- ✅ Time-to-first-score under 60s for a new user
+- Pull-up rep counter accuracy ≥ 90% on 10 test sets
+- Plank failure detection within 1s of actual failure
+- < 5 reproducible bugs remaining
+- Time-to-first-score under 60s for a new user
 
 ### Done criteria
 Three friends can each use `/test/squat`, `/test/pullup`, `/test/plank` on their phones without any guidance from you, get a score, share a card, and tell you the experience was "smooth."
@@ -602,11 +602,11 @@ If paid ads work in Week 19, scale to **$2,000/week** ad spend.
 
 ---
 
-# PHASE 5 — REGIONAL EXHIBITION + JAPAN
+# PHASE 5 — REGIONAL EXHIBITION
 
 **Nov 1 → Nov 30 · 4 weeks**
 
-**Goal:** $8,000 MRR · double press exposure (regional + Japan).
+**Goal:** $8,000 MRR · double press exposure from the regional exhibition.
 
 ---
 
@@ -630,21 +630,9 @@ If paid ads work in Week 19, scale to **$2,000/week** ad spend.
 
 ---
 
-## WEEK 24–26 (Nov 8 → Nov 30) · Japan Content Sprint
+## WEEK 24–26 (Nov 8 → Nov 30) · Consolidation
 
-### You're now in Tokyo (or wherever in Japan)
-
-### Content sprint — 30 days of Japan content
-- **Daily TikTok**: filming in Japan with location context
-- **Weekly Reel series**: "Japanese street calisthenics" — get a local crew using rvector
-- **Long-form blog/Twitter thread**: "Building an AI fitness coach from Tokyo" — distribute to Hacker News, Indie Hackers
-
-### Specific outreach
-- **2 Japanese gym partnerships** — let them use rvector free for content rights
-- **1 Japanese gymnast or street workout athlete** featured — high-trust signal
-- **Reach out to Tokyo-based English-language tech press** (Tokyodev, Disrupting Japan podcast)
-
-### Build priorities (light week — you're traveling)
+### Build priorities (light weeks)
 - Subscription churn investigation — who's canceling, why
 - One UI polish per week max
 
@@ -690,7 +678,7 @@ This is the biggest fitness app spending month of the year. Run aggressive promo
 |---|---|
 | Signups (cumulative) | 18,000 |
 | Paying users | 550 |
-| MRR | $11,000 ✅ |
+| MRR | $11,000 |
 
 ---
 
@@ -756,8 +744,8 @@ Build in deliberate checkpoints to avoid sunk-cost thinking.
 - **If MRR < $2K**: kill paid ads, focus on organic + product
 
 ### Dec 31 (target month)
-- **If MRR > $10K**: ✅ press hard, ride momentum into January
-- **If MRR < $7K**: not failure — adjust IB timeline expectation, keep building
+- **If MRR > $10K**: press hard, ride momentum into January
+- **If MRR < $7K**: not failure — adjust the timeline expectation, keep building
 
 ---
 
@@ -766,7 +754,7 @@ Build in deliberate checkpoints to avoid sunk-cost thinking.
 | Decision | Options | Default |
 |---|---|---|
 | **Domain** | rvector.fit / getrvector.app / rvectorform.ai / uservector.com | Buy whatever's available, in that order |
-| **Friend / future CEO equity** | Co-founder now vs advisor → CEO | Co-founder now with 4-yr vest, 1-yr cliff |
+| **Co-founder equity** | Co-founder now vs advisor → CEO | Co-founder now with 4-yr vest, 1-yr cliff |
 | **Marketer compensation** | Cash only / cash + equity / equity only | Cash + small equity grant (2–4%) |
 | **Data partners** | Contractors / co-founders | Contractors, paid per delivery |
 | **Office of record** | Personal / LLC / Delaware C-Corp | LLC now, Delaware C-Corp at $50K MRR |
