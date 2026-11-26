@@ -13,27 +13,38 @@ exercise videos ──► sync (light pulse) ──► 2D keypoints (RTMPose) �
                                        reps, depth, reference comparison, jitter ◄───────┘
 ```
 
-Everything is written to a numbered run folder, `outputs/V1.1.N`.
-**The software never declares itself accurate.** You get accuracy only from
-the checks in steps 5 and 7 below.
+Each measurement attempt gets a numbered output folder. A stick check measures
+geometry. Marker agreement needs an independently read scale and real footage.
+The [student checklist](PILOT_RECORDING_CHECKLIST.md) covers the recording order.
 
-## 0. One-time setup
+## 0. Set up a private take
+
+From the repository root, install the CPU detector and create a private session
+file alongside your recordings. These commands assume the example data root.
+Use your own paths, take ID, video filenames and calibration records.
 
 ```bash
-uv sync --frozen --extra pose          # RTMPose via RTMLib (CPU works)
-uv sync --frozen --extra cuda --extra pose   # optional: ~3 GB, lets pose detection use the GPU
-cp .env.example .env.local             # then set RVECTR_DATA_ROOT to your recordings folder
+bash tools/bootstrap-linux.sh --pose
+# For an NVIDIA machine use --cuda --pose and set pose.device to cuda.
+cp -n .env.example .env.local
+pilot_dir="$HOME/Videos/rvectr/2026-11-16/take1"
+mkdir -p "$pilot_dir"
+cp -n configs/session.example.json "$pilot_dir/session.json"
+cp -n configs/pilot_annotations.example.csv "$pilot_dir/pilot_annotations.csv"
 ```
 
-Put recordings under `RVECTR_DATA_ROOT` and calibration files under
-`RVECTR_DATA_ROOT/calibration` (or set `RVECTR_CALIBRATION_DIR`).
+The example fields and times illustrate the format. Replace every example row
+with an actual independent reading before analysis. Video names in the session
+are relative to `RVECTR_DATA_ROOT`, calibration names to `RVECTR_CALIBRATION_DIR`
+(default `<data root>/calibration`), and annotation names to the session JSON.
+Set the standing interval and flash search windows to suit the actual take.
+Use the same shell for the commands below.
 
 ## 1. Measure the board
 
 Your board has **8 × 11 printed squares** (7 × 10 inner corners). Measure four
 squares in a row with a ruler, divide by four, and do this along both
-directions. That number in millimetres is `--square-mm`. It sets the scale of
-every result, so do not guess it from the paper size.
+directions. Record the readings and ruler uncertainty. If the axes disagree beyond that uncertainty, reprint without stretching and repeat. Pass the verified square size as `--square-mm`; 70.7 below is only an example. Add an asymmetric physical mark at the border nearest the intended corner 0, and distinguish the +X and +Y directions.
 
 ## 2. Phone settings (same for calibration and exercise)
 
@@ -78,21 +89,37 @@ still. Use the same `--board-frame-id` for both phones. Pass
 `--same-recording-mode` only after checking that the exercise videos use
 exactly the same settings; runs refuse calibrations without it. The board must
 stay level and must not be rotated about 45° in the picture, because the corner
-numbering depends on that.
+numbering depends on that. The command saves `<output-stem>.corners.png`; open
+each preview and check the circled zero corner and the `+X`/`+Y` arrows. They
+must follow the same physical board corner and directions in every camera.
+If the preview is wrong or the board is not fully detected, stop and repeat the
+board clip/calibration instead of accepting a guessed axis.
 
 **After this, do not touch the phones.** If one moves, redo step 4.
 
 ## 5. Check the geometry with a known length (before recording people)
 
 Put a rigid stick with two marks a known distance apart (for example 50 cm) in
-the squat area. Record it in both phones. Save a frame from each:
+the squat area. Check it at **five positions**: near the middle, left and right
+edges of the movement area, and near and far from the phones. At each position,
+show the stick first upright, then sideways, then pointing towards and away from
+the cameras. Keep both marks visible and note the position and direction. This
+checks scale and axis errors across the working volume, not just one convenient
+line.
+
+Record both flashes in the stick take. Copy the session JSON to
+`$pilot_dir/stick-session.json`, change its video names to the **stick** videos and
+set `experiment.annotations` to null. Use the stick take's own sync record:
 
 ```bash
-uv run --no-sync rvectr frames --config configs/session.json --time 4.0 --out frames/
+uv run --no-sync rvectr sync --config "$pilot_dir/stick-session.json" --out "$pilot_dir/stick-sync"
+uv run --no-sync rvectr frames --config "$pilot_dir/stick-session.json" --time 4.0 \
+  --sync "$pilot_dir/stick-sync/sync.json" --out "$pilot_dir/stick-frames"
 ```
 
-Open the PNGs in any image viewer that shows pixel coordinates. Note the pixel
-position of each mark in both images and write `points.json`:
+Open the synchronized camera/time-named PNGs. Record the pixel
+position of the same two physical marks in every camera; do not pick different
+stick corners in different views. Save the two measured pixel locations per view in `$pilot_dir/points.json`. The coordinates below illustrate the format.
 
 ```json
 {"points": {"A": {"cam1": [812, 1404], "cam2": [655, 1390]},
@@ -101,23 +128,33 @@ position of each mark in both images and write `points.json`:
 ```
 
 ```bash
-uv run --no-sync rvectr check-points --config configs/session.json --points points.json
+uv run --no-sync rvectr check-points --config "$pilot_dir/stick-session.json" --points "$pilot_dir/points.json" --out "$pilot_dir/stick-result.json"
 ```
 
-Repeat with the stick in several places and orientations. Record the errors.
-This is the independent check of scale and camera geometry.
+Repeat for the five positions and directions. Use the same point names for the
+same physical marks within each synchronized frame set. Compare measured with
+known length and save every error, including failed/unreconstructed cases. This
+is an independent check of scale, camera geometry and coordinate axes.
 
-## 6. Record a take
+## 6. Record a take for the pilot comparison
 
 Before the first take, mark the standing spot with a tape cross on the floor.
 Stand on it at the start of every take and face the same way in every take.
 The one-camera comparison (see "Comparing numbers of views") needs to know where
 the person stands and which way the hips point.
 
-1. Start both phones.
+Keep a **baseline reference rep and raised-target reps in the same take**. The
+reference is the ordinary, comfortable squat to the unraised stool; the raised
+stool reps are intentionally shallower. This gives every camera condition the
+same reference without borrowing a reference from another take. Record the
+actual added stool height for every attempt. Do not combine repeated takes into
+one scoring list.
+
+1. Start all phones.
 2. Flash a light visible to both cameras: a phone torch switched on for about half a second.
 3. Stand still for 3 seconds. This is the jitter measurement.
-4. Do the reps. Rep 1 is the participant's chosen reference depth.
+4. Do the baseline reference rep first, then the raised-target reps in the same
+take. Mark which target height each attempt used in the notebook.
    Stand still for two seconds between reps: the software reads the standing
    height from that pause. When squatting to a target (a stool, a bar), touch
    it lightly and come straight back up.
@@ -127,30 +164,92 @@ the person stands and which way the hips point.
 Check the sync on its own first:
 
 ```bash
-uv run --no-sync rvectr sync --config configs/session.json --out sync_check/
+uv run --no-sync rvectr sync --config "$pilot_dir/session.json" --out "$pilot_dir/sync"
 ```
 
-Look at `sync_check/brightness.png`: the dashed lines must sit on the two
+Look at `$pilot_dir/sync/brightness.png`: the dashed lines must sit on the two
 flashes in both cameras. If other light changes confuse it, set a `roi`
 `[x, y, w, h]` around the torch for each camera in the config.
 
+One usable flash gives an offset-only diagnostic. The annotated pilot requires
+one distinct usable start and end flash in every view. Multiple rising pulses
+in a window are ambiguous. Inspect the plot, crop the ROI or adjust the windows
+and rerun. Two landmarks fit linear offset and drift; two fitted points provide
+no independent residual measurement. The report gives per-endpoint sampling
+uncertainty in seconds. A third independent landmark can check the mapping.
+
+Ordinary presentation timestamps do not specify where exposure starts.
+By default the tool uses brightness landmarks with timing uncertainty. For a
+camera with independently known exposure duration and timestamp convention,
+set e.g. `sync.exposures.cam1 = {"duration_s": 0.01, "pts_at": "start"}`.
+Allowed conventions are `start`, `centre` and `end`. Use a measured duration,
+which can differ from the frame period. The exposure model assumes a step
+flash and linear integrated brightness. Auto-exposure, rolling shutter and
+nonlinear drift can add errors beyond the reported sampling term.
+
 ## 7. Label the footage BEFORE looking at the software results
 
-For each rep, decide from the video (marked footage, or the pelvis marker)
-whether it **matches** the reference depth, is **shallow**, or is **unclear**.
-Save it as a CSV like `configs/labels.example.csv` and point `"labels"` in the
-session config at it. Making labels after seeing the software output would bias
-the comparison.
+Before opening any software result, make an independent annotation list from
+the videos. Give each rep a unique ID and record its start, lowest point and end
+time on camera 1's video clock. Record one reference rep in this same take;
+label each test rep `match`, `shallow`, `rejected` (a documented protocol
+failure), or `unscorable` (the video cannot support a judgement). Keep rejected
+and unscorable attempts in the list. For these rows only, leave an unknown
+time blank. A row without a bottom time stays in the ledger and cannot be
+paired to a detection. Record the measured added stool height in
+`target_height_m`; the annotated descent time is the start-to-bottom interval.
+Use `configs/pilot_annotations.example.csv` as the column template. Have two
+readers annotate independently when possible; keep both readers' sheets and
+record the reader ID and uncertainty estimate.
+
+For a continuous comparison, read the **visible marker against a measured
+vertical scale in its own plane**, as in the student checklist. Take independent
+standing and bottom readings before opening software depth outputs. For a
+moving marker in another view, export the corresponding frame for each time:
+
+```bash
+uv run --no-sync rvectr frames --config "$pilot_dir/session.json" --time 9.2 --sync "$pilot_dir/sync/sync.json" --out "$pilot_dir/marker-frames"
+```
+
+Record its depth and measurement uncertainty in metres. Save a blank value when
+no defensible uncertainty is available; do not enter zero. Keep the video-based
+class judgement independent from the software output. The fixed match rule is
+depth no more than 3 cm shallower than the reference; the 1 cm band around that
+boundary is reported as borderline. Set and freeze these thresholds before
+looking at results. If marker and reader depth uncertainties are known, the
+borderline band is widened to twice their combined uncertainty. The
+per-condition predicted reference comes from that condition's detection of the
+same annotated reference rep. The report retains each reader's label. If the
+marker-based class disagrees with the label, their disagreement and whether it
+falls outside the borderline band are recorded. A usable marker-based class is
+the independent comparison target when it exists.
+
+Put the CSV path in `experiment.annotations` in the session config, or pass
+`--annotations path/to/annotations.csv` to `rvectr run`. The run matches each
+condition to the same timed annotation list one-to-one, by bottom time (default
+window 0.5 s). Reference reps are retained in the ledger but excluded from
+classification denominators. A condition's denominator is the number of
+matched, classifiable test reps; missed, extra, rejected, unscorable and model
+unclear cases are reported separately. Marker depth errors use only rows with a
+measured marker depth; unknown uncertainty remains unknown.
 
 ## 8. Run
 
 ```bash
-uv run --no-sync rvectr run --config configs/session.json
+uv run --no-sync rvectr run --config "$pilot_dir/session.json"
+# score each camera subset against the independent timed pilot annotations:
+uv run --no-sync rvectr run --config "$pilot_dir/session.json" --annotations "$pilot_dir/pilot_annotations.csv"
 # change only squat/triangulation settings? reuse the slow 2D step:
-uv run --no-sync rvectr run --config configs/session.json --keypoints-from outputs/V1.1.12
+uv run --no-sync rvectr run --config "$pilot_dir/session.json" --keypoints-from outputs/V1.1.12
 ```
 
-The run folder contains:
+Only reuse a cache from the original videos with matching camera IDs, orientation,
+frame indices, presentation timestamps, stride, edge margin and detector settings.
+Each new .npz carries its source digest, the detector identity and generation code
+fingerprint. The balanced detector checks the recorded weight hashes against the measured ONNX files. For reuse with another preset, hash the two ONNX files from that preset's original model archives and set `pose.weight_sha256` (keys `det` and `pose`) to those digests. A pin may be supplied after inference. The locked ONNX Runtime version and actual inference device are also checked. If GPU inference fell back to CPU, set the intended device explicitly and regenerate. Older caches lack this evidence. To regenerate, run the same command
+without `--keypoints-from`. A synthetic projection cache must identify its source.
+
+The numbered run folder contains the following files.
 
 | File | What it is |
 |---|---|
@@ -176,9 +275,8 @@ The run folder contains:
   is a parabola, and using many frames averages out the noise. The single
   lowest frame is not used: it is the frame with the luckiest noise, so it
   reads too deep. If the person rests at the bottom, the height is flat there.
-  In simulation most such reps are still read with the parabola and come out
-  about 1 mm too deep; when the parabola does not fit at all, the bottom is the
-  median level of the resting frames. `bottom_model` in `reps_*.csv` says which
+  A long resting interval can use the median level of its observed frames.
+  Both fits require observed movement into and back out of the dip. `bottom_model` in `reps_*.csv` says which
   was used: `parabola`, `plateau` (rested), or `none` (the bottom was not seen
   well enough, so the rep is unclear). A recording that stops while the person
   is still at the lowest point gives `none`, because the bottom may not have
@@ -194,7 +292,7 @@ The run folder contains:
   Set the tolerance from a pilot clip, then keep it fixed.
 - **Borderline** = within `borderline_m` of that line, or within twice the
   plus-or-minus of the difference from the reference rep, whichever is larger.
-- **Unclear** = fewer than `min_coverage` (85 %) of the rep's frames had both
+- **Unclear** = fewer than `min_coverage` (85 %) of the rep's expected elapsed frame intervals had both
   hips reconstructed, or the bottom was not seen well enough: fewer than 5
   real frames around the lowest point, a gap of more than 0.1 s between them,
   or frames missing on one side so that the lowest point is not inside them.
@@ -209,8 +307,7 @@ The run folder contains:
   averages out when many frames are used for the standing height and the
   bottom, but slow drift does not: it shifts the whole standing level or bottom
   together, so it sets how small a depth difference can be detected.
-- **Filter effect** = filtered depth − raw depth per rep. A large change on the
-  faster reps means the filter is hiding real depth.
+- **Filter effect** = filtered depth − raw depth per rep. Report differences by actual descent duration; filter changes can reflect movement or noise.
 - **False pass** = software said reached, footage said shallow.
   **False flag** = software said shallower, footage said match.
 
@@ -258,8 +355,7 @@ The plane needs the standing spot and the hip line, in the calibration frame.
   all-cameras result while the person stands still (median pelvis position, and
   median left-hip-to-right-hip direction). **This is not a fair test of one
   camera alone**, because the one-camera conditions borrow set-up information
-  from the other cameras. It tells you the best a single camera could do with
-  perfect knowledge of where the person stands.
+  from the other cameras. Errors in that borrowed standing estimate also affect this result.
 - **`plane_source = "measured"`**: give both in the session config, measured
   independently of the cameras (for example the tape cross on the floor and the
   direction the person faces, converted to the calibration frame):
@@ -280,31 +376,31 @@ The standing spot is the pelvis position (so it is at hip height, not on the flo
 | `views_comparison.csv` | one row per rep per condition |
 | `views_summary.json` | one entry per condition: reps found, unclear, standing jitter (total, fast, slow), the averages below, `plane_source` and one sentence saying what the condition assumes |
 | `views_depth.png` | depth of every rep for every condition, with plus-or-minus bars |
+| `views_experiment.csv`, `views_experiment.json` | same independent annotation IDs for every condition, one-to-one time matches, marker depth errors, fixed-tolerance decisions, uncertainty and explicit missed/extra/rejected/unscorable/failed counts |
 
-Reading `views_comparison.csv`: `condition` and `cameras` say what was used and
-`model` how (`triangulation`, `fixed_distance` or `movement_plane`). `rep` is
-numbered as in the all-views result: a rep of another condition is the same rep
-if its bottom is within 0.5 s of that rep's bottom. A rep that a condition did
-not find has `outcome` = `not_found` and empty numbers; reps found that match no
-all-views rep are only counted in the summary. The other columns are as in
-`reps_raw.csv`, with one addition: **`depth_minus_all_views_m`** is this
-condition's depth minus the all-views depth for the same rep. A value near zero
-means that fewer views did as well. The summary gives its mean (a steady bias)
-and standard deviation (scatter), and the same for the difference from the
-reference rep (rep 1, which is zero by definition, is left out of that one).
-A condition that agrees with all views is not necessarily right: all views is
-the comparison, not the truth.
+For pilot scores every view uses the configured primary trace and the same
+annotation list. The report retains a row for every attempt, unmatched detections
+and diagnostic depths for rejected attempts. The marker error summary excludes
+rejected, unscorable and missing depths. Classification agreement excludes the
+reference. Read its numerator and denominator alongside the full attempted tally.
+The point for an accepted depth with unknown uncertainty has no error bar.
 
-## What this does not tell you
+The pilot's CSV files identify the attempt and camera combination. When the
+intended reference is missed or rejected, its row records the failure and the
+condition cannot make any reference-relative decisions. A different attempt
+cannot take its place. The raw and filtered tables record their own matched
+reference from the same annotation sheet. Independent readings of a marker and
+the stool setting have separate columns.
 
-- The hip keypoint is the detector's estimate of the hip joint, inside the body.
-  A marker on clothing moves differently. Compare the two by marking the
-  pelvis marker at the standing and bottom frames with `frames` +
-  `check-points`, and report the difference. Do not treat either one as the truth.
-- Low reprojection error means the two cameras agree. It does not prove the
-  point is anatomically right.
-- The light-pulse sync is good to roughly a quarter to a half frame. Fast
-  movement makes a residual timing error matter more. The tests show that a
-  two-frame error clearly inflates reprojection error, so watch that number.
-- Every check in `backend/tests/test_two_camera_pipeline.py` uses synthetic data.
-  It proves the software recovers known answers, not that phones are accurate.
+Without timed annotations, older configs can produce a diagnostic comparison
+against the numbered all-view detections. This comparison has no independent
+attempt denominator. Use the annotation workflow for accuracy or agreement.
+
+## Limits
+
+The tracker estimates the left and right internal hip joints. A skin or clothing
+marker can shift relative to their midpoint. Report differences against that
+marker, reader uncertainty and any out-of-plane movement. A second triangulated
+marker can diagnose geometry but shares the cameras and calibration with the
+software estimate. Low reprojection error alone cannot establish anatomical
+accuracy. All published verification so far is synthetic.

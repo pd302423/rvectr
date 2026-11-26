@@ -1,3 +1,5 @@
+> **Superseded exhibition draft.** Use the [2026–27 submission](CBSE_2026_27.md) for the current sub-theme, method and evidence. This historical text describes an earlier project.
+
 # MASTER PROMPT FOR GAMMA AI (GAMMA.APP)
 ## CBSE Regional & National Science Exhibition Presentation Deck
 

@@ -4,8 +4,8 @@
 # rvector — Handoff Document
 
 **Last updated:** 2026-07-13
-**Working directory:** `C:\Users\Parth Dalal\rvector`
-**Web app root:** `C:\Users\Parth Dalal\rvector\web`
+**Working directory:** `<checkout>`
+**Web app root:** `<checkout>`
 **Repo state:** Local git initialised, not yet pushed to remote.
 
 ---
@@ -141,7 +141,7 @@ Because processing 3D meshes is computationally heavy, the system bypasses Next.
 
 ### Run commands (Windows PowerShell)
 ```powershell
-cd "C:\Users\Parth Dalal\rvector\web"
+cd "<checkout>"
 npm run dev                                    # standard
 node --max-old-space-size=4096 node_modules/.bin/next dev   # if Turbopack crashes
 Remove-Item -Recurse -Force .next             # clear cache

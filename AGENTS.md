@@ -60,24 +60,14 @@ graph TD
 
 # Current runtime and working-copy guidance (27 October 2026)
 
-Linux is primary: WSL 2 now and native Linux later. Continue work in the Linux
-checkout at ~/projects/rvectr; the original Windows tree is preserved as a
-reference and native Windows is secondary. Read docs/LINUX_FIRST.md first.
+Read docs/LINUX_FIRST.md for native Linux and WSL setup. Use the declared Python
+3.11 project and uv.lock. Run `bash tools/bootstrap-linux.sh` for the CPU test
+environment. Add `--pose` for inference, `--cuda` for NVIDIA, and `--web` for
+the site. Normal runs use `uv run --no-sync`. Keep private data, recordings,
+calibration and model weights outside published source. Preserve timestamps,
+missing observations, failed attempts and run IDs. See docs/TWO_CAMERA_PIPELINE.md
+for the squat pipeline and docs/PUBLICATION_REVIEW.md for the owner audit.
 
-Use the declared Python 3.11 project and uv.lock. The shared bootstrap is
-`bash tools/bootstrap-linux.sh --pose --web`; normal runs use `uv run --no-sync`.
-Do not activate or copy Windows virtual environments inside Linux.
-
-Private data and model locations are supplied through .env.local. Capture JSON
-contains relative recording/calibration names, not machine-specific drive paths.
-Keep official model parameters, raw recordings, calibration records and generated
-body assets outside published source. Inspect original Git history as well as
-current tracked files before publication; source-only exports omit old history.
-
-The new pipeline currently provides versioned diagnostics. Model fitting and
-reconstruction modules still need end-to-end integration and independent
-validation. An environment check or a plausible SMPL mesh is not an accuracy
-result. Preserve missing observations, original time and failed/blocked run IDs.
 ## Luna delegation policy (user preference)
 
 - The parent agent owns architecture, task decomposition, acceptance criteria, integration, and final review.

@@ -6,17 +6,19 @@ depth of the squat (how far the hips drop). It is an entry for the CBSE Science
 Exhibition 2026-27, sub-theme "AI for Better Life".
 
 > [!IMPORTANT]
-> **Status: tested on simulated data only.**
+> **Validation available so far uses generated data.**
 > Everything checked so far uses synthetic data. That means data made by a
 > computer program, where the right answer is known in advance. These checks show
 > that the software can recover a known answer. They do not show that phone
-> cameras are accurate. No real recordings have been analysed yet. The next step
-> is a pilot recording with real phones. This page makes no accuracy claim.
+> cameras are accurate. The first real-phone pilot will compare the reconstructed
+> depths with blinded readings of a pelvis marker against a measured scale.
+
+[Current exhibition write-up](docs/writeups/CBSE_2026_27.md) · [First recording](docs/PILOT_RECORDING_CHECKLIST.md)
 
 ## The research question
 
-How does the accuracy of 3D movement estimates from ordinary phone cameras
-change with the number of camera views and with movement speed?
+How do camera count and movement speed affect the accuracy of vertical
+squat-depth estimates from ordinary phones?
 
 A "view" is one camera's picture of the person. In plain words: does a second
 phone help? Does a third? Is a fast squat measured worse than a slow one?
@@ -44,15 +46,14 @@ least two phones. It goes through these steps:
    the lines from two or more cameras cross is the position of the hip in 3D.
    The method used is DLT (direct linear transform).
 5. **Follow the pelvis height.** The pelvis is taken as the midpoint of the two
-   hips. The software tracks its height over time. Frames where the hips could
-   not be found stay missing. Missing data is never filled in.
+   hips. The software tracks its height over time. A nearby pair of valid observations can be resampled at a common time.
+   A missing hip or long gap stays missing.
 6. **Measure the depth of each squat.** The standing height is the median pelvis
    height while the person stands still (the median is the middle value, so odd
    wild values are ignored). The bottom is the lowest point of a parabola (a
    smooth U-shaped curve) fitted to the frames near the bottom. Depth is the
    standing height minus the bottom.
-7. **Compare with a reference squat.** One squat is the reference (by default the
-   first). Each squat is then labelled "reached reference", "shallower" or
+7. **Compare with a reference squat.** The pilot identifies one baseline attempt in the independent annotation sheet. Each squat is then labelled "reached reference", "shallower" or
    "unclear". "Unclear" means too little of the squat was seen to decide.
 
 Measuring with one camera, or with pairs of cameras, exists only to compare
@@ -62,17 +63,51 @@ session. The full method, with every setting explained, is in
 
 ### Error budget (a simulation)
 
-Before any real recording, a Monte Carlo simulation predicts the smallest change
-in squat depth that each camera setup could catch. Monte Carlo means running a
-random experiment many times to see how much the results spread. The simulation
-adds typical errors (noise in the keypoints, timing errors, calibration errors,
-missing frames) to a computer-made squat.
+Before any real recording, a Monte Carlo simulation compares camera setups on
+computer-made squats. It adds stated keypoint noise, missing frames,
+motion-dependent noise, phone timing offsets, shared camera biases and
+per-camera calibration errors. These are sensitivity settings, not measured
+phone error rates. The baseline is 60 fps; the frame-rate sensitivity uses
+30 fps. The camera layout is side-on plus a 45° oblique view, with a mirrored
+oblique third view when enabled.
 
-Every number from it is a prediction from a computer model. It is not a
-measurement. The model is in `backend/rvectr/errorbudget.py` and the runner is
-`tools/run_error_budget.py`. The script `tools/make_poster_charts.py` draws
-charts from a finished simulation run, which is stored locally and not in this
-repository.
+For the best-threshold comparison, matching sessions are split in half: the
+first half sets one cutoff and selects the first tested depth-grid point meeting
+the 95% shallow-detection and 5% matching-false-alarm limits. Unclear attempts
+remain in both denominators and count as not detected. Three test attempts in a
+session share the same reference, so uncertainty intervals resample complete
+sessions. The other half checks that frozen cutoff once. The summary reports
+the tested grid bracket, training and held-out counts, rates and pass/fail; it
+does not interpolate between grid points or search the held-out sessions for a
+new passing value. The software's fixed 3 cm tolerance is a separate rule.
+
+The separate 3 mm check sets a cutoff on 300 training sessions and evaluates
+it on 300 held-out sessions, giving 900 attempts in each held-out class.
+The compact summary in `src/lib/results/simulation-summary.json` records the
+named run, seed, units, settings, dependency versions and source hashes.
+The site and poster both read this file.
+
+To reproduce the full run from the repository root, use a fresh output directory.
+The wildcard in the export command then selects exactly the run just created.
+
+```bash
+mkdir -p outputs/sim
+run_root=$(mktemp -d outputs/sim/reproduce-XXXXXX)
+uv run --no-sync python tools/run_error_budget.py --workers 12 --seed 1 --out-root "$run_root"
+uv run --no-sync python tools/export_simulation_summary.py --summary "$run_root"/error_budget_*/summary.json
+uv run --no-sync python tools/make_poster_charts.py --summary src/lib/results/simulation-summary.json --out outputs/poster_kit
+```
+
+The new run gets its own UTC identifier. Compare its numerical tables with
+the versioned summary. On a smaller machine, reduce `--workers`. The seed
+and the session split determine the simulated observations. To regenerate
+the published poster alone, run the last command against the versioned file.
+
+The simulation does not run RTMPose on real video or validate its error model.
+It does not model all production checks and failures, including confidence,
+reprojection and ray-angle rejection, robust refinement, lens distortion,
+hip swaps, clothing or measured camera-error correlations. Its simulated
+multi-view benefit depends on accurate camera calibration and timing.
 
 ## Repository layout
 
@@ -116,18 +151,13 @@ You need Python 3.11 (installed for you by uv), the package manager
 ```bash
 git clone https://github.com/pd302423/rvectr.git
 cd rvectr
-bash tools/bootstrap-linux.sh --pose --web
+bash tools/bootstrap-linux.sh
 ```
 
-The script installs the locked Python packages, checks the environment, runs the
-tests and builds the website (`--pose` adds the pose-detection packages, `--web`
-adds the website). It needs an NVIDIA GPU with CUDA and stops if it cannot find
-one. Without a GPU, set up the code and run the tests like this instead:
-
-```bash
-uv sync --frozen
-uv run --no-sync pytest -q
-```
+This installs the locked CPU environment, runs the tests and enables the
+contributor publication hook. Add `--pose` for CPU inference, or
+`--cuda --pose` for NVIDIA inference. Add `--web` to build the website.
+For a minimal CPU setup use `uv sync --frozen` and `uv run --no-sync pytest -q`.
 
 Useful commands (always use `uv run --no-sync` so the locked versions are used):
 
@@ -146,7 +176,7 @@ work on the code.
 
 The website is built with Next.js 16, React 19 and Tailwind CSS 4. It explains the
 project, shows the simulated results and has a live webcam demo for the
-exhibition stall. Install a current Node.js LTS release, then:
+exhibition stall. Use Node.js 22 LTS, then:
 
 ```bash
 npm install
@@ -191,7 +221,8 @@ how to use an AI coding assistant. If you use one, point it at
 | 4D-Humans / HMR2 | older single-camera scripts (submodule) | MIT. The link and copyright notice are in LICENSE. |
 | [SMPL](https://smpl.is.tue.mpg.de) | body model for fitting | Separate model licence. Not included here. Get it yourself and accept its terms. |
 | [MediaPipe](https://github.com/google-ai-edge/mediapipe) | live webcam demo on the website | Apache 2.0. |
-| RTMPose, through RTMLib | hip detection in the main pipeline | Its own licence applies. It is not yet listed in LICENSE. |
+| RTMLib | Inference wrapper | Apache 2.0. |
+| RTMPose / MMPose | Hip keypoint model | Apache 2.0 for code. See LICENSE for weight attribution. |
 
 ## Not a medical device
 

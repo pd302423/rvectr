@@ -23,18 +23,18 @@ interface VideoSlot {
 }
 
 const KIT_LIST = [
-  "Two phones (a third helps) on tripods or something very stable",
-  "The printed checkerboard, stuck flat on a stiff board",
-  "A torch from a different phone, for the flash that lines up the clocks",
-  "A stick of known length, to check the software gets lengths right",
-  "A stool and a few flat boards or books, to raise the stool by measured amounts",
-  "Tape for a cross on the floor, and a notebook and pen",
+  "Two phones on stable supports for the one-versus-two comparison; a third phone is optional",
+  "A flat, measured checkerboard with a physical mark beside the same corner for every camera",
+  "A torch visible to all cameras at the start and end of the take",
+  "A stick of known length for the five-position geometry check",
+  "A stable stool with measured height settings, chosen with the supervisor",
+  "A floor marker, a visible pelvis marker, a measured vertical scale and a notebook",
 ] as const;
 
 const NEXT_STEPS = [
-  "The software reads the checkerboard video to learn each phone's lens and where each phone stands.",
-  "A pose model finds the hips in every frame of every video. Frames are lined up using the torch flash.",
-  "The hip positions are combined into 3D, and each squat is labelled “reached reference”, “shallower” or “unclear”.",
+  "Calibrate each lens and each camera position. Compare the corner overlays with the marks on the same board, then check the stick at five positions.",
+  "Use both torch flashes to align the videos and check drift. RTMPose estimates hip locations in the usable frames.",
+  "Reconstruct the hip midpoint, then compare the estimated displacement with the independent scale reading. Use the same annotation IDs and baseline for every camera combination.",
 ] as const;
 
 export default function UploadPage() {
@@ -51,10 +51,10 @@ export default function UploadPage() {
   const slots: VideoSlot[] = [
     {
       id: "calib",
-      title: "1. Checkerboard video",
+      title: "1. Example board clip",
       role: "Lens and phone positions",
       description:
-        "A video of the printed checkerboard, seen by both phones. The software uses it to learn each phone's lens and where each phone stands.",
+        "Keep a varied lens-calibration clip for each phone and a shared still-board clip from every view. This slot previews one of those files.",
       icon: Grid3x3,
       file: calibFile,
       required: mode === "multiview",
@@ -63,7 +63,7 @@ export default function UploadPage() {
       id: "cam1",
       title: "2. Phone 1 squat video",
       role: "First view",
-      description: "The squats, filmed from phone 1.",
+      description: "One continuous take containing the designated baseline and the test attempts.",
       icon: Camera,
       file: cam1File,
       required: true,
@@ -72,7 +72,7 @@ export default function UploadPage() {
       id: "cam2",
       title: "3. Phone 2 squat video",
       role: "Second view",
-      description: "The same squats at the same time, filmed from phone 2. A torch flash both phones see lines up the clocks.",
+      description: "The same attempts filmed by phone 2, with the same start and end flashes.",
       icon: Camera,
       file: cam2File,
       required: mode === "multiview",
@@ -127,20 +127,20 @@ export default function UploadPage() {
           ))}
         </ul>
         <p className="max-w-[65ch] text-sm leading-relaxed text-muted-foreground">
-          Film only yourself for now. Warm up first, and stop if anything hurts.
+          Keep the marker and vertical scale in the same plane. Before opening any software result, record standing and bottom readings, timing and reader uncertainty for each attempt.
         </p>
       </section>
 
       <section aria-labelledby="files-title" className="grid gap-5">
         <SectionHeading id="files-title" eyebrow="Your files">
-          Line up your videos
+          Preview local clips
         </SectionHeading>
 
-        <div role="group" aria-label="How many phones" className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Clips to preview" className="flex flex-wrap gap-2">
           {(
             [
-              { id: "multiview", label: "Two phones (checkerboard + 2 videos)" },
-              { id: "monocular", label: "One phone (1 video)" },
+              { id: "multiview", label: "Two-phone take" },
+              { id: "monocular", label: "Preview one clip" },
             ] as const
           ).map((option) => (
             <button
@@ -155,6 +155,9 @@ export default function UploadPage() {
           ))}
         </div>
 
+        <p className="max-w-[65ch] text-sm text-muted-foreground">
+          Run the pilot from a synchronized take with at least two phones. You can preview a single file here.
+        </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {visibleSlots.map((slot) => {
             const Icon = slot.icon;

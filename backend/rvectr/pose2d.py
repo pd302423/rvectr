@@ -8,6 +8,7 @@ NaN coordinates and zero scores: nothing is copied forward from earlier frames.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -18,16 +19,23 @@ from .media import frames
 JOINTS = len(JOINT_NAMES)
 
 
+# ONNX file digests from the published balanced RTMLib 0.0.15 archives.
+BALANCED_WEIGHTS = {
+    "det": "3dea6513388889f0fff4b77bf7a26013600321b9eb9ceb0e9a400a82572f5f23",
+    "pose": "5c0a4bf67953e6d2ac43ce15e77dc9d5d354ae18430a47d2c5963a7bc5683e3c",
+}
+
+
 class RTMLibDetector:
     name = "rtmlib.Body (YOLOX + RTMPose, COCO-17)"
 
-    def __init__(self, mode="balanced", device="cuda", backend="onnxruntime", det_frequency=5):
+    def __init__(self, mode="balanced", device="cpu", backend="onnxruntime", det_frequency=5):
         """det_frequency: run the person detector every N frames; between those, the
         box comes from the previous frame's keypoints. 1 = detect on every frame."""
         try:
             from rtmlib import Body, PoseTracker
         except ImportError as error:
-            raise RuntimeError("RTMLib is not installed. Run: uv sync --frozen --extra pose") from error
+            raise RuntimeError("RTMLib is not installed. Run bash tools/bootstrap-linux.sh --pose (add --cuda for GPU inference)") from error
         if device == "cuda" and backend == "onnxruntime":
             import onnxruntime
             try:  # use CUDA/cuDNN from the project's pip packages (uv sync --extra cuda) if present
@@ -36,14 +44,22 @@ class RTMLibDetector:
                 pass
         self.model = PoseTracker(Body, det_frequency=det_frequency, tracking=False, mode=mode,
                                  to_openpose=False, backend=backend, device=device)
+        from importlib.metadata import version
+        from .records import sha256
+        weights = {name: {"file": Path(part.onnx_model).name, "sha256": sha256(part.onnx_model),
+                          "source": Body.MODE[mode][name]}
+                   for name, part in (("det", self.model.det_model), ("pose", self.model.pose_model))}
         providers = []
         for part in (getattr(self.model, "det_model", None), getattr(self.model, "pose_model", None)):
             session = getattr(part, "session", None)
-            if session is not None:
+            if hasattr(session, "get_providers"):
                 providers += [p for p in session.get_providers() if p not in providers]
         actual = "cuda" if "CUDAExecutionProvider" in providers else ("cpu" if providers else "unknown")
-        self.settings = {"mode": mode, "device_requested": device, "device_used": actual,
+        self.settings = {"weights": weights, "rtmlib": version("rtmlib"), "mode": mode, "device_requested": device, "device_used": actual,
                          "providers": providers, "backend": backend, "det_frequency": det_frequency}
+        if backend == "onnxruntime":
+            import onnxruntime
+            self.settings["runtime_version"] = onnxruntime.__version__
         if device == "cuda" and actual != "cuda":
             print("WARNING: GPU pose inference unavailable (needs CUDA 12 + cuDNN 9 libraries); "
                   "running on CPU. `uv sync --frozen --extra cuda --extra pose` installs them.", flush=True)
@@ -123,3 +139,73 @@ def load(path):
         observation = {k: data[k] for k in ("frame_index", "times_s", "keypoints", "scores")}
         observation.update(json.loads(str(data["meta"])))
     return observation
+
+
+def cache_identity(camera_id, video_sha256, metadata, settings):
+    """Inputs used to generate a full-take observation cache, excluding later scoring settings."""
+    from .records import sha256
+    return {
+        "schema": 1, "camera_id": camera_id, "video_sha256": video_sha256,
+        "image_size": list(metadata["image_size"]), "coded_size": list(metadata["coded_size"]),
+        "rotation_degrees": metadata["rotation_metadata_degrees"],
+        "detector": settings.get("source", RTMLibDetector.name),
+        "pose": {key: settings[key] for key in ("mode", "backend", "device", "det_frequency", "stride")},
+        "edge_margin_fraction": settings.get("edge_margin_fraction", 0.01),
+        "expected_weight_sha256": (settings.get("weight_sha256") or
+                                   (BALANCED_WEIGHTS if settings["mode"] == "balanced" else {}))
+                                  if settings.get("source", RTMLibDetector.name) == RTMLibDetector.name else {},
+        "implementation_sha256": sha256(__file__),
+    }
+
+
+def verified_cache(path, identity, metadata):
+    """Validate the embedded source identity and the actual saved sample arrays."""
+    try:
+        obs = load(path)
+    except (OSError, ValueError, KeyError) as exc:
+        raise ValueError(f"Unreadable keypoint cache {path.name}; rerun without --keypoints-from") from exc
+    source = obs.get("source_identity", {})
+    # A model digest pin is verification policy, and may be added after inference.
+    # The saved weight digests are compared with the requested pins below.
+    mismatch = [key for key, expected in identity.items()
+                if key != "expected_weight_sha256" and source.get(key) != expected]
+    stride = identity["pose"]["stride"]
+    pts = np.asarray(metadata["pts"])
+    indices = np.arange(len(pts))[::stride]
+    indices = indices[pts[indices] >= 0]  # detect_video's full-take default start_s
+    if not np.array_equal(obs["frame_index"], indices) or not np.array_equal(obs["times_s"], pts[indices]):
+        mismatch.append("frame indices or source timestamps")
+    if (obs["keypoints"].shape != (len(indices), JOINTS, 2) or obs["scores"].shape != (len(indices), JOINTS)
+            or obs.get("joint_names") != list(JOINT_NAMES) or obs.get("image_size") != identity["image_size"]
+            or obs.get("detector") != identity["detector"]):
+        mismatch.append("detector, display size or joint layout")
+    if identity["detector"] == RTMLibDetector.name:
+        actual = obs.get("detector_settings", {})
+        for key, saved_key in (("mode", "mode"), ("device", "device_requested"),
+                               ("backend", "backend"), ("det_frequency", "det_frequency")):
+            if actual.get(saved_key) != identity["pose"][key]:
+                mismatch.append("detector setting " + key)
+        if obs.get("edge_margin_fraction") != identity["edge_margin_fraction"]:
+            mismatch.append("detector edge margin")
+        if actual.get("rtmlib") != "0.0.15":
+            mismatch.append("detector library version")
+        if actual.get("backend") == "onnxruntime":
+            providers = actual.get("providers", [])
+            used = "cuda" if "CUDAExecutionProvider" in providers else "cpu" if "CPUExecutionProvider" in providers else None
+            if actual.get("runtime_version") != "1.22.0" or not used or used != actual.get("device_used"):
+                mismatch.append("ONNX runtime version or providers")
+            if used != identity["pose"]["device"]:
+                mismatch.append("actual inference device differs from requested device")
+        if set(identity["expected_weight_sha256"]) != {"det", "pose"}:
+            mismatch.append("set pose.weight_sha256.det and .pose to independently verified ONNX digests")
+        for part in ("det", "pose"):
+            weight = actual.get("weights", {}).get(part, {})
+            digest = weight.get("sha256", "")
+            expected = identity["expected_weight_sha256"].get(part)
+            if (not re.fullmatch(r"[0-9a-f]{64}", digest) or not weight.get("file") or not weight.get("source")
+                    or digest != expected):
+                mismatch.append(part + " weight provenance")
+    if mismatch:
+        raise ValueError(f"Incompatible or unverifiable {path.name} ({', '.join(mismatch)}). "
+                         "Regenerate from the original videos without --keypoints-from.")
+    return obs

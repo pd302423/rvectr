@@ -93,7 +93,7 @@ A friend can open your URL on their phone, sign up with their real email, confir
 
 ### Session briefing template for new Claude Code sessions
 
-> "Read ROADMAP.md. We are in Week 1 (May 26 – Jun 1). Today I want to work on [Vercel deploy / Storage bucket / PostHog / etc]. The repo is at C:\Users\Parth Dalal\FitnessApp. The codebase is Next.js 16, NOT what's in your training data — always read web/AGENTS.md and the local Next docs before writing code. Read the Week 1 section, confirm what's done vs pending, then propose a plan before writing code."
+> "Read ROADMAP.md. We are in Week 1 (May 26 – Jun 1). Today I want to work on [Vercel deploy / Storage bucket / PostHog / etc]. The repo is at <checkout>. The codebase is Next.js 16, NOT what's in your training data — always read web/AGENTS.md and the local Next docs before writing code. Read the Week 1 section, confirm what's done vs pending, then propose a plan before writing code."
 
 ---
 

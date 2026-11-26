@@ -130,9 +130,7 @@ const SAMPLE_PLACEHOLDER_ANALYSIS: AnalysisResultData = {
       consistency: 0,
       score_range: { min: 0, max: 0 },
     },
-    recommendations: [
-      "This is sample data. Upload a video and run the pipeline to see real output.",
-    ],
+    recommendations: [],
   },
   frame_analyses: Array.from({ length: 291 }, (_, i) => ({
     frame_number: i + 1,
@@ -155,7 +153,7 @@ interface BiomechanicsStore {
   currentAnalysis: AnalysisResultData | null;
   activeFrame: number;
   isPlaying: boolean;
-  activeTab: 'overview' | 'joints' | 'posture' | 'recommendations' | '3d' | 'asymmetry' | 'waveform';
+  activeTab: 'overview' | 'joints' | 'posture' | '3d' | 'asymmetry' | 'waveform';
   multiCamAngle: 'frontal' | 'sagittal' | 'diagonal' | 'grid';
   userRole: 'coach' | 'athlete';
   telestratorTool: 'none' | 'protractor' | 'ruler' | 'draw';
@@ -166,7 +164,7 @@ interface BiomechanicsStore {
   setActiveFrame: (frameIndex: number) => void;
   togglePlay: () => void;
   setPlaying: (playing: boolean) => void;
-  setActiveTab: (tab: 'overview' | 'joints' | 'posture' | 'recommendations' | '3d' | 'asymmetry' | 'waveform') => void;
+  setActiveTab: (tab: 'overview' | 'joints' | 'posture' | '3d' | 'asymmetry' | 'waveform') => void;
   setMultiCamAngle: (angle: 'frontal' | 'sagittal' | 'diagonal' | 'grid') => void;
   setUserRole: (role: 'coach' | 'athlete') => void;
   setTelestratorTool: (tool: 'none' | 'protractor' | 'ruler' | 'draw') => void;

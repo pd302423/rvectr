@@ -5,7 +5,6 @@ import { HeadlineStats } from "@/components/results/HeadlineStats";
 import { Container } from "@/components/site/Container";
 import { SectionHeading } from "@/components/site/SectionHeading";
 import { TriangulationDiagram } from "@/components/site/TriangulationDiagram";
-import { ANGLED_PHONE_BIAS_MM } from "@/lib/results/errorBudget";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 const STATUS = [
-  { label: "Software built", detail: "123 automated tests pass", dot: "bg-data" },
+  { label: "Software built", detail: "ready for pilot validation", dot: "bg-data" },
   { label: "Tested on simulated data", detail: "no real footage yet", dot: "bg-warm" },
   { label: "Pilot recording next", detail: "", dot: "border border-muted-foreground" },
 ] as const;
@@ -30,8 +29,8 @@ const STEPS = [
     body: "A printed checkerboard is shown to every phone. From it the software learns each phone's lens and where each phone stands.",
   },
   {
-    title: "Line up the clocks with a torch flash",
-    body: "A torch flash that every phone can see marks one moment in all the videos, so the frames match in time.",
+    title: "Line up the clocks with two torch flashes",
+    body: "A flash near the start and another near the end of each take are seen by every phone. The software interpolates the flash times to align clocks and estimate drift.",
   },
   {
     title: "Find the hips and combine them",
@@ -39,22 +38,22 @@ const STEPS = [
   },
   {
     title: "Measure depth and label each squat",
-    body: "Pelvis height over time gives each squat's depth. Each squat is compared with the first one, the reference squat, and labelled “reached reference”, “shallower” or “unclear”. Missing data is never filled in.",
+    body: "Pelvis height over time gives each squat's depth. Squats are compared with the explicitly selected reference repetition from the same take and labelled “reached reference”, “shallower” or “unclear”. Only short bounded observation gaps may be interpolated; missing joints are not extrapolated.",
   },
 ] as const;
 
 const LIMITS = [
   {
     lead: "No real footage yet.",
-    body: "No real two-phone video has been recorded. Every number on this site comes from a computer simulation. The pilot recording will test whether they hold.",
+    body: "No real two-phone video has been recorded. The results page uses computer-simulation output; the webcam demo and sample analysis use generated or live demo data and are not research measurements.",
   },
   {
-    lead: "Slow drift is the biggest risk.",
-    body: "A slow wobble in where the pose model puts the hip adds the most error in the simulation, far more than phone timing or phone placement.",
+    lead: "Sensitivity results depend on model settings.",
+    body: "The simulation includes independent detector drift, shared camera error and timing offsets. It does not establish how often these occur in real phone footage.",
   },
   {
-    lead: `A single angled phone reads about ${ANGLED_PHONE_BIAS_MM} mm shallow.`,
-    body: "In the simulation, one phone placed at an angle reads every squat too shallow. Comparing squats with each other still works. The absolute depth does not.",
+    lead: "One camera leaves depth ambiguous.",
+    body: "In this simulation, a front-oblique camera underestimated depth when the pelvis moved away from it during the squat. That result depends on the simulated camera placement and path; extra views still depend on good calibration and timing.",
   },
 ] as const;
 
@@ -100,8 +99,8 @@ export default function Home() {
             </h1>
             <div className="grid max-w-[65ch] gap-4 text-lg leading-relaxed text-muted-foreground">
               <p>
-                Rvectr tests whether a second and a third phone make a 3D movement measurement more accurate, whether
-                a faster movement makes it worse, and whether the extra setup is worth the effort.
+                Rvectr tests how camera count and movement pace affect simulated squat-depth estimates, and whether
+                the added setup is useful enough to justify the effort.
               </p>
               <p>The test is one number: how deep a squat goes.</p>
             </div>
@@ -174,8 +173,9 @@ export default function Home() {
             How small a change can it catch?
           </SectionHeading>
           <p className="max-w-[65ch] text-lg leading-relaxed text-muted-foreground">
-            In a computer simulation, more phones catch smaller changes in squat depth. Each extra phone helps a little
-            less than the one before.
+            In this computer simulation, the first passing tested grid value varied with camera count, noise and pace.
+            The cutoff is chosen on training sessions and checked once on held-out sessions; the cards show both counts.
+            Real recordings have not tested whether the pattern holds.
           </p>
           <HeadlineStats variant="home" />
           <p>

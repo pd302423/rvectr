@@ -50,7 +50,12 @@ export function ThreeMeshCanvas({
 
   const [meshStyle, setMeshStyle] = useState<"solid" | "wireframe">("solid");
   const [sourceType, setSourceType] = useState<"obj" | "glb">(defaultSource);
-  const [isLoadingMesh, setIsLoadingMesh] = useState(false);
+  const [loadResult, setLoadResult] = useState<{ path: string; missing: boolean } | null>(null);
+  const frameIdx = Math.min(290, Math.max(0, activeFrame));
+  const objPath = `/meshes/frame_${String(frameIdx).padStart(4, "0")}.obj`;
+  const activePath = sourceType === "glb" ? glbUrl : objPath;
+  const isLoadingMesh = loadResult?.path !== activePath && !(sourceType === "obj" && objMeshCache[frameIdx]);
+
 
   const sceneRef = useRef<THREE.Scene | null>(null);
   const mainGroupRef = useRef<THREE.Group | null>(null);
@@ -73,7 +78,13 @@ export function ThreeMeshCanvas({
     camera.position.set(2.4, 1.2, 2.4);
     camera.lookAt(0, 0.5, 0);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    } catch {
+      container.textContent = "The 3D viewer requires WebGL on this device.";
+      return;
+    }
     renderer.setSize(width, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
@@ -158,11 +169,12 @@ export function ThreeMeshCanvas({
       return;
     }
 
-    setIsLoadingMesh(true);
+    let active = true;
     const loader = new GLTFLoader();
     loader.load(
       glbUrl,
       (gltf) => {
+        if (!active) return;
         const model = gltf.scene;
         model.traverse((child) => {
           if ((child as THREE.Mesh).isMesh) {
@@ -188,14 +200,14 @@ export function ThreeMeshCanvas({
         loadedGlbSceneRef.current = model;
         mainGroup.add(model);
         currentMeshRef.current = model;
-        setIsLoadingMesh(false);
+        setLoadResult({ path: glbUrl, missing: false });
       },
       undefined,
-      (err) => {
-        console.error("GLB load error:", err);
-        setIsLoadingMesh(false);
+      () => {
+        if (active) setLoadResult({ path: glbUrl, missing: true });
       }
     );
+    return () => { active = false; };
   }, [sourceType, glbUrl, meshStyle]);
 
   // Synchronize GLB animation mixer with activeFrame
@@ -212,9 +224,7 @@ export function ThreeMeshCanvas({
     const mainGroup = mainGroupRef.current;
     const mat = getMeshMaterial(meshStyle);
 
-    const frameIdx = Math.min(290, Math.max(0, activeFrame));
-    const frameStr = String(frameIdx).padStart(4, "0");
-    const objPath = `/meshes/frame_${frameStr}.obj`;
+    let active = true;
 
     if (objMeshCache[frameIdx]) {
       const cachedObj = objMeshCache[frameIdx];
@@ -230,11 +240,11 @@ export function ThreeMeshCanvas({
       mainGroup.add(cachedObj);
       currentMeshRef.current = cachedObj;
     } else {
-      setIsLoadingMesh(true);
       const loader = new OBJLoader();
       loader.load(
         objPath,
         (obj) => {
+          if (!active) return;
           obj.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
               const mesh = child as THREE.Mesh;
@@ -252,15 +262,16 @@ export function ThreeMeshCanvas({
           }
           mainGroup.add(obj);
           currentMeshRef.current = obj;
-          setIsLoadingMesh(false);
+          setLoadResult({ path: objPath, missing: false });
         },
         undefined,
         () => {
-          setIsLoadingMesh(false);
+          if (active) setLoadResult({ path: objPath, missing: true });
         }
       );
     }
-  }, [activeFrame, meshStyle, sourceType]);
+    return () => { active = false; };
+  }, [objPath, frameIdx, meshStyle, sourceType]);
 
   return (
     <div className="relative rounded-none border border-[#262626] bg-[#000000] overflow-hidden flex flex-col shadow-2xl font-mono">
@@ -268,12 +279,12 @@ export function ThreeMeshCanvas({
       <div className="p-3 border-b border-[#262626] bg-[#0a0a0a] flex flex-wrap items-center justify-between gap-2 z-10">
         <div className="flex items-center gap-2 text-xs text-[#ffffff]">
           <Box className="h-4 w-4 text-[#ffffff]" />
-          <span className="font-bold uppercase tracking-widest">EASYMOCAP 6,890-VERTEX 3D MESH VIEWPORT</span>
+          <span className="font-bold uppercase tracking-widest">Sample mesh viewer</span>
           {isLoadingMesh && <RefreshCw className="h-3 w-3 text-[#a3a3a3] animate-spin ml-2" />}
         </div>
 
         {/* Viewport Source & Material Controls */}
-        <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex flex-wrap items-center gap-2 text-[10px]">
           {/* Mesh Source Mode Switcher */}
           <div className="flex items-center gap-1 bg-[#000000] border border-[#262626] p-1">
             <button
@@ -290,7 +301,7 @@ export function ThreeMeshCanvas({
                   : "text-[#a3a3a3] hover:text-[#ffffff] hover:bg-[#171717]"
               }`}
             >
-              Animated GLB (.blend)
+              Animated GLB
             </button>
             <button
               onClick={() => {
@@ -332,6 +343,9 @@ export function ThreeMeshCanvas({
         </div>
       </div>
 
+      {loadResult?.path === activePath && loadResult.missing && (
+        <p role="status" className="p-3 text-sm">This sample mesh is unavailable in this copy.</p>
+      )}
       {/* Three.js Rendering Container */}
       <div ref={mountRef} style={{ height }} className="w-full cursor-grab active:cursor-grabbing relative" />
 

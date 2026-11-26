@@ -27,7 +27,7 @@ def inspect_environment(require_cuda=False):
             'models':{'SMPL_NEUTRAL.pkl':(paths.models/'smpl'/'SMPL_NEUTRAL.pkl').is_file() or
                                            (paths.models/'SMPL_NEUTRAL.pkl').is_file()},
             'packages':{},'cuda':{'available':False,'operation_verified':False}}
-    for name in ['numpy','opencv-contrib-python-headless','smplx','torch','onnxruntime-gpu','rtmlib']:
+    for name in ['numpy','opencv-contrib-python-headless','smplx','torch','onnxruntime','onnxruntime-gpu','rtmlib']:
         try: result['packages'][name]=importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError: result['packages'][name]=None
     try:

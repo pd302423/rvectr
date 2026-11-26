@@ -1,0 +1,6 @@
+annotation_id,start_s,bottom_s,end_s,role,label,target_height_m,marker_depth_m,marker_uncertainty_m,reader,reader_uncertainty_s,reader_uncertainty_m
+reference,8.0,9.2,10.5,reference,match,0,,,,,
+test_01,13.0,14.1,15.4,test,match,0,,,,,
+test_02,18.1,19.4,20.7,test,shallow,0.04,,,,,
+test_03,24.0,25.2,26.4,test,rejected,0.04,,,,,
+test_04,30.2,31.5,32.8,test,unscorable,0.06,,,,,

@@ -16,8 +16,8 @@ from pathlib import Path
 
 import numpy as np
 
-from . import flashsync, oneview, pose2d, squat
-from .configuration import load_camera_calibration
+from . import experiment, flashsync, oneview, pose2d, squat
+from .configuration import load_camera_calibration, load_capture_config
 from .geometry import triangulate_points
 from .kinematics import JOINT_NAMES
 from .media import probe
@@ -26,24 +26,19 @@ from .sync import interpolate_observations
 
 DEFAULTS = {
     "sync": {"method": "flash", "start_window_s": 10.0, "end_window_s": 10.0, "roi": {}},
-    "pose": {"mode": "balanced", "device": "cuda", "backend": "onnxruntime", "stride": 1, "det_frequency": 5},
+    "pose": {"mode": "balanced", "device": "cpu", "backend": "onnxruntime", "stride": 1, "det_frequency": 5},
     "triangulation": {"min_confidence": 0.3, "max_reprojection_px": 10.0, "min_ray_angle_deg": 3.0},
     "squat": {"standing_window_s": None, "reference_rep": 1, "tolerance_m": 0.03, "filter_frames": 5,
               "min_rep_depth_m": 0.06, "min_coverage": 0.85, "borderline_m": 0.01, "primary": "raw",
               "estimator": "parabola"},
     "views": {"compare": True, "standing_point_m": None, "hip_line": None},
+    "experiment": {"annotations": None, "match_window_s": 0.5, "tolerance_m": 0.03, "borderline_m": 0.01},
 }
 
 
 def load_session(path):
     path = Path(path)
-    config = json.loads(path.read_text(encoding="utf-8-sig"))
-    cameras = config.get("cameras", [])
-    if len(cameras) < 2:
-        raise ValueError("A session needs at least two cameras")
-    ids = [c.get("id") for c in cameras]
-    if len(set(ids)) != len(ids) or not all(ids) or not all(c.get("video") for c in cameras):
-        raise ValueError("Each camera needs a unique id and a video")
+    config = load_capture_config(path)
     for section, values in DEFAULTS.items():
         config[section] = {**values, **(config.get(section) or {})}
     if config["squat"]["primary"] not in ("raw", "filtered"):
@@ -56,6 +51,14 @@ def load_session(path):
     for key in ("standing_point_m", "hip_line"):
         if views[key] is not None and (np.shape(views[key]) != (3,) or not np.isfinite(views[key]).all()):
             raise ValueError(f"views.{key} must be three numbers in the calibration frame")
+    experiment_settings = config["experiment"]
+    if experiment_settings["annotations"]:
+        annotations_path = Path(experiment_settings["annotations"])
+        if not annotations_path.is_absolute():
+            annotations_path = path.resolve().parent / annotations_path
+        experiment_settings["annotations"] = str(annotations_path.resolve())
+    if experiment_settings["match_window_s"] <= 0 or experiment_settings["tolerance_m"] < 0 or experiment_settings["borderline_m"] < 0:
+        raise ValueError("experiment.match_window_s must be positive and experiment tolerances non-negative")
     config["_path"] = str(path.resolve())
     return config
 
@@ -101,10 +104,10 @@ def reconstruct_sequence(observations, cameras, syncs, min_confidence=0.3, max_r
             "reason_counts": reasons, "views_xy": views_xy, "views_score": views_score}
 
 
-def measure_squats(times, xyz, valid, up, settings):
+def measure_squats(times, xyz, valid, up, settings, annotations=None, experiment_settings=None):
     settings = {**DEFAULTS["squat"], **settings}
     pelvis_raw = squat.pelvis_track(xyz, valid)
-    pelvis_filtered = squat.smooth(pelvis_raw, settings["filter_frames"])
+    pelvis_filtered = squat.smooth(pelvis_raw, settings["filter_frames"], times=times)
     traces = {"raw": squat.height(pelvis_raw, up), "filtered": squat.height(pelvis_filtered, up)}
     window = settings.get("standing_window_s")
     jitter, standing = {}, None
@@ -118,7 +121,22 @@ def measure_squats(times, xyz, valid, up, settings):
         found, level = squat.segment_reps(times, h, standing=standing, min_depth_m=settings["min_rep_depth_m"],
                                       estimator=settings["estimator"])
         entry = {"standing_level_m": level, "reps": found, "classification": None, "error": None}
-        if found:
+        if annotations is not None:
+            policy = experiment_settings or DEFAULTS["experiment"]
+            scored = experiment.score_condition(annotations, found, policy["match_window_s"], policy["tolerance_m"],
+                                                policy["borderline_m"], settings["min_coverage"])
+            detected = scored["detections"]
+            entry.update(reps=detected, agreement=scored["summary"], attempts=scored["rows"])
+            reference = next((rep for rep in detected if rep.get("is_reference") and rep.get("quality_valid")
+                              and rep.get("outcome") != "unclear"), None)
+            if reference is None:
+                entry["error"] = "Intended reference missed or rejected; no reference-relative decisions"
+            else:
+                entry["classification"] = {**scored["summary"]["decision_rule"],
+                                           "reference_rep": reference["rep"], "reference_annotation_id": reference["annotation_id"],
+                                           "reference_depth_m": reference["depth_m"],
+                                           "pass_line_m": reference["depth_m"] - policy["tolerance_m"]}
+        elif found:
             try:
                 classified, rule = squat.classify(found, settings["reference_rep"], settings["tolerance_m"],
                                                   settings["min_coverage"], settings["borderline_m"])
@@ -232,17 +250,22 @@ def _measure_condition(times, xyz, valid, up, settings, reference_reps):
     """Same squat settings as the main result; reps are renumbered to match the all-cameras reps."""
     pelvis = squat.pelvis_track(xyz, valid)
     if settings["primary"] == "filtered":
-        pelvis = squat.smooth(pelvis, settings["filter_frames"])
+        pelvis = squat.smooth(pelvis, settings["filter_frames"], times=times)
     trace = squat.height(pelvis, up)
     window = settings.get("standing_window_s")
     jitter = squat.jitter(times, pelvis, window, up) if window else {}
     standing = _standing_level(times, squat.height(squat.pelvis_track(xyz, valid), up), window)
     found, _ = squat.segment_reps(times, trace, standing=standing, min_depth_m=settings["min_rep_depth_m"],
                                   estimator=settings["estimator"])
-    matched, extra = _match_reps(reference_reps, found)
-    reps = [{**found[fi], "rep": reference_reps[ri]["rep"]} for ri, fi in sorted(matched.items())]
+    matched, extra = _match_reps(reference_reps, found) if reference_reps else ({}, 0)
+    if reference_reps:
+        reps = [{**found[fi], "rep": reference_reps[ri]["rep"]} for ri, fi in sorted(matched.items())]
+    else:
+        reps = [{**rep, "rep": index + 1} for index, rep in enumerate(found)]
     error, rule = None, None
     try:
+        if not reference_reps:
+            raise ValueError("No all-view reference reps; independent annotation scoring is required")
         reps, rule = squat.classify(reps, settings["reference_rep"], settings["tolerance_m"],
                                     settings["min_coverage"], settings["borderline_m"])
     except ValueError as problem:   # for example the reference rep was not seen in this condition
@@ -269,28 +292,34 @@ def _pair_conditions(observations, cameras, syncs, config, frame_periods):
             chosen = [observations[i] for i in pair]
             chosen_syncs = [{"offset_s": 0.0, "drift_rate": 0.0, "anchor_s": 0.0}] + \
                            [_sync_between(syncs[first], syncs[i]) for i in pair[1:]]
-            seq = reconstruct_sequence(chosen, [cameras[i] for i in pair], chosen_syncs, t["min_confidence"],
-                                       t["max_reprojection_px"], t["min_ray_angle_deg"],
-                                       [frame_periods[i] for i in pair],
-                                       joints=[squat.LEFT_HIP, squat.RIGHT_HIP])
             label = "+".join(ids[i] for i in pair)
-            conditions.append({"name": f"two views ({label})", "cameras": [ids[i] for i in pair],
-                               "model": "triangulation", "times": flashsync.to_reference(seq["times_s"], syncs[first]),
-                               "xyz": seq["xyz"], "valid": seq["valid"],
-                               "assumption": f"Triangulates with only {label}; no assumption about where the person moves."})
+            try:
+                seq = reconstruct_sequence(chosen, [cameras[i] for i in pair], chosen_syncs, t["min_confidence"],
+                                           t["max_reprojection_px"], t["min_ray_angle_deg"],
+                                           [frame_periods[i] for i in pair],
+                                           joints=[squat.LEFT_HIP, squat.RIGHT_HIP])
+                conditions.append({"name": f"two views ({label})", "cameras": [ids[i] for i in pair],
+                                   "model": "triangulation", "times": flashsync.to_reference(seq["times_s"], syncs[first]),
+                                   "xyz": seq["xyz"], "valid": seq["valid"],
+                                   "assumption": f"Triangulates with only {label}; no assumption about where the person moves."})
+            except Exception as error:
+                conditions.append({"name": f"two views ({label})", "cameras": [ids[i] for i in pair],
+                                   "model": "triangulation", "error": str(error),
+                                   "assumption": f"Triangulates with only {label}; no assumption about where the person moves."})
     return conditions
 
 
 ONE_VIEW_ASSUMPTION = {
     "fixed_distance": "Assumes the person stays the same distance from this camera and moves only up and down "
                       "in a plane facing it; a step towards or away from the camera makes the depth read too long or short.",
-    "movement_plane": "Assumes the person moves only forwards, backwards, up and down in the vertical plane along "
+    "movement_plane": "Assumes the person moves only forwards, backwards, up and down in the vertical plane perpendicular to "
                       "the hip line through the standing spot; a sideways shift is misread.",
 }
 KIND_NAME = {"fixed_distance": "fixed distance", "movement_plane": "movement plane"}
 
 
-def compare_views(observations, cameras, syncs, up, config, sequence, result, frame_periods=None, run=None):
+def compare_views(observations, cameras, syncs, up, config, sequence, result, frame_periods=None, run=None,
+                 annotations=None):
     """Measure the same recording with one camera, every pair of cameras, and all cameras together.
 
     observations/cameras/syncs: as for reconstruct_sequence (camera 0 is the reference clock).
@@ -302,12 +331,15 @@ def compare_views(observations, cameras, syncs, up, config, sequence, result, fr
     ids = [c["id"] for c in config["cameras"]]
     frame_periods = frame_periods or [float(np.median(np.diff(o["times_s"]))) for o in observations]
     primary = result["reps"][settings["primary"]]
-    reference_reps = primary["reps"]
-    if not reference_reps or not primary["classification"]:
+    reference_reps = primary["reps"] if annotations is None else []
+    if annotations is None and (not reference_reps or not primary["classification"]):
         raise ValueError("The all-cameras measurement has no classified reps to compare against")
-    all_by_rep = {r["rep"]: r for r in reference_reps}
 
-    point, hip_line, plane_source = _standing_plane_inputs(config, sequence, result, up)
+    plane_error = None
+    try:
+        point, hip_line, plane_source = _standing_plane_inputs(config, sequence, result, up)
+    except Exception as error:
+        point, hip_line, plane_source, plane_error = None, None, "unavailable", str(error)
     borrowed = (" The plane was set from the multi-view standing position, so this condition borrows set-up "
                 "information from the other cameras." if plane_source == "multiview_standing" else "")
     conditions = []
@@ -316,23 +348,41 @@ def compare_views(observations, cameras, syncs, up, config, sequence, result, fr
         obs = observations[index]
         times = flashsync.to_reference(obs["times_s"], syncs[index])   # own frames, on the reference timeline
         for kind in ("fixed_distance", "movement_plane"):
-            plane_point, normal = oneview.movement_plane(kind, point, up, centre, hip_line)
-            xyz, valid = oneview.reconstruct_one_view(obs["keypoints"], obs["scores"], cameras[index], plane_point,
-                                                      normal, config["triangulation"]["min_confidence"])
-            conditions.append({"name": f"one view, {KIND_NAME[kind]} ({camera_id})", "cameras": [camera_id],
-                               "model": kind, "times": times, "xyz": xyz, "valid": valid,
-                               "assumption": ONE_VIEW_ASSUMPTION[kind] + borrowed})
+            try:
+                if plane_error:
+                    raise ValueError(plane_error)
+                plane_point, normal = oneview.movement_plane(kind, point, up, centre, hip_line)
+                xyz, valid = oneview.reconstruct_one_view(obs["keypoints"], obs["scores"], cameras[index], plane_point,
+                                                          normal, config["triangulation"]["min_confidence"])
+                conditions.append({"name": f"one view, {KIND_NAME[kind]} ({camera_id})", "cameras": [camera_id],
+                                   "model": kind, "times": times, "xyz": xyz, "valid": valid,
+                                   "assumption": ONE_VIEW_ASSUMPTION[kind] + borrowed})
+            except Exception as error:
+                conditions.append({"name": f"one view, {KIND_NAME[kind]} ({camera_id})", "cameras": [camera_id],
+                                   "model": kind, "error": str(error),
+                                   "assumption": ONE_VIEW_ASSUMPTION[kind] + borrowed})
     conditions += _pair_conditions(observations, cameras, syncs, config, frame_periods)
 
-    rows, summary = [], {}
+    rows, summary, experiment_rows, experiment_conditions = [], {}, [], {}
     everything = [{"name": "all views (" + "+".join(ids) + ")", "cameras": ids, "model": "triangulation",
                    "assumption": "Triangulates with every camera (the main result): no assumption about where the person moves."}]
     for cond in conditions + everything:
-        if "xyz" in cond:
-            measured = _measure_condition(cond["times"], cond["xyz"], cond["valid"], up, settings, reference_reps)
-        else:   # all cameras: the main result itself
-            measured = {"reps": reference_reps, "extra_reps": 0, "rule": primary["classification"], "error": None,
-                        "jitter": result["jitter"].get(settings["primary"]) or {}}
+        try:
+            if cond.get("error"):
+                raise ValueError(cond["error"])
+            if "xyz" in cond:
+                measured = _measure_condition(cond["times"], cond["xyz"], cond["valid"], up,
+                                              settings, reference_reps)
+            elif annotations is not None:
+                measured = _measure_condition(sequence["times_s"], sequence["xyz"], sequence["valid"], up,
+                                              settings, reference_reps)
+            else:   # all cameras: the main result itself
+                measured = {"reps": reference_reps, "extra_reps": 0, "rule": primary["classification"], "error": None,
+                            "jitter": result["jitter"].get(settings["primary"]) or {}}
+            condition_error = None
+        except Exception as error:
+            condition_error = str(error)
+            measured = {"reps": [], "extra_reps": 0, "rule": None, "error": condition_error, "jitter": {}}
         by_rep = {r["rep"]: r for r in measured["reps"]}
         diffs_depth, diffs_reference = [], []
         for ref in reference_reps:
@@ -343,9 +393,12 @@ def compare_views(observations, cameras, syncs, up, config, sequence, result, fr
                 row["outcome"] = "not_found"
             else:
                 gap = rep["depth_m"] - ref["depth_m"]
-                diffs_depth.append(gap)
+                accepted = (not ref.get("is_reference") and rep.get("outcome") in ("reached_reference", "shallower")
+                            and ref.get("outcome") in ("reached_reference", "shallower"))
+                if accepted:
+                    diffs_depth.append(gap)
                 reference_gap = rep.get("difference_from_reference_m")
-                if reference_gap is not None and not ref.get("is_reference"):
+                if accepted and reference_gap is not None:
                     diffs_reference.append(reference_gap - ref["difference_from_reference_m"])
                 row.update(depth_m=rep["depth_m"], depth_se_m=rep.get("depth_se_m"),
                            difference_from_reference_m=reference_gap, difference_se_m=rep.get("difference_se_m"),
@@ -364,29 +417,82 @@ def compare_views(observations, cameras, syncs, up, config, sequence, result, fr
             "difference_from_reference_minus_all_views_m": {"mean": _mean(diffs_reference), "sd": _sd(diffs_reference),
                                                             "n": len(diffs_reference)},
             "classification_error": measured["error"]}
+        if annotations is not None:
+            scored = experiment.score_condition(annotations, measured["reps"],
+                                                config["experiment"]["match_window_s"],
+                                                config["experiment"]["tolerance_m"],
+                                                config["experiment"]["borderline_m"],
+                                                config["squat"]["min_coverage"])
+            experiment_conditions[cond["name"]] = {"cameras": cond["cameras"], "model": cond["model"],
+                                                     "status": "failed" if condition_error else "scored",
+                                                     "plane_source": summary[cond["name"]]["plane_source"],
+                                                     "assumes": cond["assumption"],
+                                                     "error": condition_error,
+                                                     **scored["summary"]}
+            experiment_rows.extend({"condition": cond["name"], "cameras": "+".join(cond["cameras"]),
+                                    "model": cond["model"], **row} for row in scored["rows"])
     info = {"plane_source": plane_source, "standing_point_m": point, "hip_line": hip_line,
             "reference_rep": settings["reference_rep"], "trace": settings["primary"],
             "conditions": summary, "rows": rows,
-            "note": ("With multiview_standing the one-camera conditions borrow the standing spot and hip line from "
+            "note": ("The one-camera setup could not be placed: " + plane_error) if plane_error else
+                     ("With multiview_standing the one-camera conditions borrow the standing spot and hip line from "
                      "the multi-view result, so they are not fully independent of the other cameras. Give "
                      "views.standing_point_m and views.hip_line (measured on the floor) to avoid that.")
             if plane_source == "multiview_standing" else "Planes were set from measured values in the config."}
+    if annotations is not None:
+        reference_id = next(a["annotation_id"] for a in annotations if a["role"] == "reference")
+        info["reference_source"] = {"kind": "independent_same_take_annotation", "annotation_id": reference_id,
+                                    "file": config["experiment"]["annotations"], "take": config.get("take")}
+        info["experiment"] = {"annotations_file": config["experiment"]["annotations"],
+                               "reference_source": info["reference_source"],
+                               "conditions": experiment_conditions, "rows": experiment_rows,
+                               "note": "All conditions use the same independent timed annotations; the detected reference repetition anchors each condition's own classifications."}
+    if annotations is not None:
+        numbers = {a["annotation_id"]: i for i, a in enumerate(annotations, 1)}
+        info["annotation_ids"] = list(numbers)
+        info["reference_rep"] = reference_id
+        info["rows"] = [{**row, "rep": numbers.get(row["annotation_id"]),
+                         "outcome": row.get("model_outcome") or row["status"]} for row in experiment_rows]
+        for name, condition in info["conditions"].items():
+            scored = experiment_conditions[name]
+            condition.update(reps_expected=len(annotations), extra_reps_not_matched=scored["counts"]["extra"],
+                             unclear=scored["counts"]["model_unclear"], classification_error=scored["error"],
+                             reference_annotation_id=info["reference_rep"],
+                             continuous_depth_error_m=scored["continuous_depth_error_m"],
+                             counts=scored["counts"])
+    else:
+        info["reference_source"] = {"kind": "legacy_detection_index", "rep": settings["reference_rep"],
+                                    "take": config.get("take")}
     if run is not None:
         _write_views(Path(run), info)
     return info
 
 
+def _csv_value(value):
+    if isinstance(value, (float, np.floating)) and not np.isfinite(value):
+        return ""
+    return value
+
+
 def _write_views(run, info):
-    def text(value):
-        if value is None or (isinstance(value, float) and not np.isfinite(value)):
-            return ""
-        return f"{value:.5f}" if isinstance(value, float) else value
     with (run / "views_comparison.csv").open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=VIEW_COLUMNS, extrasaction="ignore")
+        fields = list(VIEW_COLUMNS)
+        if info.get("annotation_ids"):
+            fields += sorted({k for row in info["rows"] for k in row} - set(fields))
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         for row in info["rows"]:
-            writer.writerow({k: text(v) for k, v in row.items()})
-    write_json(run / "views_summary.json", {k: v for k, v in info.items() if k != "rows"})
+            writer.writerow({k: _csv_value(v) for k, v in row.items()})
+    write_json(run / "views_summary.json", {k: v for k, v in info.items() if k not in ("rows", "experiment")})
+    if info.get("experiment"):
+        experiment_info = info["experiment"]
+        write_json(run / "views_experiment.json", {k: v for k, v in experiment_info.items() if k != "rows"})
+        with (run / "views_experiment.csv").open("w", newline="", encoding="utf-8") as stream:
+            fields = sorted({key for row in experiment_info["rows"] for key in row})
+            writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore")
+            writer.writeheader()
+            for row in experiment_info["rows"]:
+                writer.writerow({k: _csv_value(v) for k, v in row.items()})
     _plot_views(run / "views_depth.png", info)
 
 
@@ -399,15 +505,24 @@ def _plot_views(path, info):
     colors, markers = plt.get_cmap("tab10").colors, "osD^v<>PXh"
     width = 0.8 / max(len(names), 1)
     for k, name in enumerate(names):
-        rows = [r for r in info["rows"] if r["condition"] == name and r.get("depth_m") is not None]
+        rows = [r for r in info["rows"] if r["condition"] == name and r.get("depth_m") is not None and r.get("rep") is not None]
         x = np.array([r["rep"] for r in rows], float) - 0.4 + width * (k + 0.5)
         depth = np.array([r["depth_m"] for r in rows]) * 100
         error = np.array([r["depth_se_m"] if r.get("depth_se_m") is not None else np.nan for r in rows]) * 100
-        axis.errorbar(x, depth, yerr=np.where(np.isfinite(error), error, 0), fmt=markers[k % len(markers)],
-                      color=colors[k % len(colors)], ms=5, capsize=2, lw=1, label=name)
-    axis.set_xlabel("repetition (numbered as in the all-cameras result)")
+        colour = colors[k % len(colors)]
+        axis.plot(x, depth, markers[k % len(markers)], color=colour, ms=5, label=name)
+        known = np.isfinite(error)
+        if known.any():
+            axis.errorbar(x[known], depth[known], yerr=error[known], fmt="none", ecolor=colour, capsize=2)
+
+    if "annotation_ids" in info:
+        axis.set_xticks(np.arange(1, len(info["annotation_ids"])+1), info["annotation_ids"], rotation=25)
+        axis.set_xlabel("Independent attempt ID (empty slot = no detected depth)")
+    else:
+        axis.set_xlabel("Repetition in all-camera reconstruction (legacy diagnostic)")
+
     axis.set_ylabel("depth (cm)")
-    axis.set_title(f"Squat depth by number of views (bars: plus-or-minus; planes: {info['plane_source']})")
+    axis.set_title(f"Squat depth by number of views (bars show known standard errors only; planes: {info['plane_source']})")
     axis.legend(fontsize=7, ncol=2)
     axis.grid(alpha=0.3)
     figure.tight_layout()
@@ -415,17 +530,21 @@ def _plot_views(path, info):
     plt.close(figure)
 
 
-def _run_views_comparison(run, config, observations, cameras, syncs, up, sequence, result, metadata, report, progress):
+def _run_views_comparison(run, config, observations, cameras, syncs, up, sequence, result, metadata, report, progress, annotations=None):
     """Run the comparison without ever losing the main result; record any error in the report."""
     try:
         periods = [1 / m["median_fps"] * config["pose"]["stride"] for m in metadata]
-        info = compare_views(observations, cameras, syncs, up, config, sequence, result, periods, run=run)
+        info = compare_views(observations, cameras, syncs, up, config, sequence, result, periods, run=run,
+                             annotations=annotations)
         report["views"] = {"status": "done", "plane_source": info["plane_source"],
-                           "files": ["views_comparison.csv", "views_summary.json", "views_depth.png"],
+                           "files": ["views_comparison.csv", "views_summary.json", "views_depth.png"]
+                                    + (["views_experiment.csv", "views_experiment.json"] if annotations else []),
                            "conditions": {name: {"reps_found": c["reps_found"], "unclear": c["unclear"],
                                                  "mean_depth_minus_all_views_m": c["depth_minus_all_views_m"]["mean"],
                                                  "sd_depth_minus_all_views_m": c["depth_minus_all_views_m"]["sd"]}
-                                          for name, c in info["conditions"].items()}}
+                                          for name, c in info["conditions"].items()},
+                           **({"experiment": {name: c for name, c in info["experiment"]["conditions"].items()}}
+                              if annotations else {})}
     except Exception as error:
         progress(f"Views comparison failed (main result kept): {error}")
         (run / "views_error.txt").write_text(traceback.format_exc(), encoding="utf-8")
@@ -461,7 +580,8 @@ def _sync(config, video_paths, metadata, run):
         record = {"method": "manual", "alignments": syncs}
     elif settings["method"] == "flash":
         rois = [settings["roi"].get(c["id"]) for c in config["cameras"]]
-        record = flashsync.synchronize(video_paths, settings["start_window_s"], settings["end_window_s"], rois)
+        record = flashsync.synchronize(video_paths, settings["start_window_s"], settings["end_window_s"], rois,
+                                       [settings.get("exposures", {}).get(c["id"]) for c in config["cameras"]])
         syncs = record["alignments"]
         _plot_sync(record, [c["id"] for c in config["cameras"]], run / "sync" / "brightness.png")
     else:
@@ -470,6 +590,9 @@ def _sync(config, video_paths, metadata, run):
     failed = [a for a in syncs if a["status"] == "failed"]
     if failed:
         raise RuntimeError("Synchronization failed: " + "; ".join(a.get("reason", "") for a in failed))
+    scoring_pilot = bool(config.get("experiment", {}).get("annotations"))
+    if (settings.get("require_end") or scoring_pilot) and not all(a.get("drift_checked") for a in syncs[1:]):
+        raise ValueError("The speed comparison requires one usable start and end flash per camera; inspect sync.json")
     return syncs
 
 
@@ -478,41 +601,69 @@ def _detect(config, video_paths, metadata, run, keypoints_from=None, progress=pr
     detector = None
     for camera, path, info in zip(config["cameras"], video_paths, metadata):
         target = run / "keypoints2d" / f"{camera['id']}.npz"
+        identity = pose2d.cache_identity(camera["id"], info["sha256"], info, config["pose"])
         if keypoints_from:
             source = Path(keypoints_from) / "keypoints2d" / f"{camera['id']}.npz"
-            observation = pose2d.load(source)
+            observation = pose2d.verified_cache(source, identity, info)
             observation["reused_from"] = str(source)
         else:
+            if identity["detector"] != pose2d.RTMLibDetector.name:
+                raise ValueError("Live detection requires the RTMLib detector")
             if detector is None:
                 p = config["pose"]
                 detector = pose2d.RTMLibDetector(p["mode"], p["device"], p["backend"], p["det_frequency"])
+            detector.model.reset()  # tracking state belongs to one camera only
             total = info["frame_count"]
 
             def report(index, stamp, cam=camera["id"]):
                 if index % 120 == 0:
                     progress(f"  {cam}: frame {index}/{total}")
-            observation = pose2d.detect_video(path, info, detector, stride=config["pose"]["stride"], progress=report)
+            observation = pose2d.detect_video(path, info, detector, stride=config["pose"]["stride"], progress=report,
+                                               edge_margin_fraction=identity["edge_margin_fraction"])
+            weights = observation["detector_settings"]["weights"]
+            if any(weights[key]["sha256"] != value for key, value in identity["expected_weight_sha256"].items()):
+                raise ValueError("Detector weights differ from the expected hashes for the requested pose settings")
+            observation["source_identity"] = identity
         pose2d.save(target, observation)
         observations.append(observation)
     return observations
 
 
-def run_session(config_path, paths, output_root=None, keypoints_from=None, progress=print):
-    config = load_session(config_path)
+def run_session(config_path, paths, output_root=None, keypoints_from=None, progress=print, annotations_override=None):
     run = allocate_run(output_root or paths.outputs)
+    config_path = Path(config_path).expanduser().resolve()
+    try:
+        config_digest = sha256(config_path) if config_path.is_file() else None
+    except OSError:
+        config_digest = None
     manifest = {"schema_version": 1, "run_id": run.name, "created_utc": utc_now(), "status": "running",
-                "mode": "two_camera_squat", "accuracy_validated": False, "config": config,
+                "mode": "two_camera_squat", "accuracy_validated": False,
+                "config_attempt": {"path": str(config_path),
+                                   "sha256": config_digest},
                 "python": sys.version, "platform": platform.platform(), "inputs": [],
                 "source_sha256": {p.name: sha256(p) for p in sorted(Path(__file__).parent.glob("*.py"))}}
     write_json(run / "manifest.json", manifest)
+    config = None
+    annotations = None
     try:
+        config = load_session(config_path)
+        if annotations_override is not None:
+            config["experiment"]["annotations"] = str(Path(annotations_override).expanduser().resolve())
+        manifest["config"] = config
+        manifest["annotations_attempt"] = config["experiment"]["annotations"]
+        write_json(run / "manifest.json", manifest)
+        annotation_path = config["experiment"]["annotations"]
+        if annotation_path:
+            annotations = experiment.load_annotations(annotation_path)
+            manifest["annotation_sha256"] = sha256(annotation_path)
         video_paths = [paths.video(c["video"]) for c in config["cameras"]]
         metadata = []
         for camera, path in zip(config["cameras"], video_paths):
             progress(f"Reading {camera['id']}: {path}")
             info = probe(path)
+            info["sha256"] = sha256(path)
             metadata.append(info)
-            manifest["inputs"].append({"camera": camera["id"], "path": str(path), "sha256": sha256(path),
+            manifest["inputs"].append({"camera": camera["id"], "path": str(path), "sha256": info["sha256"],
                                        "image_size": info["image_size"], "median_fps": info["median_fps"],
                                        "frame_count": info["frame_count"]})
         write_json(run / "manifest.json", manifest)
@@ -530,15 +681,30 @@ def run_session(config_path, paths, output_root=None, keypoints_from=None, progr
                             valid=sequence["valid"], reprojection_px=sequence["reprojection_px"],
                             joint_names=np.array(JOINT_NAMES))
         progress("Measuring squat depth")
-        result = measure_squats(sequence["times_s"], sequence["xyz"], sequence["valid"], up, config["squat"])
+        result = measure_squats(sequence["times_s"], sequence["xyz"], sequence["valid"], up, config["squat"],
+                                annotations, config["experiment"])
+        # Keep legacy labels for audit, but never score them against automatic
+        # rep numbers: dropped/extra detections make that comparison ambiguous.
         labels = _labels(config)
-        report = _report(run, config, metadata, syncs, sequence, result, labels, up)
+        report = _report(run, config, metadata, syncs, sequence, result, labels, up, observations)
+        if annotations is not None:
+            primary = result["reps"][result["primary"]]
+            name = "all views (" + "+".join(c["id"] for c in config["cameras"]) + ")"
+            report["experiment"] = {name: {"model": "triangulation",
+                                          "status": primary["agreement"]["reference_status"],
+                                          "cameras": [c["id"] for c in config["cameras"]],
+                                          **primary["agreement"]}}
+            report["scoring"] = {"source": "independent_timed_annotations",
+                                 "annotations_file": config["experiment"]["annotations"],
+                                 "annotations_sha256": manifest["annotation_sha256"],
+                                 "primary_condition": name, "legacy_rep_number_labels_used": False}
         _write_tables(run, sequence, result)
         _plot_trace(run / "depth_trace.png", sequence["times_s"], result, config)
         if config["views"]["compare"]:
             progress("Comparing numbers of camera views")
             _run_views_comparison(run, config, observations, cameras, syncs, up, sequence, result, metadata,
-                                  report, progress)
+                                  report, progress, annotations)
+        write_json(run / "report.json", report)
         manifest.update(status=report["status"], completed_utc=utc_now())
         write_json(run / "manifest.json", manifest)
         progress(f"Saved {run}: {report['status']}")
@@ -546,7 +712,55 @@ def run_session(config_path, paths, output_root=None, keypoints_from=None, progr
     except Exception as error:
         manifest.update(status="failed", completed_utc=utc_now(), error=str(error))
         write_json(run / "manifest.json", manifest)
-        (run / "error.txt").write_text(traceback.format_exc(), encoding="utf-8")
+        trace = traceback.format_exc()
+        (run / "error.txt").write_text(trace, encoding="utf-8")
+        if (run / "report.json").exists():
+            try:
+                report = json.loads((run / "report.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                report = {"run_id": run.name, "accuracy_validated": False}
+            report.update(status="failed", pipeline_failure=str(error), traceback_file="error.txt")
+        else:
+            report = {"run_id": run.name, "status": "failed", "accuracy_validated": False,
+                      "stage": "configuration" if config is None else "analysis",
+                      "error": str(error), "traceback_file": "error.txt",
+                      "config_path": str(config_path), "config_sha256": manifest["config_attempt"]["sha256"]}
+            report["reference_source"] = {"kind": "unavailable", "reason": "failed before resolving reference"}
+            if config is not None and not config["experiment"]["annotations"]:
+                report["reference_source"] = {"kind": "legacy_detection_index", "take": config.get("take"),
+                                              "rep": config["squat"]["reference_rep"]}
+            annotation_path = Path(annotations_override).expanduser() if annotations_override is not None else None
+            if annotation_path is None:
+                try:
+                    raw_config = json.loads(config_path.read_text(encoding="utf-8-sig"))
+                    section = raw_config.get("experiment") if isinstance(raw_config, dict) else None
+                    annotation_value = section.get("annotations") if isinstance(section, dict) else None
+                    if isinstance(annotation_value, str) and annotation_value:
+                        annotation_path = Path(annotation_value).expanduser()
+                        if not annotation_path.is_absolute():
+                            annotation_path = config_path.parent / annotation_path
+                except (OSError, ValueError, TypeError):
+                    annotation_path = None
+            if annotation_path is not None:
+                attempt = {"path": str(annotation_path.resolve()),
+                           "sha256": sha256(annotation_path) if annotation_path.is_file() else None,
+                           "status": "unavailable"}
+                try:
+                    roster = annotations or experiment.load_annotations(annotation_path)
+                    ref = next(a for a in roster if a["role"] == "reference")
+                    report["reference_source"] = {"kind": "independent_same_take_annotation",
+                                                  "annotation_id": ref["annotation_id"], "file": str(annotation_path),
+                                                  "take": config.get("take") if config else None}
+                    attempt["annotated_tests"] = len(roster) - 1
+                    attempt["status"] = "available_but_unscorable_run_failed_before_result"
+                    report["experiment_attempt"] = {**attempt, "records": [
+                        {"annotation_id": item["annotation_id"], "role": item["role"], "label": item["label"],
+                         "bottom_s": item["bottom_s"], "status": "unscorable_run_failed_before_result"}
+                        for item in roster]}
+                except (OSError, ValueError) as annotation_error:
+                    attempt["error"] = str(annotation_error)
+                    report["experiment_attempt"] = attempt
+        write_json(run / "report.json", report)
         raise
 
 
@@ -567,14 +781,23 @@ def _labels(config):
     return {"path": str(path), "labels": labels}
 
 
-def _report(run, config, metadata, syncs, sequence, result, labels, up):
+def _report(run, config, metadata, syncs, sequence, result, labels, up, observations=None):
     valid = sequence["valid"]
     hips = valid[:, squat.LEFT_HIP] & valid[:, squat.RIGHT_HIP]
     primary = result["reps"][result["primary"]]
     report = {"run_id": run.name, "created_utc": utc_now(),
               "status": "measured" if primary["reps"] and primary["classification"] else "no_classified_reps",
               "accuracy_validated": False,
-              "what_this_is": "Pelvis (hip-midpoint) height from two calibrated, synchronized phones. "
+              "reference_source": ({"kind": "independent_same_take_annotation", "take": config.get("take"),
+                                    "file": config["experiment"]["annotations"],
+                                    "annotation_id": primary["agreement"]["reference_annotation_id"]}
+                                   if "agreement" in primary else
+                                   {"kind": "legacy_detection_index", "take": config.get("take"),
+                                    "rep": config["squat"]["reference_rep"]}),
+              "evidence_kind": config.get("evidence_kind") or
+                               ("synthetic_projection" if any(obs.get("detector") == "synthetic projection"
+                                                              for obs in observations or []) else "video_estimate"),
+              "what_this_is": "Pelvis (hip-midpoint) height from calibrated, synchronized cameras. "
                               "Agreement with the footage and with a pelvis marker must be checked separately.",
               "session": {k: config.get(k) for k in ("session", "participant", "take", "pace")},
               "up_axis_board": up, "synchronization": syncs,
@@ -585,13 +808,21 @@ def _report(run, config, metadata, syncs, sequence, result, labels, up):
               "recordings": [{"camera": c["id"], "image_size": m["image_size"], "median_fps": m["median_fps"],
                               "duration_s": m["duration_s"], "frame_count": m["frame_count"]}
                              for c, m in zip(config["cameras"], metadata)],
+              "observations": [{"camera": camera["id"],
+                                "kind": observation.get("detector") or observation.get("source") or "unknown",
+                                "reused_from": observation.get("reused_from")}
+                               for camera, observation in zip(config["cameras"], observations or [])],
               "jitter_standing": result["jitter"], "primary_trace": result["primary"],
               "squat_estimator": result["settings"]["estimator"],
               "reps": {name: {k: v for k, v in entry.items()} for name, entry in result["reps"].items()},
               "filter_effect": result["filter_effect"]}
-    if labels and primary["classification"]:
-        counts, rows = squat.score_against_labels(primary["reps"], labels["labels"])
-        report["comparison_with_footage"] = {"labels_file": labels["path"], "counts": counts, "rows": rows}
+    if labels:
+        report["comparison_with_footage"] = {
+            "labels_file": labels["path"], "status": "not_scored_requires_independent_timestamps",
+            "reason": ("Rep-number matching can hide missed or extra detections. Add timed independent "
+                       "annotations in experiment.annotations to score each camera condition."),
+            "labels": [{"rep": rep, "judged_from_footage": judged}
+                       for rep, judged in sorted(labels["labels"].items())]}
     write_json(run / "report.json", report)
     return report
 
@@ -610,7 +841,7 @@ def _write_tables(run, sequence, result):
             writer.writerow([f"{t:.5f}"] + [("" if not np.isfinite(v) else f"{v:.5f}") for v in
                             (result["height_m"]["raw"][i], result["height_m"]["filtered"][i],
                              sequence["reprojection_px"][i, 11], sequence["reprojection_px"][i, 12])])
-    columns = ["rep", "outcome", "borderline", "is_reference", "depth_m", "difference_from_reference_m",
+    columns = ["rep", "annotation_id", "quality_status", "outcome", "borderline", "is_reference", "depth_m", "difference_from_reference_m",
                "descent_s", "coverage", "start_s", "bottom_s", "end_s", "standing_m", "bottom_m",
                "depth_se_m", "difference_se_m", "bottom_samples", "estimator", "bottom_model"]
     for name, entry in result["reps"].items():
@@ -618,7 +849,7 @@ def _write_tables(run, sequence, result):
             writer = csv.DictWriter(stream, fieldnames=columns, extrasaction="ignore")
             writer.writeheader()
             for rep in entry["reps"]:
-                writer.writerow({k: (f"{v:.4f}" if isinstance(v, float) else v) for k, v in rep.items()})
+                writer.writerow({k: _csv_value(v) for k, v in rep.items()})
 
 
 OUTCOME_COLORS = {"reached_reference": "#2e7d32", "shallower": "#c62828", "unclear": "#9e9e9e", None: "#1565c0"}
@@ -640,7 +871,7 @@ def _plot_trace(path, times, result, config):
     for rep in primary["reps"]:
         color = OUTCOME_COLORS[rep.get("outcome")]
         axis.axvspan(rep["start_s"], rep["end_s"], color=color, alpha=0.12)
-        axis.text(rep["bottom_s"], 0.97, f"rep {rep['rep']}\n{rep['depth_m'] * 100:.1f} cm",
+        axis.text(rep["bottom_s"], 0.97, f"{rep.get('annotation_id') or rep['rep']}\n{rep['depth_m'] * 100:.1f} cm",
                   transform=axis.get_xaxis_transform(), ha="center", va="top", fontsize=8, color=color)
     window = result["settings"].get("standing_window_s")
     if window:

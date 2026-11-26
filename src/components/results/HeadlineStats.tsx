@@ -12,7 +12,7 @@ interface HeadlineStatsProps {
 export function HeadlineStats({ variant = "results" }: HeadlineStatsProps) {
   return (
     <div className="grid gap-4">
-      <ul aria-label="Smallest depth change caught, by number of phones (simulated)" className="grid gap-4 sm:grid-cols-3">
+      <ul aria-label="First passing training-grid result by camera count, with held-out counts (simulated)" className="grid gap-4 sm:grid-cols-3">
         {HEADLINE_NUMBERS.map((stat) => (
           <li key={stat.phones} className="grid content-start gap-2 rounded-xl border border-border bg-card p-5">
             <span className="flex items-center justify-between gap-3 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
@@ -21,17 +21,22 @@ export function HeadlineStats({ variant = "results" }: HeadlineStatsProps) {
                 Simulated
               </span>
             </span>
-            <span className="font-mono text-4xl tabular-nums text-data">{stat.mm.toFixed(1)} mm</span>
+            <span className="font-mono text-4xl tabular-nums text-data">
+              {stat.mm === null ? "not reached on tested grid" : `${stat.mm.toFixed(1)} mm`}
+            </span>
             <span className="text-sm leading-relaxed text-muted-foreground">
-              {variant === "results" ? stat.label : "smallest depth change it can catch"}
+              {stat.label}. First passing tested training-grid value for the lower-noise, controlled-pace setting.
+            </span>
+            <span className="text-xs leading-relaxed text-muted-foreground">
+              Held out: {stat.heldout.falseAlarms}/{stat.heldout.falseAlarmTotal} matching flagged; {stat.heldout.shallowDetected}/{stat.heldout.shallowTotal} shallow flagged; {stat.heldout.pass ? "pass" : "fail"}.
             </span>
           </li>
         ))}
       </ul>
       {variant === "home" ? (
         <p className="max-w-[65ch] text-sm leading-relaxed text-muted-foreground">
-          Slow squat, clean video. The one-phone number is for a side view. These come from a computer simulation, not
-          from real recordings.
+          The cutoff is chosen from training sessions then evaluated once on held-out sessions. These are model results,
+          not real-camera measurements. Unclear attempts stay in the denominators and count as not detected.
         </p>
       ) : null}
     </div>

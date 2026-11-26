@@ -1,46 +1,6 @@
-# rvectr — Research Roadmap
+# Earlier research roadmap
 
-**Program:** Velocity-dependent error in markerless 3D human pose estimation
-**Author:** Parth Dalal · solo researcher
-**Written:** 2026-07-26 · **Revised:** 2026-07-26 (relocation constraint)
-**Supersedes:** `ROADMAP.md` (SaaS launch plan, retired)
-
----
-
-## The constraint that defines this document
-
-**Relocation to Japan in 2027 makes IRIS a one-shot competition.**
-
-IRIS requires enrollment at a school based in India. Students studying abroad are ineligible regardless of citizenship. There is no second attempt, no rehearsal year, no fallback cycle.
-
-| Date | Event | Status |
-|---|---|---|
-| **Oct 15, 2026** | IRIS submission deadline | **The only shot.** 12 weeks out. |
-| **Jan 2027** | IRIS National Fair, ~100 shortlisted exhibit | If selected |
-| **May 2027** | Regeneron ISEF, if Grand Award | ⚠️ see open question |
-| 2027 onward | Relocation to Japan | IRIS permanently closed |
-| **Nov 1, 2028** | MIT Early Action | Unaffected — program continues |
-
-### Two questions only IRIS can answer — ask this week
-
-1. Confirm the exact Oct 15, 2026 deadline and the entry fee (sources conflict: ₹5,000 + taxes per project with EWS waiver, vs. free).
-2. **If selected for Team India in January 2027, does relocating to Japan before May 2027 affect ISEF participation?** This determines whether ISEF is reachable at all. Nobody but IRIS can tell you.
-
-### Second life: JSEC
-
-[JSEC](https://isef.jp/about/perticipation/) is one of Japan's two ISEF-affiliated contests, run by Asahi Shimbun and TV Asahi. No regional preliminaries — direct application to the national contest. **Eligibility for a foreign student enrolled in Japan is undocumented; contact them directly once relocated.** If eligible, the 2027–28 running study finds a home there.
-
----
-
-## Why 12 weeks is survivable
-
-One design decision makes this feasible: **synthetic ground truth plus self-only filming requires no IRB, no recruitment, no scheduling, no consent forms.**
-
-Filming yourself to test your own invention is generally exempt from IRB pre-approval. Authoring known SMPL poses and rendering them requires no human participants at all. Every logistical dependency that would have eaten the twelve weeks is removed by construction.
-
-The multi-subject study, the ethics packet, the mentor recruitment — all of it moves past October. None of it is needed to submit.
-
----
+Written 26 July 2026 for a proposed angular-velocity benchmark. For the current CBSE project and recording plan, see the [active submission](writeups/CBSE_2026_27.md) and [pilot checklist](PILOT_RECORDING_CHECKLIST.md).
 
 ## The research question
 
@@ -123,13 +83,13 @@ None of it is needed to submit. All of it still serves Nov 2028.
 
 # PART 2 — Post-October, through Nov 2028
 
-**Relocation does not touch this.** The research program is geography-independent; only the fair pathway changed.
+The remaining work was proposed for a later benchmark.
 
 | Window | Work |
 |---|---|
 | Nov 2026 – Jan 2027 | IRIS fair prep if shortlisted. Benchmark calibration vs. 3DPW/EMDB. Paper draft. |
 | Feb – May 2027 | ISEF if reachable. Otherwise: workshop paper submission, Zenodo dataset, upstream PRs. |
-| Jun 2027 – Mar 2028 | Japan. Contact JSEC re: eligibility. Multi-subject running study **with local IRB approval first**. Extended benchmark. |
+| Jun 2027 – Mar 2028 | Multi-subject running study **with local IRB approval first**. Extended benchmark. |
 | Apr – Sep 2028 | v1.0.0, publication, real external users, leaderboard submissions. |
 | Oct 2028 | Portfolio assembly — 27 months of log → 10 SlideRoom items. |
 

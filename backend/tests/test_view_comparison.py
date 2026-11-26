@@ -255,11 +255,22 @@ def test_full_run_writes_the_view_files_and_can_be_switched_off(tmp_path, monkey
 
     config = json.loads((tmp_path / "session.json").read_text())
     config["views"] = {"compare": False}
+    config["experiment"] = {"annotations": "roster.csv"}
+    (tmp_path / "roster.csv").write_text(
+        "annotation_id,start_s,bottom_s,end_s,role,label,target_height_m,marker_depth_m,marker_uncertainty_m,reader,reader_uncertainty_s,reader_uncertainty_m\n"
+        "S1,3,4,5,test,match,0,,,,,\n"
+        "S2,5.8,6.8,7.8,reference,match,0,,,,,\n"
+    )
     (tmp_path / "session_off.json").write_text(json.dumps(config))
     run_off, report_off = run_session(tmp_path / "session_off.json", paths, outputs, keypoints_from=previous,
                                       progress=lambda *_: None)
     assert report_off["status"] == "measured" and "views" not in report_off
     assert not (run_off / "views_comparison.csv").exists()
+    saved = json.loads((run_off / "report.json").read_text())
+    assert saved["reference_source"]["annotation_id"] == "S2"
+    score = saved["experiment"][saved["scoring"]["primary_condition"]]
+    assert score["counts"]["reference_excluded"] == 1 and score["counts"]["extra"] == 4
+    assert score["classification"]["denominator"] == 1
 
 
 @needs_ffmpeg
@@ -275,3 +286,96 @@ def test_a_failing_comparison_keeps_the_main_result(tmp_path, monkeypatch):
     assert report["status"] == "measured"
     assert report["views"] == {"status": "failed", "error": "planes could not be placed"}
     assert (run / "reps_raw.csv").exists() and not (run / "views_comparison.csv").exists()
+
+
+def test_independent_annotation_list_scores_each_condition_even_without_all_view_reference(monkeypatch):
+    from rvectr.pipeline import compare_views
+
+    cameras, observations, syncs = make_session([-50, 40], [0.0, 0.6173])
+    periods = [1 / 60, 1 / 30]
+    sequence = reconstruct_sequence(observations, cameras, syncs, frame_periods=periods, joints=HIPS)
+    measured = measure_squats(sequence["times_s"], sequence["xyz"], sequence["valid"], UP,
+                              {"standing_window_s": [0.5, 2.5]})
+    found = measured["reps"]["raw"]["reps"]
+    annotations = []
+    for rep in found:
+        is_reference = rep["rep"] == 1
+        annotations.append({"annotation_id": f"rep{rep['rep']}", "start_s": rep["start_s"],
+                            "bottom_s": rep["bottom_s"], "end_s": rep["end_s"],
+                            "role": "reference" if is_reference else "test",
+                            "label": "match" if is_reference or rep["rep"] % 2 else "shallow",
+                            "target_height_m": None, "marker_depth_m": None,
+                            "marker_uncertainty_m": None, "reader": "reader-a",
+                            "reader_uncertainty_s": 0.03, "reader_uncertainty_m": None})
+    config = {"cameras": [{"id": "cam1"}, {"id": "cam2"}], "squat": measured["settings"],
+              "triangulation": DEFAULTS["triangulation"], "views": {"compare": True,
+                  "standing_point_m": STANDING.tolist(), "hip_line": HIP_LINE.tolist()},
+              "experiment": {"annotations": "pilot.csv", "match_window_s": 0.5,
+                             "tolerance_m": 0.03, "borderline_m": 0.01}}
+    result = {"reps": {"raw": {"reps": [], "classification": None}}, "jitter": {},
+              "settings": measured["settings"], "primary": "raw"}
+    from rvectr import pipeline
+    original = pipeline._measure_condition
+    middle_time = found[2]["bottom_s"]
+
+    def less_accurate_all_views(times, xyz, valid, up, settings, reference_reps):
+        scored = original(times, xyz, valid, up, settings, reference_reps)
+        if xyz is sequence["xyz"]:
+            scored["reps"] = [rep for rep in scored["reps"] if abs(rep["bottom_s"] - middle_time) > 0.5]
+        return scored
+
+    monkeypatch.setattr(pipeline, "_measure_condition", less_accurate_all_views)
+    info = pipeline.compare_views(observations, cameras, syncs, UP, config, sequence, result,
+                                  periods, annotations=annotations)
+    conditions = info["experiment"]["conditions"]
+    assert len(conditions) == 5
+    assert all(item["status"] == "scored" for item in conditions.values())
+    expected_ids = {item["annotation_id"] for item in annotations}
+    for condition in conditions:
+        rows = [row for row in info["experiment"]["rows"] if row["condition"] == condition]
+        assert {row["annotation_id"] for row in rows if row["annotation_id"]} == expected_ids
+        assert sum(row["status"] == "reference_excluded" for row in rows) == 1
+    all_view_name = next(name for name in conditions if name.startswith("all views"))
+    all_rows = [row for row in info["experiment"]["rows"] if row["condition"] == all_view_name]
+    assert next(row for row in all_rows if row["annotation_id"] == "rep3")["status"] == "missed"
+    better_camera = next(name for name in conditions if name.startswith("one view"))
+    better_rows = [row for row in info["experiment"]["rows"] if row["condition"] == better_camera]
+    assert next(row for row in better_rows if row["annotation_id"] == "rep3")["status"] != "missed"
+
+
+def test_invalid_config_still_records_a_failed_attempt_and_annotation_roster(tmp_path):
+    from rvectr.paths import RuntimePaths
+
+    annotations = tmp_path / "pilot.csv"
+    annotations.write_text(
+        "annotation_id,start_s,bottom_s,end_s,role,label,target_height_m,marker_depth_m,marker_uncertainty_m,reader,reader_uncertainty_s,reader_uncertainty_m\n"
+        "ref,0,1,2,reference,match,0,,,,,\n"
+        "rep2,3,4,5,test,shallow,0.04,,,,,\n", encoding="utf-8")
+    config = tmp_path / "bad-session.json"
+    config.write_text(json.dumps({"cameras": [{"id": "cam1", "video": "one.mp4"}],
+                                  "experiment": {"annotations": "pilot.csv"}}), encoding="utf-8")
+    outputs = tmp_path / "outputs"
+    paths = RuntimePaths(tmp_path, tmp_path, tmp_path, tmp_path, outputs)
+    with pytest.raises(ValueError, match="at least two cameras"):
+        run_session(config, paths, progress=lambda *_: None)
+    run = outputs / "V1.1.1"
+    manifest = json.loads((run / "manifest.json").read_text())
+    report = json.loads((run / "report.json").read_text())
+    assert manifest["status"] == report["status"] == "failed"
+    assert report["stage"] == "configuration"
+    records = report["experiment_attempt"]["records"]
+    assert [item["status"] for item in records] == ["unscorable_run_failed_before_result"] * 2
+
+
+
+def test_invalid_json_structure_has_a_failed_report(tmp_path):
+    from rvectr.paths import RuntimePaths
+
+    cfg = tmp_path / "session.json"
+    cfg.write_text("[]", encoding="utf-8")
+    paths = RuntimePaths(tmp_path, tmp_path, tmp_path, tmp_path, tmp_path / "outputs")
+    with pytest.raises(ValueError, match="JSON object"):
+        run_session(cfg, paths, progress=lambda *_: None)
+    run = paths.outputs / "V1.1.1"
+    assert json.loads((run / "report.json").read_text())["reference_source"]["kind"] == "unavailable"
+    assert json.loads((run / "manifest.json").read_text())["status"] == "failed"

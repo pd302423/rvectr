@@ -6,7 +6,11 @@ from .calibration import validate_camera
 
 def load_capture_config(path):
     config=json.loads(Path(path).read_text(encoding='utf-8-sig'))
-    cameras=config.get('cameras',[])
+    if not isinstance(config, dict):
+        raise ValueError("The capture configuration must be a JSON object")
+    cameras = config.get("cameras", [])
+    if not isinstance(cameras, list) or not all(isinstance(camera, dict) for camera in cameras):
+        raise ValueError("cameras must be an array of camera objects")
     if len(cameras)<2:
         raise ValueError('A multiview capture configuration needs at least two cameras')
     names=[camera.get('id') for camera in cameras]

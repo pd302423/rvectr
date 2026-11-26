@@ -3,9 +3,8 @@
 Board frame (metres): corner 0 is the origin, X runs along a row of inner
 corners, Y runs from row to row, Z = X x Y. Detected corners are put in a fixed
 order: the first corner is the one nearest the top-left of the image. For a
-board held level and seen from the front by every camera, every camera
-therefore agrees on the origin and axes. A board rotated about 45 degrees in the
-image, or seen from behind, breaks that agreement; keep it level.
+level board this is a candidate orientation. Check the saved origin and axis
+overlays against an asymmetric physical mark on the same board in every view.
 
 Board sizes are given as printed SQUARES (for example 8x11). OpenCV works with
 INNER corners, which is one fewer in each direction (7x10).
@@ -163,7 +162,7 @@ def up_axis(R, t, placement):
 
 
 def extrinsics_from_video(path, intrinsics, squares, square_mm, board_frame_id, start_s, end_s,
-                          placement="upright", max_corner_motion_px=1.5, recording_mode_verified=False):
+                          placement="upright", max_corner_motion_px=1.5, recording_mode_verified=False, overlay_path=None):
     """Camera position in the shared board frame, from a still board held in [start_s, end_s].
 
     Every camera must see the same board, in the same place, during its window.
@@ -183,6 +182,27 @@ def extrinsics_from_video(path, intrinsics, squares, square_mm, board_frame_id, 
     if len(detections) < 3:
         return {**base, "status": "failed", "reason": "board_not_found_in_window",
                 "quality": {"frames_with_board": len(detections)}}
+    if overlay_path is not None:
+        sample = detections[len(detections) // 2]
+        frame_iter = frames(path, metadata, start_s=sample["time_s"], end_s=sample["time_s"])
+        try:
+            _, _, overlay = next(frame_iter)
+        finally:
+            frame_iter.close()
+        corners = np.rint(sample["corners"]).astype(int)
+        origin = tuple(corners[0])
+        for index, label, color in ((pattern[0]-1, "+X", (0, 0, 255)),
+                                    (-pattern[0], "+Y", (0, 255, 0))):
+            tip = tuple(corners[index])
+            cv2.arrowedLine(overlay, origin, tip, color, 3)
+            cv2.putText(overlay, label, tip, cv2.FONT_HERSHEY_SIMPLEX, .8, color, 2)
+        cv2.circle(overlay, origin, 6, (255, 0, 255), 2)
+        cv2.putText(overlay, "0", origin, cv2.FONT_HERSHEY_SIMPLEX, .8, (255, 0, 255), 2)
+        overlay_path.parent.mkdir(parents=True, exist_ok=True)
+        if not cv2.imwrite(str(overlay_path), overlay):
+            raise OSError("Could not save the checkerboard orientation overlay")
+        base["corner_overlay"] = {"file": overlay_path.name, "frame_index": sample["frame_index"],
+                                  "review": "Compare corner 0 and both axes to physical marks in every view"}
     stack = np.stack([d["corners"] for d in detections])
     motion = float(np.max(np.linalg.norm(stack - np.median(stack, axis=0), axis=2)))
     if motion > max_corner_motion_px:

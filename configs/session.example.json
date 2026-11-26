@@ -11,9 +11,10 @@
     "method": "flash",
     "start_window_s": 10,
     "end_window_s": 10,
+    "require_end": true,
     "roi": {"cam1": null, "cam2": null}
   },
-  "pose": {"mode": "balanced", "device": "cuda", "stride": 1, "det_frequency": 5},
+  "pose": {"mode": "balanced", "device": "cpu", "stride": 1, "det_frequency": 5},
   "triangulation": {"min_confidence": 0.3, "max_reprojection_px": 10, "min_ray_angle_deg": 3},
   "squat": {
     "standing_window_s": [3.0, 6.0],
@@ -25,5 +26,11 @@
     "borderline_m": 0.01,
     "primary": "raw"
   },
-  "labels": null
+  "labels": null,
+  "experiment": {
+    "annotations": "pilot_annotations.csv",
+    "match_window_s": 0.5,
+    "tolerance_m": 0.03,
+    "borderline_m": 0.01
+  }
 }

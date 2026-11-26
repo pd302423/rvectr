@@ -1,3 +1,5 @@
+> **Historical workspace summary.** The current exhibition uses the [squat-depth pipeline](TWO_CAMERA_PIPELINE.md). For its status and evidence use the [active write-up](writeups/CBSE_2026_27.md).
+
 > [!IMPORTANT]
 > **Status (2026-07-26):** The SaaS coaching-product framing below is retired — the project is now a research program on velocity-dependent error in markerless 3D pose estimation. See [`RESEARCH_ROADMAP.md`](RESEARCH_ROADMAP.md). The computer-vision architecture documented here remains accurate.
 

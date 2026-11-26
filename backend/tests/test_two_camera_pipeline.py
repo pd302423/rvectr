@@ -115,7 +115,12 @@ def test_intrinsics_and_extrinsics_from_rendered_videos(tmp_path):
     still = [render_board(K, R_true, t_true, size)] * 20
     write_video(tmp_path / "extrinsics.mp4", still, 30)
     camera = board.extrinsics_from_video(tmp_path / "extrinsics.mp4", result, "8x11", SQUARE_M * 1000,
-                                         "setupA", 0.0, 1.0, recording_mode_verified=True)
+                                         "setupA", 0.0, 1.0, recording_mode_verified=True,
+                                         overlay_path=tmp_path / "corners.png")
+    assert camera["corner_overlay"]["file"] == "corners.png"
+    overlay = cv2.imread(str(tmp_path / "corners.png"))
+    assert overlay.shape[:2] == (720, 1280)
+    assert (overlay[:, :, 2].astype(float) - overlay[:, :, 0]).max() > 200
     assert camera["status"] == "passed", camera.get("reason")
     centre_true = -R_true.T @ t_true
     centre = -np.asarray(camera["R"]).T @ np.asarray(camera["t"])
@@ -319,12 +324,20 @@ def prepare_full_run(tmp_path, monkeypatch):
         obs = observe(world_times, skeleton(world_times), camera, 0.5, rng)
         obs.update(frame_index=np.arange(len(own_times)), times_s=own_times, image_size=[width, height],
                    joint_names=[], detector="synthetic projection")
+        from rvectr.media import probe
+        from rvectr.records import sha256
+        from rvectr.pipeline import DEFAULTS
+        path = data / f"cam{index + 1}.mp4"
+        meta = probe(path)
+        obs.update(times_s=meta["pts"], joint_names=list(pose2d.JOINT_NAMES),
+                   source_identity=pose2d.cache_identity(f"cam{index + 1}", sha256(path), meta,
+                                                        {**DEFAULTS["pose"], "source": "synthetic projection"}))
         observations.append(obs)
     previous = outputs / "V1.1.1"
     for index, obs in enumerate(observations):
         pose2d.save(previous / "keypoints2d" / f"cam{index + 1}.npz", obs)
     (tmp_path / "labels.csv").write_text("rep,judged_from_footage\n1,match\n2,match\n3,shallow\n4,match\n5,shallow\n6,match\n")
-    config = {"session": "synthetic", "cameras": [{"id": f"cam{i}", "video": f"cam{i}.mp4", "calibration": f"cam{i}.json"}
+    config = {"session": "synthetic", "pose": {"source": "synthetic projection"}, "cameras": [{"id": f"cam{i}", "video": f"cam{i}.mp4", "calibration": f"cam{i}.json"}
                                                   for i in (1, 2)],
               "sync": {"method": "flash", "start_window_s": 3, "end_window_s": 3},
               "squat": {"standing_window_s": [1.6, 2.8]}, "labels": "labels.csv"}
@@ -342,7 +355,11 @@ def test_full_run_from_videos_and_saved_keypoints(tmp_path, monkeypatch):
     assert run.name == "V1.1.2"
     assert report["status"] == "measured"
     assert report["synchronization"][1]["offset_s"] == pytest.approx(offset, abs=0.01)
-    assert report["comparison_with_footage"]["counts"]["agree"] == 6
+    assert len(report["reps"]["raw"]["reps"]) == 6
+    assert report["reference_source"]["kind"] == "legacy_detection_index"
+    assert report["comparison_with_footage"]["status"] == "not_scored_requires_independent_timestamps"
+    assert len(report["comparison_with_footage"]["labels"]) == 6
+    assert "counts" not in report["comparison_with_footage"]
     for name in ("report.json", "manifest.json", "pelvis_trace.csv", "reps_raw.csv", "depth_trace.png",
                  "points3d.npz", "sync/sync.json", "sync/brightness.png", "keypoints2d/cam2.npz"):
         assert (run / name).exists(), name

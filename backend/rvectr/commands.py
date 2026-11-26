@@ -64,7 +64,7 @@ def calibrate_extrinsics(argv):
     intrinsics = json.loads(args.intrinsics.read_text())
     result = extrinsics_from_video(args.video, intrinsics, args.squares, args.square_mm, args.board_frame_id,
                                    args.start, args.end, args.placement,
-                                   recording_mode_verified=args.same_recording_mode)
+                                   recording_mode_verified=args.same_recording_mode, overlay_path=args.out.with_suffix(".corners.png"))
     write_json(args.out, result)
     print(f"{result['status'].upper()}: {args.out}")
     q = result.get("quality", {})
@@ -91,7 +91,8 @@ def sync(argv):
     paths = RuntimePaths.discover()
     videos = [paths.video(c["video"]) for c in config["cameras"]]
     s = config["sync"]
-    record = synchronize(videos, s["start_window_s"], s["end_window_s"], [s["roi"].get(c["id"]) for c in config["cameras"]])
+    record = synchronize(videos, s["start_window_s"], s["end_window_s"], [s["roi"].get(c["id"]) for c in config["cameras"]],
+                         [s.get("exposures", {}).get(c["id"]) for c in config["cameras"]])
     write_json(args.out / "sync.json", record)
     _plot_sync(record, [c["id"] for c in config["cameras"]], args.out / "brightness.png")
     for camera, cam, align in zip(config["cameras"], record["cameras"], record["alignments"]):
@@ -100,18 +101,27 @@ def sync(argv):
         if align["status"] not in ("reference",):
             print(f"  {align['status']}: offset {align.get('offset_s')} s, drift {align.get('drift_s')} s"
                   + (f"  ({align.get('reason') or align.get('warning')})" if align.get('reason') or align.get('warning') else ""))
+            if align.get("start_sampling_uncertainty_s") is not None:
+                print(f"  start sampling uncertainty ±{1000 * align['start_sampling_uncertainty_s']:.1f} ms")
     print(f"Plot: {args.out / 'brightness.png'}")
-    return 0 if all(a["status"] != "failed" for a in record["alignments"]) else 1
+    require_end = s.get("require_end") or bool(config.get("experiment", {}).get("annotations"))
+    return 0 if all(a["status"] != "failed" and (not require_end or a.get("drift_checked"))
+                    for a in record["alignments"][1:]) else 1
 
 
 def run(argv):
     from .pipeline import run_session
-    parser = argparse.ArgumentParser(prog="rvectr run", description="Full two-camera squat measurement into outputs/V1.1.N")
+    parser = argparse.ArgumentParser(prog="rvectr run", description=(
+        "Measure squat depth, compare every camera subset, and optionally score every condition against "
+        "the independent timed annotations in config.experiment.annotations. Use one reference rep in the same take."))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--keypoints-from", type=Path, help="earlier run folder whose 2D keypoints to reuse")
+    parser.add_argument("--annotations", type=Path,
+                        help="independent timed annotation CSV; overrides experiment.annotations in the config")
     args = parser.parse_args(argv)
-    run_dir, report = run_session(args.config, RuntimePaths.discover(), args.output_root, args.keypoints_from)
+    run_dir, report = run_session(args.config, RuntimePaths.discover(), args.output_root, args.keypoints_from,
+                                  annotations_override=args.annotations)
     primary = report["reps"][report["primary_trace"]]
     print(f"\nPelvis reconstructed in {report['frames']['pelvis_reconstructed_fraction']:.0%} of frames")
     jitter = report["jitter_standing"].get(report["primary_trace"]) if report["jitter_standing"] else None
@@ -119,12 +129,30 @@ def run(argv):
         print(f"Standing jitter ({report['primary_trace']}): RMS {jitter['rms_m'] * 1000:.1f} mm, p95 {jitter['p95_m'] * 1000:.1f} mm")
     if primary.get("error"):
         print(f"Classification: {primary['error']}")
+    experiment = report.get("views", {}).get("experiment") or report.get("experiment")
+    independent = bool(experiment) or report.get("scoring", {}).get("source") == "independent_timed_annotations"
     for rep in primary["reps"]:
-        print(f"  rep {rep['rep']:2d}: depth {rep['depth_m'] * 100:5.1f} cm  descent {rep['descent_s']:.2f} s  "
-              f"{rep.get('outcome', '-')}{' (borderline)' if rep.get('borderline') else ''}"
-              f"{'  <- reference' if rep.get('is_reference') else ''}")
-    if "comparison_with_footage" in report:
-        print("Against footage labels:", report["comparison_with_footage"]["counts"])
+        status = "" if independent else (f"  {rep.get('outcome', '-')}{' (borderline)' if rep.get('borderline') else ''}"
+                                          f"{'  <- reference' if rep.get('is_reference') else ''}")
+        print(f"  rep {rep['rep']:2d}: depth {rep['depth_m'] * 100:5.1f} cm  descent {rep['descent_s']:.2f} s{status}")
+    if "comparison_with_footage" in report and not independent:
+        print("Footage labels retained, not scored:", report["comparison_with_footage"]["reason"])
+    if experiment:
+        print("\nIndependent annotation score (reference excluded; same timed list for each condition):")
+        for name, entry in experiment.items():
+            counts = entry.get("counts", {})
+            classification = entry.get("classification", {})
+            accuracy = classification.get("accuracy")
+            accuracy_text = "unknown" if accuracy is None else f"{accuracy:.1%}"
+            end_to_end = classification.get("end_to_end_accuracy")
+            end_to_end_text = "unknown" if end_to_end is None else f"{end_to_end:.1%}"
+            print(f"  {name}: {entry.get('status')}  accuracy {accuracy_text} "
+                  f"({counts.get('correct', 0)}/{classification.get('denominator', 0)}); "
+                  f"end-to-end {end_to_end_text} "
+                  f"({counts.get('correct', 0)}/{classification.get('all_eligible_tests_denominator', 0)}); "
+                  f"missed {counts.get('missed', 0)}, extra {counts.get('extra', 0)}, "
+                  f"rejected {counts.get('rejected', 0)}, unscorable {counts.get('unscorable_annotation', 0)}, "
+                  f"unclear {counts.get('model_unclear', 0)}")
     print(f"\nRun folder: {run_dir}")
     return 0
 
@@ -156,7 +184,9 @@ def check_points(argv):
 
 def frames(argv):
     from .pipeline import extract_frames
-    parser = argparse.ArgumentParser(prog="rvectr frames", description="Save each camera's frame at one moment, for marking points")
+    parser = argparse.ArgumentParser(prog="rvectr frames", description=(
+        "Save synchronized frames for marking points. Supply --sync sync.json so the images show the same "
+        "reference-camera time. The filenames identify the camera and requested time."))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--time", type=float, required=True, help="seconds on the reference (first) camera")
     parser.add_argument("--sync", type=Path, help="sync.json from a run or from `rvectr sync`")

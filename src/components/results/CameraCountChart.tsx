@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CAMERA_CHART_MAX_MM, CAMERA_SETUPS, SCENARIOS, type ScenarioKey } from "@/lib/results/errorBudget";
+import { CAMERA_CHART_MAX_MM, CAMERA_SETUPS, SCENARIOS, detectionDetails, type ScenarioKey } from "@/lib/results/errorBudget";
 import { ChartFigure, ChartLegend } from "./ChartFigure";
 
 // Chart geometry, in SVG units. The SVG scales with its container.
@@ -16,17 +16,18 @@ const GROUP_GAP = 18;
 const AXIS_H = 30;
 const GROUP_H = LABEL_H + 2 * BAR + BAR_GAP + GROUP_GAP;
 const H = TOP + CAMERA_SETUPS.length * GROUP_H + AXIS_H;
-const TICKS = [0, 5, 10, 15, 20];
+const TICKS = Array.from({ length: 5 }, (_, i) => (i * CAMERA_CHART_MAX_MM) / 4);
 
 const x = (mm: number) => LEFT + (mm / CAMERA_CHART_MAX_MM) * (W - LEFT - RIGHT);
-const fmt = (mm: number) => mm.toFixed(1);
+const fmt = (mm: number | null) => (mm === null ? "not reached" : mm.toFixed(1));
 
 const ARIA_LABEL =
-  "Bar chart: the smallest change in squat depth that 1 phone from the side, 1 phone at an angle, 2 phones and 3 phones can catch, at a controlled and at a fast pace. Shorter bars are better.";
+  "Bar chart: the first tested change meeting the simulated training threshold for 1 phone from the side, 1 phone at an angle, 2 phones and 3 phones, at controlled and fast paces. Shorter bars are better.";
 
 export function CameraCountChart() {
   const [key, setKey] = useState<ScenarioKey>("clean");
   const scenario = SCENARIOS.find((s) => s.key === key) ?? SCENARIOS[0];
+  const details = detectionDetails(key);
 
   const controls = (
     <div className="grid gap-3">
@@ -62,9 +63,9 @@ export function CameraCountChart() {
       }
       caption={
         <>
-          Smallest difference in squat depth the setup can catch, in millimetres. Shorter bar = better.
-          &quot;Catch&quot; means it flags at least 95 out of 100 truly shallower squats while wrongly flagging at most
-          5 out of 100 normal ones.
+          First tested change in millimetres where the training sessions met the 95% detection and 5% false-alarm
+          limits. The chosen cutoff is then checked on held-out sessions. Unclear reps stay in the denominator and count
+          as not detected. Values are grid points; no between-point interpolation. A shorter bar is better.
         </>
       }
     >
@@ -78,7 +79,7 @@ export function CameraCountChart() {
               textAnchor="middle"
               className="fill-muted-foreground font-mono text-[12px] tabular-nums"
             >
-              {t}
+              {t.toFixed(0)}
               {t === CAMERA_CHART_MAX_MM ? " mm" : ""}
             </text>
           </g>
@@ -102,13 +103,13 @@ export function CameraCountChart() {
                     <rect
                       x={LEFT}
                       y={y}
-                      width={Math.max(1, x(bar.mm) - LEFT)}
+                      width={Math.max(1, x(bar.mm ?? CAMERA_CHART_MAX_MM) - LEFT)}
                       height={BAR}
                       rx={2}
                       className={bar.fill}
                     />
                     <text
-                      x={x(bar.mm) + 6}
+                      x={x(bar.mm ?? CAMERA_CHART_MAX_MM) + 6}
                       y={y + BAR - 2.5}
                       className="fill-foreground font-mono text-[13px] tabular-nums"
                     >
@@ -142,6 +143,39 @@ export function CameraCountChart() {
           </tbody>
         </table>
       </div>
+      <details className="mt-4 rounded-md border border-border px-4 py-3 text-sm">
+        <summary className="cursor-pointer font-medium">Training grid and held-out counts</summary>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-xs">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="py-2 pr-3">Setup</th>
+                <th className="py-2 pr-3">Pace</th>
+                <th className="py-2 pr-3">First passing training grid</th>
+                <th className="py-2 pr-3">Held-out false alarms</th>
+                <th className="py-2 pr-3">Held-out shallow detected</th>
+                <th className="py-2">Held-out result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {details.map((row) => (
+                <tr key={`${row.mode}-${row.pace}`} className="border-t border-border">
+                  <th scope="row" className="py-2 pr-3 font-normal">{row.mode}</th>
+                  <td className="py-2 pr-3">{row.pace}</td>
+                  <td className="py-2 pr-3 font-mono">{row.trainingGridMm === null ? "not reached" : `${row.lowerTestedMm}–${row.trainingGridMm} mm`}</td>
+                  <td className="py-2 pr-3 font-mono">{row.heldoutFalseAlarms.false_alarms}/{row.heldoutFalseAlarms.matching_total}</td>
+                  <td className="py-2 pr-3 font-mono">{row.heldoutDetection.detected_shallow}/{row.heldoutDetection.shallow_total}</td>
+                  <td className="py-2">{row.heldoutPass ? "meets both limits" : "does not meet both limits"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          The first tested grid point is selected using training sessions. This table shows the single held-out check;
+          it does not search for another point if that check fails.
+        </p>
+      </details>
     </ChartFigure>
   );
 }
