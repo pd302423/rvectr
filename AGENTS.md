@@ -62,11 +62,18 @@ graph TD
 
 Read docs/LINUX_FIRST.md for native Linux and WSL setup. Use the declared Python
 3.11 project and uv.lock. Run `bash tools/bootstrap-linux.sh` for the CPU test
-environment. Add `--pose` for inference, `--cuda` for NVIDIA, and `--web` for
-the site. Normal runs use `uv run --no-sync`. Keep private data, recordings,
-calibration and model weights outside published source. Preserve timestamps,
-missing observations, failed attempts and run IDs. See docs/TWO_CAMERA_PIPELINE.md
-for the squat pipeline and docs/PUBLICATION_REVIEW.md for the owner audit.
+environment. Add `--pose` for CPU pose inference, `--cuda --pose` for NVIDIA GPU
+inference, and `--web` for the site. Normal runs use `uv run --no-sync`.
+
+Private data and model locations are supplied through .env.local. Capture JSON
+files contain relative recording and calibration names, not machine-specific
+drive paths. Keep private data, recordings, calibration and model weights outside
+published source. Preserve timestamps, missing observations, failed attempts and
+run IDs. An environment check, a passing test or a plausible 3D model is not an
+accuracy result.
+
+See docs/TWO_CAMERA_PIPELINE.md for the squat pipeline. The owner keeps a private
+audit of older files in the Git history.
 
 ## Luna delegation policy (user preference)
 

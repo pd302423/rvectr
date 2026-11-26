@@ -30,7 +30,7 @@ const STEPS = [
   },
   {
     title: "Line up the clocks with two torch flashes",
-    body: "A flash near the start and another near the end of each take are seen by every phone. The software interpolates the flash times to align clocks and estimate drift.",
+    body: "A flash near the start and another near the end of each take are seen by every phone. The software uses the two flash times to line up the phones' clocks and to check whether the clocks drift apart during the take.",
   },
   {
     title: "Find the hips and combine them",
@@ -38,7 +38,7 @@ const STEPS = [
   },
   {
     title: "Measure depth and label each squat",
-    body: "Pelvis height over time gives each squat's depth. Squats are compared with the explicitly selected reference repetition from the same take and labelled “reached reference”, “shallower” or “unclear”. Only short bounded observation gaps may be interpolated; missing joints are not extrapolated.",
+    body: "Pelvis height over time gives each squat's depth. Squats are compared with the explicitly selected reference repetition from the same take and labelled “reached reference”, “shallower” or “unclear”. A short gap between two real observations may be bridged; a longer gap, or a joint that was never seen, stays missing.",
   },
 ] as const;
 
@@ -48,8 +48,8 @@ const LIMITS = [
     body: "No real two-phone video has been recorded. The results page uses computer-simulation output; the webcam demo and sample analysis use generated or live demo data and are not research measurements.",
   },
   {
-    lead: "Sensitivity results depend on model settings.",
-    body: "The simulation includes independent detector drift, shared camera error and timing offsets. It does not establish how often these occur in real phone footage.",
+    lead: "The results depend on the assumed settings.",
+    body: "The simulation includes slow drift in the hip positions, error shared by the cameras and timing offsets between phones. It does not show how often these happen in real phone footage.",
   },
   {
     lead: "One camera leaves depth ambiguous.",
@@ -173,9 +173,10 @@ export default function Home() {
             How small a change can it catch?
           </SectionHeading>
           <p className="max-w-[65ch] text-lg leading-relaxed text-muted-foreground">
-            In this computer simulation, the first passing tested grid value varied with camera count, noise and pace.
-            The cutoff is chosen on training sessions and checked once on held-out sessions; the cards show both counts.
-            Real recordings have not tested whether the pattern holds.
+            In this computer simulation, the smallest depth change that met both limits depended on the number of
+            cameras, the amount of random noise and the squat pace. The simulation picks its cutoff using half of the
+            computer-made sessions and checks it once on the other half. Each card says whether that check passed, with
+            the counts. Real recordings have not tested whether the pattern holds.
           </p>
           <HeadlineStats variant="home" />
           <p>

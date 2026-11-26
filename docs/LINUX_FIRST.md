@@ -35,8 +35,9 @@ uv run --no-sync pytest -q
 Use the [pilot recording checklist](PILOT_RECORDING_CHECKLIST.md) and
 [two-camera commands](TWO_CAMERA_PIPELINE.md) for a measurement run.
 `configs/capture_v1.json` belongs to the separate legacy diagnostic entry
-point. The optional PowerShell wrapper runs the existing Linux environment
-in `~/projects/rvectr`. From any other checkout use the Linux shell directly.
+point. The optional PowerShell wrapper (`tools/run-wsl.ps1`) runs `rvectr`
+inside WSL from one fixed folder in your WSL home folder. If your checkout is
+somewhere else, edit the path in that script or use the Linux shell directly.
 
 ## Publication checks
 
@@ -54,5 +55,5 @@ pushed. Use `--base <commit>` to select an explicit local comparison base.
 If a checkout has no main ref, the local check covers the current branch's
 reachable commits. Fetch main to narrow that comparison to your own branch.
 The full audit also checks the tracked tree and reachable historical blobs,
-including files removed in later commits. See [the publication review](PUBLICATION_REVIEW.md)
-for the unresolved legacy assets and the owner's decisions.
+including files removed in later commits. The owner keeps a private audit of
+older files in the Git history.

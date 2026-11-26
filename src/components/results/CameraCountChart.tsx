@@ -22,7 +22,7 @@ const x = (mm: number) => LEFT + (mm / CAMERA_CHART_MAX_MM) * (W - LEFT - RIGHT)
 const fmt = (mm: number | null) => (mm === null ? "not reached" : mm.toFixed(1));
 
 const ARIA_LABEL =
-  "Bar chart: the first tested change meeting the simulated training threshold for 1 phone from the side, 1 phone at an angle, 2 phones and 3 phones, at controlled and fast paces. Shorter bars are better.";
+  "Bar chart: the smallest tested depth change that met both limits on the first half of the simulated sessions, for 1 phone from the side, 1 phone at an angle, 2 phones and 3 phones, at controlled and fast paces. Shorter bars are better.";
 
 export function CameraCountChart() {
   const [key, setKey] = useState<ScenarioKey>("clean");
@@ -63,9 +63,11 @@ export function CameraCountChart() {
       }
       caption={
         <>
-          First tested change in millimetres where the training sessions met the 95% detection and 5% false-alarm
-          limits. The chosen cutoff is then checked on held-out sessions. Unclear reps stay in the denominator and count
-          as not detected. Values are grid points; no between-point interpolation. A shorter bar is better.
+          Smallest tested depth change, in millimetres, that met both limits on the first half of the simulated
+          sessions: at least 95% of shallow squats flagged and at most 5% of matching squats wrongly flagged. The chosen
+          cutoff is then checked once on the other half. Squats the software calls unclear are still counted, as not
+          caught. Values come from a fixed list of tested changes, so nothing is estimated in between. A shorter bar is
+          better.
         </>
       }
     >
@@ -144,17 +146,17 @@ export function CameraCountChart() {
         </table>
       </div>
       <details className="mt-4 rounded-md border border-border px-4 py-3 text-sm">
-        <summary className="cursor-pointer font-medium">Training grid and held-out counts</summary>
+        <summary className="cursor-pointer font-medium">First-half result and second-half check, with counts</summary>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[40rem] text-left text-xs">
             <thead className="text-muted-foreground">
               <tr>
                 <th className="py-2 pr-3">Setup</th>
                 <th className="py-2 pr-3">Pace</th>
-                <th className="py-2 pr-3">First passing training grid</th>
-                <th className="py-2 pr-3">Held-out false alarms</th>
-                <th className="py-2 pr-3">Held-out shallow detected</th>
-                <th className="py-2">Held-out result</th>
+                <th className="py-2 pr-3">Tested changes: last that missed, first that passed (first half)</th>
+                <th className="py-2 pr-3">Matching squats wrongly flagged (second half)</th>
+                <th className="py-2 pr-3">Shallow squats flagged (second half)</th>
+                <th className="py-2">Second-half result</th>
               </tr>
             </thead>
             <tbody>
@@ -165,15 +167,15 @@ export function CameraCountChart() {
                   <td className="py-2 pr-3 font-mono">{row.trainingGridMm === null ? "not reached" : `${row.lowerTestedMm}–${row.trainingGridMm} mm`}</td>
                   <td className="py-2 pr-3 font-mono">{row.heldoutFalseAlarms.false_alarms}/{row.heldoutFalseAlarms.matching_total}</td>
                   <td className="py-2 pr-3 font-mono">{row.heldoutDetection.detected_shallow}/{row.heldoutDetection.shallow_total}</td>
-                  <td className="py-2">{row.heldoutPass ? "meets both limits" : "does not meet both limits"}</td>
+                  <td className="py-2">{row.heldoutPass ? "passed: meets both limits" : "did not pass: misses at least one limit"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-          The first tested grid point is selected using training sessions. This table shows the single held-out check;
-          it does not search for another point if that check fails.
+          The smallest passing change is chosen using the first half of the sessions. This table shows the single check
+          on the other half. It does not look for another value if that check fails.
         </p>
       </details>
     </ChartFigure>

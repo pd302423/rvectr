@@ -29,7 +29,8 @@ Follow the "Quick start" in the [README](README.md). In short:
 ```bash
 # Python (Linux or WSL 2, with uv and ffmpeg installed)
 bash tools/bootstrap-linux.sh                  # CPU tools, tests and local hook
-# Optional: add --pose for CPU inference, --cuda --pose for NVIDIA, --web for the site
+# Optional flags: --pose (CPU pose inference), --cuda --pose (NVIDIA GPU
+# inference), --web (install the site packages and build the site)
 
 # Website
 npm install
@@ -43,8 +44,9 @@ Real recordings and the official body-model files are private and are not in the
 repository. You do not need them to work on the code. The tests use synthetic
 data (data made by a program, where the right answer is known).
 
-The local pre-push hook checks newly introduced commits. For a full working-tree
-and history audit, use `uv run --no-sync python tools/check_publish.py --history`.
+The bootstrap script also turns on a local Git pre-push hook. The hook checks
+only the commits you are about to push, so old history does not block you. It
+can still stop a push that adds a file that should not be public.
 
 ## Workflow
 
@@ -126,10 +128,11 @@ Run these yourself. Write in the pull request what you ran.
    uv run --no-sync python tools/check_publish.py
    ```
 
-   Fix findings introduced by your changes. The default compares against the
-   common upstream/main, origin/main or local main base, and inspects staged
-   and untracked files. Fetch main first. The owner audit with `--history`
-   reports legacy material separately. See [publication review](docs/PUBLICATION_REVIEW.md).
+   Fix any findings that your changes introduce. By default the check compares
+   your branch with the common base of `upstream/main`, `origin/main` or local
+   `main`, and it also inspects staged and untracked files. Fetch `main` first so
+   it can find that base. Older files in the Git history are not your concern:
+   the owner keeps a private audit of them.
 
 4. **Documentation changes.** Check that every command and file path you wrote
    really exists, and that nothing in your text claims more than has been shown.
@@ -197,8 +200,9 @@ You may use any AI coding assistant, such as Claude, Codex or Astra. Some rules:
   data or accuracy numbers, must not stage with `git add -A` or `git add .`, and
   must not push to `main`, rewrite history or force-push.
 - The section of `AGENTS.md` called "Luna delegation policy" is the owner's
-  personal preference for the owner's own sessions. It does not restrict you. Use your own checkout and local settings. The rest (the Next.js warning, the runtime
-  notes and the data rules) does apply.
+  personal preference for the owner's own sessions. It does not restrict you.
+  Use your own checkout and local settings. The rest (the Next.js warning, the
+  runtime notes and the data rules) does apply.
 - Competition rules may require that the use of AI is disclosed. If an AI
   assistant wrote a substantial part of your pull request, say so in the "AI
   assistance" part of the description: which tool, and for what.

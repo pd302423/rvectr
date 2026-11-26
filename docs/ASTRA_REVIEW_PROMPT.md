@@ -1,5 +1,8 @@
 # Review prompt for an AI assistant (GPT 6.2 Astra)
 
+The outside review based on this prompt took place in November 2026. Its changes
+were merged after review.
+
 Copy everything below the line into the assistant. It asks for a read-only
 review of the whole project and a written report. It does not ask for code
 changes.
@@ -80,9 +83,10 @@ Work through these areas. For each one, say what you checked and what you found.
    slow drift, timing error, calibration error, missed detections)? Are the
    assumptions stated? Is the "smallest catchable change" defined and computed
    correctly? Is anything important left out?
-5. **Tests.** Run `uv run --no-sync pytest -q` (set up with `uv sync --frozen` if
-   there is no NVIDIA GPU). Report the result. Which important behaviours have
-   no test? Could any test pass while the code is wrong?
+5. **Tests.** Run `uv run --no-sync pytest -q` (set up with
+   `bash tools/bootstrap-linux.sh`, which installs a CPU environment by default).
+   Report the result. Which important behaviours have no test? Could any test
+   pass while the code is wrong?
 6. **Honesty of claims.** Search the README, docs, website text and code
    comments for any claim of measured accuracy, clinical use or validation. All
    numbers from the simulation must be labelled as predictions. Check that the
@@ -102,18 +106,30 @@ Work through these areas. For each one, say what you checked and what you found.
 
 ## Known issues (already known; confirm or add detail, do not just repeat)
 
+Still open:
+
 - The Vercel preview deployment fails after a few seconds, before the build
   starts. `npm run build` passes on a clean install. The cause is not known.
-- `tools/check_publish.py --history` fails because old commits from July 2026
-  contain video frames, generated body meshes and a video. The bootstrap script
-  turns on a pre-push hook that runs this check, so it blocks pushes.
-- The plain publish check flags three tracked files:
+- `tools/check_publish.py --history` still fails, because old commits from July
+  2026 contain video frames, generated body meshes and a video. The default
+  check (your changes compared with `main`) passes. The pre-push hook now checks
+  only the commits being pushed, so the old history no longer blocks pushes. The
+  owner keeps a private audit of the older files in the Git history.
+- The history check also flags three tracked generated files:
   `backend/running_kinematics.json`, `backend/squat_dataset.json` and
   `backend/squat_kinematics.json`.
-- `docs/RESEARCH_ROADMAP.md` names a different sub-theme ("Emerging
-  Technologies") from the one used elsewhere ("AI for Better Life").
-- RTMPose and RTMLib are not yet listed in `LICENSE`.
-- The bootstrap script stops without an NVIDIA GPU.
+- The older write-ups in `docs/writeups/` still name a different sub-theme
+  ("Emerging Technologies") from the one used elsewhere ("AI for Better Life").
+  They carry a "Superseded" banner that points to the current write-up.
+
+Fixed since the first version of this prompt (check that the fixes hold):
+
+- `docs/RESEARCH_ROADMAP.md` is now marked as an earlier roadmap and no longer
+  names a sub-theme.
+- RTMLib, RTMPose and the weight sources are now listed in `LICENSE`. Check that
+  the entries and the weight terms are complete.
+- The bootstrap script now has a CPU default (`bash tools/bootstrap-linux.sh`).
+  An NVIDIA GPU is needed only for `--cuda`.
 
 ## Rules for the review
 

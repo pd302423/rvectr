@@ -127,7 +127,12 @@ export default function UploadPage() {
           ))}
         </ul>
         <p className="max-w-[65ch] text-sm leading-relaxed text-muted-foreground">
-          Keep the marker and vertical scale in the same plane. Before opening any software result, record standing and bottom readings, timing and reader uncertainty for each attempt.
+          Keep the marker and the vertical scale in the same plane. Before you look at any software result, write down
+          the standing height, the bottom height, the time and how unsure you are for each attempt.
+        </p>
+        <p className="max-w-[65ch] text-sm font-medium leading-relaxed text-foreground">
+          Safety: film only yourself for now. Do not film classmates or anyone else until your school and guide teacher
+          have approved it. Warm up first, and stop if anything hurts.
         </p>
       </section>
 

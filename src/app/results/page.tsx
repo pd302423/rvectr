@@ -61,6 +61,19 @@ export default function ResultsPage() {
         <Notice title="These are predictions from a computer simulation, not measurements.">
           <p>No real two-phone footage exists yet. The pilot recording will test whether these numbers hold.</p>
         </Notice>
+        <div className="grid max-w-[65ch] gap-2 rounded-xl border border-border bg-card p-4 text-sm leading-relaxed sm:p-5">
+          <p className="font-semibold text-foreground">How the simulation picks a cutoff and checks it</p>
+          <p className="text-foreground/85">
+            The simulation makes many computer-made sessions. In each one, a squat either reaches the reference depth
+            (a &ldquo;matching&rdquo; squat) or is shallower by a set amount (a &ldquo;shallow&rdquo; squat). To count as
+            working, the software must flag at least 95% of the shallow squats and wrongly flag at most 5% of the
+            matching ones. The simulation splits its sessions into two halves. On the first half it sets a cutoff that
+            wrongly flags at most 5% of matching squats, then tries a list of shallower and shallower depth changes and
+            keeps the smallest one that the cutoff catches 95% of the time. That is the number on each card. The cutoff
+            is then locked and checked once on the other half, which the choice never saw. A card says plainly whether
+            that check passed. Squats the software cannot judge (&ldquo;unclear&rdquo;) are still counted, as not caught.
+          </p>
+        </div>
       </div>
 
       <section aria-labelledby="question" className="grid gap-6">
@@ -69,7 +82,7 @@ export default function ResultsPage() {
         </SectionHeading>
         <p className="max-w-[65ch] text-lg leading-relaxed">
           In this model, the estimates depend on camera count and movement speed. The result varies with the assumed
-          noise and camera geometry, and needs a real recording before it can answer whether more phones help in practice.
+          noise and camera placement, and needs a real recording before it can answer whether more phones help in practice.
         </p>
         <HeadlineStats variant="results" />
         <CameraCountChart />
@@ -82,9 +95,9 @@ export default function ResultsPage() {
           affect the result.
         </p>
         <p className="max-w-[65ch] leading-relaxed text-muted-foreground">
-          The chart reports a cutoff selected from tested grid values on training sessions and checked on separate
-          held-out sessions. The table below shows a different result: the pipeline&apos;s fixed {DEFAULT_TOLERANCE_CM} cm
-          rule applied directly to the simulation. It was not trained or evaluated as a held-out cutoff.
+          The chart reports the cutoff picked on the first half of the simulated sessions and then checked on the other
+          half. The table below shows something different: the software&apos;s fixed {DEFAULT_TOLERANCE_CM} cm rule
+          applied directly to the simulated squats. That rule was not tuned or tested with the two-half method.
         </p>
       </section>
 
@@ -134,9 +147,10 @@ export default function ResultsPage() {
           What the 3 cm rule flags in this simulation
         </SectionHeading>
         <p className="max-w-[65ch] leading-relaxed">
-          These values come from the versioned simulation summary for standard noise and controlled pace. Each cell
-          lists flagged, unclear and missed shares, in that order. The fixed {DEFAULT_TOLERANCE_CM} cm rule is applied
-          directly; these values are separate from the training-grid cutoff and its held-out check.
+          These values come from the saved simulation summary for standard noise and controlled pace. Each cell
+          lists the share of squats flagged, unclear and missed, in that order. The fixed {DEFAULT_TOLERANCE_CM} cm
+          rule is applied directly; these values are separate from the cutoff picked on the first half of the
+          sessions and its check on the second half.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[48rem] text-sm">
@@ -166,20 +180,21 @@ export default function ResultsPage() {
 
       <section aria-labelledby="budget" className="grid gap-6">
         <SectionHeading id="budget" eyebrow="Error budget">
-          How modeled error settings changed the cutoff
+          How the assumed error settings changed the result
         </SectionHeading>
         <p className="max-w-[65ch] leading-relaxed">
-          These one-at-a-time runs compare specific assumed error sizes. Independent slow drift in the camera hip
-          detections changed the selected cutoff in this model. That does not estimate the real frequency or size of such drift.
-          Other camera-specific calibration errors, motion-dependent detector noise and shared missing-frame bursts are
-          included in separate sensitivity cases. None has yet been measured from real phones.
+          These runs change one assumed error at a time, to see which one matters most. Slow drift in the hip positions
+          each camera reports changed the smallest catchable depth change in this model. That does not tell us how often,
+          or how large, such drift is in real phones. Other errors are tested in separate runs: a constant error for
+          each camera, noise that grows with movement speed, and bursts of missing frames shared by the cameras. None
+          has yet been measured from real phones.
         </p>
         <ErrorRankingChart />
         <p className="max-w-[65ch] leading-relaxed">
-          In the simulated slow-drift case, the software&apos;s per-squat error bar was smaller than the across-session
-          spread. That check uses a model with independent frame noise in its error-bar formula and correlated drift
-          added to the observations. Real recordings must be compared with measured targets; the model&apos;s error bars
-          are not validated.
+          In the simulated slow-drift case, the plus-or-minus the software reports for each squat was smaller than the
+          real spread of results across sessions, so the error bar was too small. The software&apos;s formula assumes the
+          error in each frame is independent of the next, while the simulation added error that wanders slowly. Real
+          recordings must be compared with measured targets; the software&apos;s error bars have not been validated.
         </p>
       </section>
 
@@ -240,16 +255,17 @@ export default function ResultsPage() {
         </p>
         <p>
           Seed {SIMULATION_INFO.seed}; {SIMULATION_INFO.sessions_per_condition} sessions per condition; tested depth
-          grid {SIMULATION_INFO.settings.reference_grid_cm.join(", ")} cm; source revision {SIMULATION_INFO.code_version}
+          changes {SIMULATION_INFO.settings.reference_grid_cm.join(", ")} cm; source revision {SIMULATION_INFO.code_version}
           {SIMULATION_INFO.source_dirty ? " (working tree contained local edits; file hashes below identify the simulation code)" : ""}.
         </p>
         <p>
-          Targeted 3 mm held-out check: threshold {TARGETED_3MM.threshold_mm.toFixed(2)} mm; matching false alarms{" "}
-          {TARGETED_3MM.heldout_matching_counts.false_alarms}/{TARGETED_3MM.heldout_matching_counts.matching_total}; shallow attempts
-          detected {TARGETED_3MM.heldout_shallow_counts.detected_shallow}/{TARGETED_3MM.heldout_shallow_counts.shallow_total};{" "}
-          {TARGETED_3MM.passes_on_heldout_sessions ? "met" : "did not meet"} the two limits on held-out sessions.
-          Bootstrap intervals across whole sessions: false alarms {Math.round(TARGETED_3MM.heldout_matching_false_alarm_rate_95ci[0] * 100)}–
-          {Math.round(TARGETED_3MM.heldout_matching_false_alarm_rate_95ci[1] * 100)}%; shallow detected {Math.round(TARGETED_3MM.heldout_shallow_detection_rate_95ci[0] * 100)}–
+          Separate 3 mm check on the second half of the sessions: cutoff {TARGETED_3MM.threshold_mm.toFixed(2)} mm;
+          matching squats wrongly flagged{" "}
+          {TARGETED_3MM.heldout_matching_counts.false_alarms}/{TARGETED_3MM.heldout_matching_counts.matching_total}; shallow squats
+          flagged {TARGETED_3MM.heldout_shallow_counts.detected_shallow}/{TARGETED_3MM.heldout_shallow_counts.shallow_total};{" "}
+          {TARGETED_3MM.passes_on_heldout_sessions ? "met" : "did not meet"} the two limits on those new sessions.
+          Ranges from re-drawing whole sessions at random (a bootstrap): wrongly flagged {Math.round(TARGETED_3MM.heldout_matching_false_alarm_rate_95ci[0] * 100)}–
+          {Math.round(TARGETED_3MM.heldout_matching_false_alarm_rate_95ci[1] * 100)}%; shallow squats flagged {Math.round(TARGETED_3MM.heldout_shallow_detection_rate_95ci[0] * 100)}–
           {Math.round(TARGETED_3MM.heldout_shallow_detection_rate_95ci[1] * 100)}%.
         </p>
         <details>

@@ -6,12 +6,13 @@ depth of the squat (how far the hips drop). It is an entry for the CBSE Science
 Exhibition 2026-27, sub-theme "AI for Better Life".
 
 > [!IMPORTANT]
-> **Validation available so far uses generated data.**
-> Everything checked so far uses synthetic data. That means data made by a
-> computer program, where the right answer is known in advance. These checks show
-> that the software can recover a known answer. They do not show that phone
-> cameras are accurate. The first real-phone pilot will compare the reconstructed
-> depths with blinded readings of a pelvis marker against a measured scale.
+> **Everything tested so far uses simulated data.**
+> That means data made by a computer program, where the right answer is known in
+> advance. These tests show that the software can recover a known answer. They do
+> not show that phone cameras are accurate. The first real-phone pilot will
+> compare the reconstructed depths with readings of a pelvis marker against a
+> measured scale. Those readings are made before anyone looks at the software's
+> output.
 
 [Current exhibition write-up](docs/writeups/CBSE_2026_27.md) · [First recording](docs/PILOT_RECORDING_CHECKLIST.md)
 

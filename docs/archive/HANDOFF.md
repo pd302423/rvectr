@@ -75,13 +75,13 @@ Because processing 3D meshes is computationally heavy, the system bypasses Next.
 
 ## 4. Errors encountered
 
-### ✅ Solved
+### Solved
 
 | # | Error / issue | Cause | Resolution |
 |---|---|---|---|
 | 1 | `create-next-app` rejected "FitnessApp" folder name | npm naming rules: no capitals | Scaffolded into subdirectory `web/` — cleaner anyway |
 | 2 | `npx shadcn add form` silently failed | shadcn 4.8 + base-ui registry quirk for form component specifically | Wrote `form.tsx` manually; installed `@radix-ui/react-slot` for the Slot primitive (Base UI doesn't ship it) |
-| 3 | `⚠ The "middleware" file convention is deprecated` warning on every request | Next.js 16 renamed `middleware.ts` → `proxy.ts` | Renamed file, changed exported function name from `middleware` to `proxy` |
+| 3 | `The "middleware" file convention is deprecated` warning on every request | Next.js 16 renamed `middleware.ts` → `proxy.ts` | Renamed file, changed exported function name from `middleware` to `proxy` |
 | 4 | Runtime error: "Your project's URL and Key are required" when submitting signin form | Server action called `createClient()` without env-guard | Added `isSupabaseConfigured()` check in `sendMagicLink` returning a friendly redirect with error message |
 | 5 | UI "looked built by AI" (generic shadcn dark theme, card grids, gradient hero text, glassmorphism) | Out-of-the-box shadcn defaults | Full visual rebuild: removed card grids, switched to editorial asymmetric layout, added Instrument Serif display font, replaced feature grids with one detailed lab-report mockup, removed all gradients and backdrop-blur |
 | 6 | Dev server V8 crash after adding large biomechanics knowledge file | Turbopack memory pressure with large TS file | Use `node --max-old-space-size=4096 node_modules/.bin/next dev` flag when needed |
@@ -124,7 +124,7 @@ Because processing 3D meshes is computationally heavy, the system bypasses Next.
 ### Stack
 - Next.js **16.2.6** (App Router) + TypeScript 5
 - Tailwind 4 + shadcn **4.8** (Base UI, NOT Radix — except `@radix-ui/react-slot` for form)
-- Supabase (free tier, project name: "rvector", project ref: `dshalwuzxoprtqxfdskv`)
+- Supabase (free tier, project name: "rvector", project ref: `<project-ref>`)
 - React Hook Form + zod for forms
 - Sonner for toasts
 - Instrument Serif (display) + Geist Sans (body) + Geist Mono (data)
@@ -149,7 +149,7 @@ Remove-Item -Recurse -Force .next             # clear cache
 
 ### Environment variables (in `web/.env.local`)
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://dshalwuzxoprtqxfdskv.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<JWT>
 ANTHROPIC_API_KEY=(not set yet)
 ```

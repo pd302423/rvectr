@@ -22,7 +22,7 @@ Written 26 July 2026 for a proposed angular-velocity benchmark. For the current 
 - Delete the unbacked results in `cbse_science_exhibition_final_writeup.md`. No number ships without a script behind it.
 - Strip the SaaS: `dashboard`, `onboarding`, `signin`, `workouts`, `roster`, `supabase/`, `anthropic.ts`, `knowledge/`, mock `api/v1/analyze`. Relicense research-only.
 - Open `docs/log/` — dated entry every session, starting now.
-- **Pre-register on OSF.** Hypotheses and analysis plan, timestamped, before any data. Costs an evening; almost no pre-college researcher does it.
+- **Pre-register on OSF.** Hypotheses and analysis plan, timestamped, before any data. Costs an evening; few student researchers do it.
 - `smplx` loads; pose a mesh from known θ; render one frame offscreen (pyrender + EGL).
 
 ## W3–5 · Aug 10 – Aug 30 · The harness
@@ -77,11 +77,11 @@ If the schedule slips, this still constitutes a legitimate entry — novelty cla
 
 Web viewer · 3DPW/EMDB benchmark calibration · multi-subject study · IRB packet · TRAM/WHAM fourth backend · Blender pipeline work · paper publication · upstream PRs · mentor recruitment.
 
-None of it is needed to submit. All of it still serves Nov 2028.
+None of it is needed to submit. It all stays on the list for later.
 
 ---
 
-# PART 2 — Post-October, through Nov 2028
+# PART 2 — After October
 
 The remaining work was proposed for a later benchmark.
 
@@ -91,22 +91,9 @@ The remaining work was proposed for a later benchmark.
 | Feb – May 2027 | ISEF if reachable. Otherwise: workshop paper submission, Zenodo dataset, upstream PRs. |
 | Jun 2027 – Mar 2028 | Multi-subject running study **with local IRB approval first**. Extended benchmark. |
 | Apr – Sep 2028 | v1.0.0, publication, real external users, leaderboard submissions. |
-| Oct 2028 | Portfolio assembly — 27 months of log → 10 SlideRoom items. |
 
-### The 10 portfolio items
-
-1. The rig — two phones, checkerboard, your actual floor. Unstaged.
-2. **Video, 60–90 s:** one stride through all three pipelines, error overlaid live.
-3. Drift bug: before/after, with the root-translation diagnosis.
-4. Orientation bug: sideways mesh + your rotation math on paper.
-5. Harness diagram: known θ → render → recover → error.
-6. **The money figure:** error vs. angular velocity.
-7. Real-world validation: measurement photo + Bland–Altman plot.
-8. Repo: README, CI badge, DOI badge, real issues and stars.
-9. Engineering log spread — dated, messy, authentic.
-10. What I deleted and why — the SaaS, one honest paragraph.
-
-Every description answers: what broke, how you found it, what *you* did versus what the library did.
+Whatever is shown publicly should say what broke, how it was found, and what the
+project did itself versus what a library did.
 
 ---
 
@@ -124,7 +111,7 @@ Every description answers: what broke, how you found it, what *you* did versus w
 
 **Capture** — 120/240 fps phone slow-mo · OpenCV ChArUco · audio/LED sync · treadmill for known ground-truth speed
 
-**Experiments** — Hydra sweeps · Weights & Biases (public dashboards double as portfolio evidence)
+**Experiments** — Hydra sweeps · Weights & Biases (public dashboards let anyone check the results)
 
 **Validation** — authored-θ synthetic ground truth · *(3DPW, EMDB — post-October)* · Bland–Altman · bootstrap CIs
 
@@ -142,4 +129,3 @@ Every description answers: what broke, how you found it, what *you* did versus w
 - **Building the viewer.** It's the fun part and contributes least. It is cut.
 - **A number without a script.** The reason `ROADMAP.md` was retired.
 - **Retroactive log-writing.** Reviewers can tell. Write it the day it happens.
-- **Discovering the deadline moved.** Confirm with IRIS this week.

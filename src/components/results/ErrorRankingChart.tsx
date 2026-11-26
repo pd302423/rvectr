@@ -18,13 +18,15 @@ export function ErrorRankingChart() {
     <ChartFigure
       caption={
         <>
-          First passing tested training-grid value for two cameras at controlled pace. The baseline is {" "}
-          <span className="font-mono tabular-nums">{fmt(ERROR_BUDGET_BASELINE_MM)}</span>. Each row then reports
-          held-out false alarms, shallow detections and whether the frozen training cutoff met both limits in this run.
+          Smallest tested depth change that met both limits on the first half of the simulated sessions, for two cameras
+          at controlled pace. The baseline is {" "}
+          <span className="font-mono tabular-nums">{fmt(ERROR_BUDGET_BASELINE_MM)}</span>. Each row then reports,
+          for the other half of the sessions, how many matching squats were wrongly flagged, how many shallow squats were
+          flagged, and whether the locked cutoff passed both limits.
         </>
       }
     >
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Training-selected grid points and held-out count results for modeled two-camera sensitivity cases." className="block h-auto w-full">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Smallest passing depth change on the first half of the sessions, and the check on the other half, for each assumed error in the two-camera case." className="block h-auto w-full">
         {TICKS.map((tick) => (
           <g key={tick}>
             <line x1={x(tick)} x2={x(tick)} y1={TOP} y2={H - AXIS_H + 2} className="stroke-border" strokeWidth={1} />
@@ -40,7 +42,7 @@ export function ErrorRankingChart() {
             <g key={row.label}>
               <text x={LEFT} y={y + 14} className="fill-foreground text-[13px]">{row.label}</text>
               {row.trainingMddMm === null ? (
-                <text x={LEFT} y={y + 35} className="fill-muted-foreground text-[12px]">No training-grid value passed</text>
+                <text x={LEFT} y={y + 35} className="fill-muted-foreground text-[12px]">No tested depth change passed</text>
               ) : (
                 <>
                   <rect x={LEFT} y={y + 22} width={width} height={BAR_H} rx={2} className="fill-data" />
@@ -48,7 +50,7 @@ export function ErrorRankingChart() {
                 </>
               )}
               <text x={LEFT} y={y + 50} className="fill-muted-foreground text-[11px]">
-                Held out: {row.falseAlarms}/{row.falseAlarmTotal} false alarms; {row.detectedShallow}/{row.shallowTotal} shallow flagged; {row.heldoutPass ? "pass" : "fail"}
+                Other half: {row.falseAlarms}/{row.falseAlarmTotal} matching wrongly flagged; {row.detectedShallow}/{row.shallowTotal} shallow flagged; {row.heldoutPass ? "passed" : "did not pass"}
               </text>
             </g>
           );
@@ -56,12 +58,12 @@ export function ErrorRankingChart() {
       </svg>
       <div className="sr-only">
         <table>
-          <caption>Training-selected grid results and frozen held-out counts. Simulation only.</caption>
-          <thead><tr><th scope="col">Modeled condition</th><th scope="col">Training grid value</th><th scope="col">False alarms</th><th scope="col">Shallow flagged</th><th scope="col">Held-out result</th></tr></thead>
+          <caption>Smallest passing depth change on the first half of the sessions, and the locked check on the other half. Simulation only.</caption>
+          <thead><tr><th scope="col">Assumed error</th><th scope="col">Smallest passing depth change (first half)</th><th scope="col">Matching squats wrongly flagged (other half)</th><th scope="col">Shallow squats flagged (other half)</th><th scope="col">Result on the other half</th></tr></thead>
           <tbody>{ERROR_BUDGET.map((row) => <tr key={row.label}>
             <th scope="row">{row.label}</th><td>{fmt(row.trainingMddMm)}</td>
             <td>{row.falseAlarms}/{row.falseAlarmTotal}</td><td>{row.detectedShallow}/{row.shallowTotal}</td>
-            <td>{row.heldoutPass ? "pass" : "fail"}</td>
+            <td>{row.heldoutPass ? "passed" : "did not pass"}</td>
           </tr>)}</tbody>
         </table>
       </div>

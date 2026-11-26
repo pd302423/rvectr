@@ -72,7 +72,7 @@ export const FIXED_RULE_CURVE: readonly FixedRulePoint[] = Object.keys(twoCamera
   });
 
 export const NOISE_DEFINITIONS =
-  "Noise levels are simulated settings, not estimates from phone recordings. Hip-point noise is specified in model pixels and converted to millimetres at the simulated person.";
+  "Noise levels are simulated settings, not estimates from phone recordings. Hip-point noise is set in \"model pixels\" (one pixel of the small, shrunk picture the pose model works on) and converted to millimetres at the simulated person.";
 
 /* ------------------------------------------------------------------ */
 /* 1. Camera count                                                      */
@@ -135,19 +135,19 @@ export const SCENARIOS: readonly Scenario[] = [
   {
     key: "clean",
     label: "Lower random noise",
-    note: "Independent hip-point noise: 0.5 model pixel per camera, hip and image axis.",
+    note: "Random error in each hip point, drawn separately for every camera, hip and image direction: 0.5 model pixel.",
     values: modes.map((mode) => ({ controlled: referenceValue(0.5, mode, "controlled"), fast: referenceValue(0.5, mode, "fast") })),
   },
   {
     key: "noisy",
     label: "Higher random noise",
-    note: "Independent hip-point noise is doubled to 1.0 model pixel; this is a sensitivity setting, not a phone estimate.",
+    note: "The same random error, doubled to 1.0 model pixel. This is a test setting, not an estimate for real phones.",
     values: modes.map((mode) => ({ controlled: referenceValue(1.0, mode, "controlled"), fast: referenceValue(1.0, mode, "fast") })),
   },
   {
     key: "drift",
-    label: "Correlated drift",
-    note: "Independent AR(1) drift of 0.5 model pixel per camera, hip and image axis; not measured from phones.",
+    label: "Slow drift",
+    note: "Error that wanders slowly instead of jumping about, drawn separately for every camera, hip and image direction: 0.5 model pixel. Not measured from phones.",
     values: modes.map((mode) => ({ controlled: driftValue(mode, "controlled"), fast: driftValue(mode, "fast") })),
   },
 ];
@@ -255,14 +255,14 @@ const extraRepRow = (estimator: string) => {
 export const OLD_VS_NEW: readonly OldVsNewRow[] = [
   { measure: "Average depth error, lower random noise", kind: "signedMm", oldRule: estimatorRow("extreme", 0.5).mean_depth_error_mm, newRule: estimatorRow("parabola", 0.5).mean_depth_error_mm },
   { measure: "Average depth error, higher random noise", kind: "signedMm", oldRule: estimatorRow("extreme", 1.0).mean_depth_error_mm, newRule: estimatorRow("parabola", 1.0).mean_depth_error_mm },
-  { measure: "First training-grid value, lower random noise", kind: "mm", oldRule: estimatorRow("extreme", 0.5).minimum_detectable_difference_mm, newRule: estimatorRow("parabola", 0.5).minimum_detectable_difference_mm },
-  { measure: "Extra repetitions found per take, 2 model-pixel noise", kind: "count", oldRule: extraRepRow("extreme"), newRule: extraRepRow("parabola") },
+  { measure: "Smallest passing depth change (first half of sessions), lower random noise", kind: "mm", oldRule: estimatorRow("extreme", 0.5).minimum_detectable_difference_mm, newRule: estimatorRow("parabola", 0.5).minimum_detectable_difference_mm },
+  { measure: "Extra repetitions found per take, random noise of 2 model pixels", kind: "count", oldRule: extraRepRow("extreme"), newRule: extraRepRow("parabola") },
 ];
 
 const MINUS = "−";
 
 export function formatValue(value: number | null, kind: ValueKind): string {
-  if (value === null) return kind === "mm" ? `not reached (grid to ${gridLimitMm.toFixed(0)} mm)` : "not reached";
+  if (value === null) return kind === "mm" ? `not reached (tested up to ${gridLimitMm.toFixed(0)} mm)` : "not reached";
   const abs = Math.abs(value).toFixed(1);
   switch (kind) {
     case "signedMm":
@@ -315,14 +315,14 @@ export interface ErrorSource {
 }
 
 const SENSITIVITY_LABELS: Record<string, string> = {
-  clustered_missing_8_frames: "Clustered missing detections (8 frames)",
-  motion_dependent_noise_100pct: "Motion-dependent noise (100%)",
-  camera_specific_bias_0_5_px: "Camera-specific bias (0.5 image px)",
-  shared_vertical_error_4mm: "Shared vertical error (4 mm)",
-  slow_drift_0_5_model_px: "Slow hip-point drift (0.5 model px)",
-  two_camera_offset_1_frame: "Two-camera offset (1 frame)",
-  camera_center_error_10mm: "Camera center error (10 mm)",
-  camera_rotation_error_0_5deg: "Camera rotation error (0.5°)",
+  clustered_missing_8_frames: "Bursts of missing detections (8 frames)",
+  motion_dependent_noise_100pct: "Noise that grows with movement (100%)",
+  camera_specific_bias_0_5_px: "Constant error for each camera (0.5 image pixel)",
+  shared_vertical_error_4mm: "Vertical error shared by all cameras (4 mm)",
+  slow_drift_0_5_model_px: "Slow drift in hip points (0.5 model pixel)",
+  two_camera_offset_1_frame: "Timing offset between two cameras (1 frame)",
+  camera_center_error_10mm: "Camera position error (10 mm)",
+  camera_rotation_error_0_5deg: "Camera angle error (0.5°)",
 };
 const baselineRow = simulation.reference_table.find((row) => row.mode === "two_cam" && row.white_noise_model_px === 0.5 && row.pace === "controlled");
 if (!baselineRow) throw new Error("Missing two-camera baseline simulation row");
