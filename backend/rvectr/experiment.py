@@ -93,6 +93,30 @@ def load_annotations(path):
     return rows
 
 
+class AnnotationConfigError(ValueError):
+    """The annotation file and the matching settings cannot be scored together."""
+
+
+def check_match_window(annotations, match_window_s):
+    """Refuse a match window that could pair one detection with two annotations.
+
+    One-to-one matching keeps as many pairs as possible before it looks at timing
+    error. If two annotated bottoms are closer than twice the window, a missed
+    squat could be paired with its neighbour's detection to free a second pair.
+    Requiring the window to be under half the smallest gap rules that out.
+    """
+    timed = sorted((row["bottom_s"], row["annotation_id"]) for row in annotations
+                   if row["bottom_s"] is not None)
+    if len(timed) < 2:
+        return
+    gap, first, second = min((b[0] - a[0], a[1], b[1]) for a, b in zip(timed, timed[1:]))
+    if match_window_s >= gap / 2:
+        raise AnnotationConfigError(
+            f"experiment.match_window_s ({match_window_s:g} s) must be less than half the smallest gap between "
+            f"annotated bottom times ({gap:g} s, between '{first}' and '{second}'); use a window below "
+            f"{gap / 2:g} s or correct the annotation times")
+
+
 def _finite_stats(values):
     values = np.asarray(values, float)
     values = values[np.isfinite(values)]
@@ -113,6 +137,7 @@ def score_condition(annotations, reps, match_window_s=0.5, tolerance_m=0.03, bor
         raise ValueError("match window must be positive and tolerances non-negative")
     if not annotations:
         raise ValueError("At least one independent annotation is required")
+    check_match_window(annotations, match_window_s)
     reference_index = next(i for i, row in enumerate(annotations) if row["role"] == "reference")
     reference = annotations[reference_index]
     tests = [row for row in annotations if row["role"] == "test"]
@@ -304,11 +329,15 @@ def score_condition(annotations, reps, match_window_s=0.5, tolerance_m=0.03, bor
 
     extras = [rep for i, rep in enumerate(detections) if i not in used_reps]
     counts["extra"] = len(extras)
+    # Pieces of one squat cut by a timestamp hole are still counted as extra detections,
+    # but this count shows how many of them are such pieces.
+    counts["extra_split_by_gap"] = sum(bool(rep.get("split_by_gap")) for rep in extras)
     for index, rep in enumerate(extras, start=1):
         rows.append({"annotation_id": None, "role": None, "label": None, "bottom_s": None,
                      "status": "extra_detection", "matched": False, "detection_rep": rep.get("rep"),
                      "detection_bottom_s": rep.get("bottom_s"), "depth_m": rep.get("depth_m"),
-                     "model_outcome": rep.get("outcome"), "extra_index": index})
+                     "model_outcome": rep.get("outcome"), "extra_index": index,
+                     "split_by_gap": bool(rep.get("split_by_gap"))})
         mapped_detections.append({**rep, "annotation_id": None, "is_reference": False,
                                   "reference_status": reference_status})
     denominator = counts["scorable_matched"]
@@ -332,3 +361,35 @@ def score_condition(annotations, reps, match_window_s=0.5, tolerance_m=0.03, bor
                                  "positive": "depth >= matched reference depth - tolerance"},
                "uncertainty_note": "Blank marker or reader uncertainties remain unknown; no zero uncertainty is assumed."}
     return {"summary": summary, "rows": rows, "detections": mapped_detections}
+
+
+# Counts and rates that come from the model's detections. They are unknown
+# (None) for a condition that failed, not zero.
+_DETECTION_COUNTS = ("matched_any", "matched", "missed", "extra", "scorable_matched", "model_unclear",
+                     "correct", "false_pass", "false_flag", "marker_depth_available", "extra_split_by_gap")
+_DETECTION_RATES = ("denominator", "accuracy", "conditional_accuracy", "false_pass_rate", "false_flag_rate",
+                    "end_to_end_accuracy", "matched_annotation_coverage", "all_attempt_coverage")
+
+
+def score_failed_condition(annotations, reason, match_window_s=0.5, tolerance_m=0.03, borderline_m=0.01,
+                           min_coverage=0.85):
+    """Record a condition that could not be measured at all (for example a plane or triangulation error).
+
+    Every attempt keeps its ID but is marked condition_failed instead of missed, and the
+    detection-based counts and rates are None. The reason is stored on the summary and each row.
+    """
+    scored = score_condition(annotations, [], match_window_s, tolerance_m, borderline_m, min_coverage)
+    summary = scored["summary"]
+    for key in _DETECTION_COUNTS:
+        summary["counts"][key] = None
+    for key in _DETECTION_RATES:
+        summary["classification"][key] = None
+    summary["reference_status"] = "condition_failed"
+    summary["failure_reason"] = reason
+    for row in scored["rows"]:
+        row["reference_status"] = "condition_failed"
+        row["condition_failure"] = reason
+        # Rejected and unscorable attempts never reach the model, so they keep their annotation status.
+        if row["status"] not in ("rejected", "unscorable"):
+            row["status"] = "condition_failed"
+    return scored

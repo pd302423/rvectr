@@ -140,6 +140,9 @@ def run(argv):
     if experiment:
         print("\nIndependent annotation score (reference excluded; same timed list for each condition):")
         for name, entry in experiment.items():
+            if entry.get("status") == "failed":
+                print(f"  {name}: condition failed, not scored ({entry.get('error')})")
+                continue
             counts = entry.get("counts", {})
             classification = entry.get("classification", {})
             accuracy = classification.get("accuracy")

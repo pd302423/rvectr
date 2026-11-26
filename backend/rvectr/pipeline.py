@@ -26,7 +26,8 @@ from .sync import interpolate_observations
 
 DEFAULTS = {
     "sync": {"method": "flash", "start_window_s": 10.0, "end_window_s": 10.0, "roi": {}},
-    "pose": {"mode": "balanced", "device": "cpu", "backend": "onnxruntime", "stride": 1, "det_frequency": 5},
+    "pose": {"mode": "balanced", "device": pose2d.DEFAULT_DEVICE, "backend": "onnxruntime", "stride": 1,
+             "det_frequency": 5},
     "triangulation": {"min_confidence": 0.3, "max_reprojection_px": 10.0, "min_ray_angle_deg": 3.0},
     "squat": {"standing_window_s": None, "reference_rep": 1, "tolerance_m": 0.03, "filter_frames": 5,
               "min_rep_depth_m": 0.06, "min_coverage": 0.85, "borderline_m": 0.01, "primary": "raw",
@@ -39,8 +40,10 @@ DEFAULTS = {
 def load_session(path):
     path = Path(path)
     config = load_capture_config(path)
+    set_by_user = "device" in (config.get("pose") or {})
     for section, values in DEFAULTS.items():
         config[section] = {**values, **(config.get(section) or {})}
+    config["pose"]["device_source"] = "config" if set_by_user else "default"
     if config["squat"]["primary"] not in ("raw", "filtered"):
         raise ValueError("squat.primary must be 'raw' or 'filtered'")
     if config["squat"]["estimator"] not in ("parabola", "extreme"):
@@ -418,11 +421,13 @@ def compare_views(observations, cameras, syncs, up, config, sequence, result, fr
                                                             "n": len(diffs_reference)},
             "classification_error": measured["error"]}
         if annotations is not None:
-            scored = experiment.score_condition(annotations, measured["reps"],
-                                                config["experiment"]["match_window_s"],
-                                                config["experiment"]["tolerance_m"],
-                                                config["experiment"]["borderline_m"],
-                                                config["squat"]["min_coverage"])
+            policy = (config["experiment"]["match_window_s"], config["experiment"]["tolerance_m"],
+                      config["experiment"]["borderline_m"], config["squat"]["min_coverage"])
+            if condition_error:
+                # The condition could not be measured: record it as failed, not as every squat missed.
+                scored = experiment.score_failed_condition(annotations, condition_error, *policy)
+            else:
+                scored = experiment.score_condition(annotations, measured["reps"], *policy)
             experiment_conditions[cond["name"]] = {"cameras": cond["cameras"], "model": cond["model"],
                                                      "status": "failed" if condition_error else "scored",
                                                      "plane_source": summary[cond["name"]]["plane_source"],
@@ -599,6 +604,8 @@ def _sync(config, video_paths, metadata, run):
 def _detect(config, video_paths, metadata, run, keypoints_from=None, progress=print):
     observations = []
     detector = None
+    if config["pose"].get("device_source") == "default":
+        progress(f"pose.device is not set in the config: using the default '{config['pose']['device']}'")
     for camera, path, info in zip(config["cameras"], video_paths, metadata):
         target = run / "keypoints2d" / f"{camera['id']}.npz"
         identity = pose2d.cache_identity(camera["id"], info["sha256"], info, config["pose"])
@@ -624,6 +631,9 @@ def _detect(config, video_paths, metadata, run, keypoints_from=None, progress=pr
             if any(weights[key]["sha256"] != value for key, value in identity["expected_weight_sha256"].items()):
                 raise ValueError("Detector weights differ from the expected hashes for the requested pose settings")
             observation["source_identity"] = identity
+            # Say whether the device came from the config or from the default.
+            observation["detector_settings"] = {**observation["detector_settings"],
+                                                "device_source": config["pose"].get("device_source")}
         pose2d.save(target, observation)
         observations.append(observation)
     return observations
@@ -655,6 +665,7 @@ def run_session(config_path, paths, output_root=None, keypoints_from=None, progr
         annotation_path = config["experiment"]["annotations"]
         if annotation_path:
             annotations = experiment.load_annotations(annotation_path)
+            experiment.check_match_window(annotations, config["experiment"]["match_window_s"])
             manifest["annotation_sha256"] = sha256(annotation_path)
         video_paths = [paths.video(c["video"]) for c in config["cameras"]]
         metadata = []
@@ -697,7 +708,10 @@ def run_session(config_path, paths, output_root=None, keypoints_from=None, progr
             report["scoring"] = {"source": "independent_timed_annotations",
                                  "annotations_file": config["experiment"]["annotations"],
                                  "annotations_sha256": manifest["annotation_sha256"],
-                                 "primary_condition": name, "legacy_rep_number_labels_used": False}
+                                 "primary_condition": name, "legacy_rep_number_labels_used": False,
+                                 "decision_settings": _annotated_decision_settings(config)}
+            if report["scoring"]["decision_settings"]["warning"]:
+                progress("Warning: " + report["scoring"]["decision_settings"]["warning"])
         _write_tables(run, sequence, result)
         _plot_trace(run / "depth_trace.png", sequence["times_s"], result, config)
         if config["views"]["compare"]:
@@ -722,7 +736,8 @@ def run_session(config_path, paths, output_root=None, keypoints_from=None, progr
             report.update(status="failed", pipeline_failure=str(error), traceback_file="error.txt")
         else:
             report = {"run_id": run.name, "status": "failed", "accuracy_validated": False,
-                      "stage": "configuration" if config is None else "analysis",
+                      "stage": ("configuration" if config is None or isinstance(error, experiment.AnnotationConfigError)
+                                else "analysis"),
                       "error": str(error), "traceback_file": "error.txt",
                       "config_path": str(config_path), "config_sha256": manifest["config_attempt"]["sha256"]}
             report["reference_source"] = {"kind": "unavailable", "reason": "failed before resolving reference"}
@@ -762,6 +777,22 @@ def run_session(config_path, paths, output_root=None, keypoints_from=None, progr
                     report["experiment_attempt"] = attempt
         write_json(run / "report.json", report)
         raise
+
+
+def _annotated_decision_settings(config):
+    """The tolerances that scored an annotated run, and any squat.* values that were ignored.
+
+    With annotations the experiment section decides; squat.tolerance_m and squat.borderline_m
+    belong to the older rep-number path and are not used.
+    """
+    used = {key: config["experiment"][key] for key in ("tolerance_m", "borderline_m")}
+    ignored = {f"squat.{key}": config["squat"][key] for key in used if config["squat"][key] != used[key]}
+    warning = None
+    if ignored:
+        warning = (f"Annotated scoring used experiment.tolerance_m={used['tolerance_m']:g} and "
+                   f"experiment.borderline_m={used['borderline_m']:g}; ignored "
+                   + ", ".join(f"{name}={value:g}" for name, value in ignored.items()) + ".")
+    return {**used, "source": "experiment section", "squat_values_not_used": ignored, "warning": warning}
 
 
 def _labels(config):
@@ -843,7 +874,7 @@ def _write_tables(run, sequence, result):
                              sequence["reprojection_px"][i, 11], sequence["reprojection_px"][i, 12])])
     columns = ["rep", "annotation_id", "quality_status", "outcome", "borderline", "is_reference", "depth_m", "difference_from_reference_m",
                "descent_s", "coverage", "start_s", "bottom_s", "end_s", "standing_m", "bottom_m",
-               "depth_se_m", "difference_se_m", "bottom_samples", "estimator", "bottom_model"]
+               "depth_se_m", "difference_se_m", "bottom_samples", "estimator", "bottom_model", "split_by_gap"]
     for name, entry in result["reps"].items():
         with (run / f"reps_{name}.csv").open("w", newline="", encoding="utf-8") as stream:
             writer = csv.DictWriter(stream, fieldnames=columns, extrasaction="ignore")

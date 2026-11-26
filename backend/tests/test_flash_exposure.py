@@ -32,6 +32,24 @@ def test_distractor_and_missing_end_are_visible():
     assert result["end_sampling_uncertainty_s"] is None
 
 
+def test_two_candidate_flashes_in_a_window_are_reported_as_ambiguous_not_missing():
+    a = pulses(30, .025)
+    reference = {**a, "candidate_counts": {"start": 1, "end": 1}}
+    two_starts = {"start": None, "end": a["end"], "candidate_counts": {"start": 2, "end": 1}}
+    result = flashsync.align(reference, two_starts, 1/30)
+    assert result["status"] == "failed"
+    assert result["reason"] == "start_pulse_ambiguous: candidate flashes in the start window: reference 1, other 2"
+    # No flash at all keeps the "not found" reason.
+    none_found = {"start": None, "end": None, "candidate_counts": {"start": 0, "end": 0}}
+    assert flashsync.align(reference, none_found, 1/30)["reason"] == "start_pulse_not_found_in_both_cameras"
+    # The same for the end window: the take stays offset-only, and the warning says why.
+    two_ends = {"start": a["start"], "end": None, "candidate_counts": {"start": 1, "end": 2}}
+    result = flashsync.align(reference, two_ends, 1/30)
+    assert result["status"] == "offset_only" and not result["drift_checked"]
+    assert result["warning"] == ("End pulse ambiguous (candidate flashes in the end window: reference 1, other 2)"
+                                 ": drift could not be checked")
+
+
 def test_speed_comparison_blocks_start_only_and_records_sync(tmp_path, monkeypatch):
     from rvectr import pipeline
 

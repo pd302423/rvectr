@@ -98,6 +98,18 @@ def _pick(events, window):
     return inside[0] if len(inside) == 1 else None
 
 
+def _candidate_note(which, reference, other):
+    """Whether a window held several candidate flashes, and the counts per camera as text.
+
+    The counts come from synchronize(); cameras given as plain landmarks carry none (unknown).
+    """
+    counts = {name: (camera.get("candidate_counts") or {}).get(which)
+              for name, camera in (("reference", reference), ("other", other))}
+    ambiguous = any(count is not None and count > 1 for count in counts.values())
+    text = ", ".join(f"{name} {'unknown' if count is None else count}" for name, count in counts.items())
+    return ambiguous, text
+
+
 def windows_for(times, start_window_s, end_window_s):
     first, last = float(times[0]), float(times[-1])
     mid = (first + last) / 2
@@ -111,6 +123,9 @@ def align(reference, other, frame_period_s, max_drift_fraction=0.005):
     Mapping: reference_time = other_time + offset_s + drift_rate * (other_time - anchor_s).
     """
     if not reference.get("start") or not other.get("start"):
+        ambiguous, counts = _candidate_note("start", reference, other)
+        if ambiguous:   # two or more flashes in the window: none was chosen, which is not the same as none found
+            return {"status": "failed", "reason": "start_pulse_ambiguous: candidate flashes in the start window: " + counts}
         return {"status": "failed", "reason": "start_pulse_not_found_in_both_cameras"}
     start_offset = reference["start"]["onset_s"] - other["start"]["onset_s"]
     def uncertainty(which):
@@ -140,7 +155,9 @@ def align(reference, other, frame_period_s, max_drift_fraction=0.005):
             if abs(drift) > 0.5 * frame_period_s:
                 result["warning"] = "Clocks drift by more than half a frame over the take; linear correction applied"
     else:
-        result["warning"] = "No end pulse in both cameras: drift could not be checked"
+        ambiguous, counts = _candidate_note("end", reference, other)
+        result["warning"] = (("End pulse ambiguous (candidate flashes in the end window: " + counts + ")")
+                             if ambiguous else "No end pulse in both cameras") + ": drift could not be checked"
     return result
 
 

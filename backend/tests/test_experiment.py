@@ -2,7 +2,13 @@ import csv
 
 import pytest
 
-from rvectr.experiment import ANNOTATION_COLUMNS, load_annotations, score_condition
+from rvectr.experiment import (ANNOTATION_COLUMNS, AnnotationConfigError, load_annotations,
+                               score_condition as score_with_window, score_failed_condition)
+
+
+def score_condition(annotations, reps, **settings):
+    """Most tests space attempts 1 s apart, so use a 0.4 s window (it must stay under half the gap)."""
+    return score_with_window(annotations, reps, **{"match_window_s": 0.4, **settings})
 
 
 def write_annotations(path, rows):
@@ -130,7 +136,9 @@ def test_annotation_label_conflict_with_clear_marker_is_flagged_and_preserved(tm
     assert len(scored["rows"]) == 2
 
 
-def test_time_match_maximizes_valid_pairs_before_minimizing_time_error(tmp_path):
+def test_match_window_must_be_under_half_the_gap_between_annotated_bottoms(tmp_path):
+    # Bottoms 0.8 s apart and a 0.5 s window: a missed squat could be paired with its
+    # neighbour's detection up to 0.5 s away to free a second pair. That is refused.
     annotations = [row("base", 0.0, "reference"), row("rep2", 0.8)]
     annotations = load_annotations(write_annotations(tmp_path / "score.csv", annotations))
     reps = [
@@ -139,12 +147,68 @@ def test_time_match_maximizes_valid_pairs_before_minimizing_time_error(tmp_path)
         {"rep": 2, "bottom_s": 0.3, "depth_m": .30, "coverage": .99, "bottom_observed": True,
          "depth_se_m": .001},
     ]
-    scored = score_condition(annotations, reps)
-    summary = scored["summary"]
-    assert summary["counts"]["matched"] == 1
-    assert summary["counts"]["missed"] == 0
+    with pytest.raises(AnnotationConfigError, match=r"less than half the smallest gap.*'base' and 'rep2'"):
+        score_with_window(annotations, reps, match_window_s=0.5)
+    # Exactly half the gap is still refused. Under half is accepted, and the squat nobody
+    # detected stays missed instead of being rescued by a neighbouring detection.
+    with pytest.raises(AnnotationConfigError):
+        score_with_window(annotations, reps, match_window_s=0.4)
+    counts = score_with_window(annotations, reps, match_window_s=0.39)["summary"]["counts"]
+    assert counts["missed"] == 1 and counts["extra"] == 1
+
+
+def test_well_spaced_take_matches_each_detection_to_its_own_annotation(tmp_path):
+    annotations = [row("base", 0.0, "reference"), row("rep2", 3.0), row("rep3", 6.0)]
+    annotations = load_annotations(write_annotations(tmp_path / "score.csv", annotations))
+    reps = [
+        {"rep": 1, "bottom_s": -0.4, "depth_m": .30, "coverage": .99, "bottom_observed": True,
+         "depth_se_m": .001},
+        {"rep": 2, "bottom_s": 3.3, "depth_m": .30, "coverage": .99, "bottom_observed": True,
+         "depth_se_m": .001},
+    ]
+    scored = score_with_window(annotations, reps)   # default 0.5 s window, bottoms 3 s apart
+    counts = scored["summary"]["counts"]
+    assert counts["matched"] == 1 and counts["missed"] == 1 and counts["extra"] == 0
     mapped = {item["annotation_id"]: item["bottom_s"] for item in scored["detections"] if item["annotation_id"]}
-    assert mapped == {"base": -0.5, "rep2": 0.3}
+    assert mapped == {"base": -0.4, "rep2": 3.3}
+
+
+def test_failed_condition_keeps_attempt_ids_and_leaves_rates_unknown(tmp_path):
+    annotations = [row("base", 1.0, "reference"), row("rep2", 2.0), row("rep3", 3.0, label="shallow"),
+                   row("rep4", 4.0, label="rejected")]
+    annotations = load_annotations(write_annotations(tmp_path / "score.csv", annotations))
+    scored = score_failed_condition(annotations, "movement plane could not be placed", match_window_s=0.4)
+    assert [item["annotation_id"] for item in scored["rows"]] == ["base", "rep2", "rep3", "rep4"]
+    # Not "missed": the condition never produced detections. A rejected attempt keeps its own status.
+    assert [item["status"] for item in scored["rows"]] == ["condition_failed"] * 3 + ["rejected"]
+    assert all(item["condition_failure"] == "movement plane could not be placed" for item in scored["rows"])
+    summary = scored["summary"]
+    assert summary["failure_reason"] == "movement plane could not be placed"
+    assert summary["reference_status"] == "condition_failed"
+    for key in ("matched", "missed", "extra", "correct", "false_pass", "false_flag", "model_unclear"):
+        assert summary["counts"][key] is None, key
+    for key in ("denominator", "accuracy", "end_to_end_accuracy", "false_pass_rate", "false_flag_rate",
+                "matched_annotation_coverage", "all_attempt_coverage"):
+        assert summary["classification"][key] is None, key
+    # What the annotations alone say is still reported.
+    assert summary["classification"]["all_eligible_tests_denominator"] == 2
+    assert summary["counts"]["rejected"] == 1 and scored["detections"] == []
+
+
+def test_pieces_of_a_squat_cut_by_a_hole_are_flagged_among_the_extra_detections(tmp_path):
+    annotations = [row("base", 1.0, "reference"), row("rep2", 2.0)]
+    annotations = load_annotations(write_annotations(tmp_path / "score.csv", annotations))
+    reps = [
+        {"rep": 1, "bottom_s": 1.0, "depth_m": .3, "coverage": .99, "bottom_observed": True},
+        {"rep": 2, "bottom_s": 2.0, "depth_m": .29, "coverage": .99, "bottom_observed": True},
+        {"rep": 3, "bottom_s": 6.0, "depth_m": .1, "coverage": .6, "bottom_observed": False, "split_by_gap": True},
+        {"rep": 4, "bottom_s": 9.0, "depth_m": .3, "coverage": .99, "bottom_observed": True},
+    ]
+    scored = score_condition(annotations, reps)
+    extras = [item for item in scored["rows"] if item["status"] == "extra_detection"]
+    assert [(item["detection_rep"], item["split_by_gap"]) for item in extras] == [(3, True), (4, False)]
+    assert scored["summary"]["counts"]["extra"] == 2
+    assert scored["summary"]["counts"]["extra_split_by_gap"] == 1
 
 
 def test_tolerance_boundary_is_inclusive_with_float_rounding(tmp_path):

@@ -94,12 +94,15 @@ def test_shallow_repetitions_are_flagged_with_the_default_rule():
     assert eb.flag_rate(deep) == 0 and eb.flag_rate(shallow) == 1
 
 
-def test_minimum_detectable_difference_returns_a_tested_grid_value_without_interpolation():
-    setup = eb.Setup(white_px=eb.model_px_to_image_px(0.5))
-    grid_cm = (0, 2, 4, 8)
-    runs = [eb.run_config(setup, d / 100, 20, seed=6) for d in grid_cm]
-    detected, _ = eb.minimum_detectable_difference_m(runs)
-    assert not np.isfinite(detected) or detected in {d / 100 for d in grid_cm[1:]}
+def test_minimum_detectable_difference_grows_with_noise_and_is_a_tested_grid_value():
+    grid_m = [step / 200 for step in range(7)]          # 0, 0.5 cm, ... 3 cm: fine enough to tell the noise levels apart
+    found = []
+    for model_px in (0.25, 1.0, 2.0):
+        setup = eb.Setup(white_px=eb.model_px_to_image_px(model_px))
+        runs = [eb.run_config(setup, delta, 24, seed=6) for delta in grid_m]
+        found.append(eb.minimum_detectable_difference_m(runs)[0])
+    assert all(value in grid_m[1:] for value in found)   # a tested value, never interpolated
+    assert found == sorted(found) and found[0] < found[-1]
 
 
 def test_simulated_truth_matching_windows_are_disjoint_for_both_paces():

@@ -18,6 +18,15 @@ from .media import frames
 
 JOINTS = len(JOINT_NAMES)
 
+# Used when the session config does not set pose.device. Live detection records whether the
+# device came from the config or from this default (detector_settings["device_source"]).
+DEFAULT_DEVICE = "cpu"
+
+# Bump this when a change to RTMLibDetector, choose_person or detect_video, or to what a cache
+# holds, would change the saved keypoints. Caches with another number must be regenerated.
+# Other edits to this file leave existing caches valid; a test fails if the detection code changes.
+CACHE_FORMAT_VERSION = 1
+
 
 # ONNX file digests from the published balanced RTMLib 0.0.15 archives.
 BALANCED_WEIGHTS = {
@@ -29,7 +38,7 @@ BALANCED_WEIGHTS = {
 class RTMLibDetector:
     name = "rtmlib.Body (YOLOX + RTMPose, COCO-17)"
 
-    def __init__(self, mode="balanced", device="cpu", backend="onnxruntime", det_frequency=5):
+    def __init__(self, mode="balanced", device=DEFAULT_DEVICE, backend="onnxruntime", det_frequency=5):
         """det_frequency: run the person detector every N frames; between those, the
         box comes from the previous frame's keypoints. 1 = detect on every frame."""
         try:
@@ -141,20 +150,40 @@ def load(path):
     return observation
 
 
+def _installed_version(*distributions):
+    """Version of the first of these installed packages (importlib.metadata), or None if none is installed."""
+    from importlib.metadata import PackageNotFoundError, version
+    for name in distributions:
+        try:
+            return version(name)
+        except PackageNotFoundError:
+            continue
+    return None
+
+
+def _version_note(name, saved, installed):
+    return f"{name} version (cache {saved}, installed {installed or 'not installed'})"
+
+
 def cache_identity(camera_id, video_sha256, metadata, settings):
     """Inputs used to generate a full-take observation cache, excluding later scoring settings."""
-    from .records import sha256
+    detector = settings.get("source", RTMLibDetector.name)
     return {
         "schema": 1, "camera_id": camera_id, "video_sha256": video_sha256,
         "image_size": list(metadata["image_size"]), "coded_size": list(metadata["coded_size"]),
         "rotation_degrees": metadata["rotation_metadata_degrees"],
-        "detector": settings.get("source", RTMLibDetector.name),
+        "detector": detector,
         "pose": {key: settings[key] for key in ("mode", "backend", "device", "det_frequency", "stride")},
         "edge_margin_fraction": settings.get("edge_margin_fraction", 0.01),
         "expected_weight_sha256": (settings.get("weight_sha256") or
                                    (BALANCED_WEIGHTS if settings["mode"] == "balanced" else {}))
-                                  if settings.get("source", RTMLibDetector.name) == RTMLibDetector.name else {},
-        "implementation_sha256": sha256(__file__),
+                                  if detector == RTMLibDetector.name else {},
+        # The library versions installed now, not fixed numbers: a cache is only reused with the
+        # versions that wrote it.
+        "libraries": ({"rtmlib": _installed_version("rtmlib"),
+                       "onnxruntime": _installed_version("onnxruntime", "onnxruntime-gpu")}
+                      if detector == RTMLibDetector.name else {}),
+        "cache_format_version": CACHE_FORMAT_VERSION,
     }
 
 
@@ -165,6 +194,11 @@ def verified_cache(path, identity, metadata):
     except (OSError, ValueError, KeyError) as exc:
         raise ValueError(f"Unreadable keypoint cache {path.name}; rerun without --keypoints-from") from exc
     source = obs.get("source_identity", {})
+    saved_format = source.get("cache_format_version")
+    if saved_format != identity["cache_format_version"]:
+        found = "no format version (an older release wrote it)" if saved_format is None else f"format version {saved_format}"
+        raise ValueError(f"Keypoint cache {path.name} has {found}; this release needs version "
+                         f"{identity['cache_format_version']}. Regenerate from the original videos without --keypoints-from.")
     # A model digest pin is verification policy, and may be added after inference.
     # The saved weight digests are compared with the requested pins below.
     mismatch = [key for key, expected in identity.items()
@@ -187,13 +221,16 @@ def verified_cache(path, identity, metadata):
                 mismatch.append("detector setting " + key)
         if obs.get("edge_margin_fraction") != identity["edge_margin_fraction"]:
             mismatch.append("detector edge margin")
-        if actual.get("rtmlib") != "0.0.15":
-            mismatch.append("detector library version")
+        installed = identity["libraries"]
+        if actual.get("rtmlib") is None or actual.get("rtmlib") != installed.get("rtmlib"):
+            mismatch.append(_version_note("rtmlib", actual.get("rtmlib"), installed.get("rtmlib")))
         if actual.get("backend") == "onnxruntime":
             providers = actual.get("providers", [])
             used = "cuda" if "CUDAExecutionProvider" in providers else "cpu" if "CPUExecutionProvider" in providers else None
-            if actual.get("runtime_version") != "1.22.0" or not used or used != actual.get("device_used"):
-                mismatch.append("ONNX runtime version or providers")
+            if actual.get("runtime_version") is None or actual.get("runtime_version") != installed.get("onnxruntime"):
+                mismatch.append(_version_note("onnxruntime", actual.get("runtime_version"), installed.get("onnxruntime")))
+            if not used or used != actual.get("device_used"):
+                mismatch.append("ONNX runtime providers")
             if used != identity["pose"]["device"]:
                 mismatch.append("actual inference device differs from requested device")
         if set(identity["expected_weight_sha256"]) != {"det", "pose"}:

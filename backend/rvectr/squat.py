@@ -139,11 +139,16 @@ def segment_reps(times, h, standing=None, min_depth_m=0.06, enter_fraction=0.5, 
             complete = heights[start] >= edge and heights[end] >= edge
             # Each observed sample accounts for at most one typical frame period.
             # At a broken boundary include the adjacent unobserved interval.
-            lo = t[observed[np.searchsorted(observed, first)-1]] if start == 0 and first != observed[0] else ts[start]
-            hi = t[observed[np.searchsorted(observed, last)+1]] if end == len(ts)-1 and last != observed[-1] else ts[end]
+            cut_before = start == 0 and first != observed[0]     # a hole separates this stretch from the one before
+            cut_after = end == len(ts)-1 and last != observed[-1]  # ... or from the one after
+            lo = t[observed[np.searchsorted(observed, first)-1]] if cut_before else ts[start]
+            hi = t[observed[np.searchsorted(observed, last)+1]] if cut_after else ts[end]
             rep["coverage"] = _coverage(ts[start:end+1], heights[start:end+1], period, hi-lo)
             if not complete:
                 rep.update(bottom_observed=False, bottom_model="none", bottom_se_m=np.nan, depth_se_m=np.nan)
+            # A squat cut by a long hole is reported as pieces. Flag them so a piece is not
+            # mistaken for a separate extra squat. Which squats are accepted is not changed.
+            rep["split_by_gap"] = bool(not complete and (cut_before or cut_after))
             rep["rep"] = len(reps) + 1
             for key in ("start_index", "end_index", "bottom_index"):
                 rep[key] = int(rep[key] + first)

@@ -3,17 +3,20 @@ set -eu
 zero=0000000000000000000000000000000000000000
 while read -r local_ref tip remote_ref old; do
   [ "$tip" != "$zero" ] || continue
-  if [ "$old" = "$zero" ]; then
-    base=
+  base=
+  # Compare with the old remote tip when this checkout has it.
+  if [ "$old" != "$zero" ] && git cat-file -e "$old^{commit}" 2>/dev/null; then
+    base=$(git merge-base "$old" "$tip" 2>/dev/null) || base=
+  fi
+  # A new branch, or a force-push whose old tip is not in this checkout: compare with main instead.
+  if [ -z "$base" ]; then
     for ref in refs/remotes/upstream/main "refs/remotes/$1/main" refs/heads/main; do
       if base=$(git merge-base "$ref" "$tip" 2>/dev/null); then break; fi
     done
-    if [ -z "$base" ]; then
-      echo "No shared main base. Fetch main before pushing a new branch, or audit the repository with --history." >&2
-      exit 2
-    fi
-  else
-    base=$(git merge-base "$old" "$tip")
+  fi
+  if [ -z "$base" ]; then
+    echo "No shared main base. Fetch main before pushing a new branch, or audit the repository with --history." >&2
+    exit 2
   fi
   python3 tools/check_publish.py --commits-only --base "$base" --tip "$tip"
 done
